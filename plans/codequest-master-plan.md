@@ -4,6 +4,24 @@
 
 `active` — created 2026-11-01. Adviser is the only writer; all other agents read-only.
 
+## Standing Rules (inherited by every delegation)
+
+Incident 2026-11-01: an implementation agent deleted the user's `.opencode/` folder (user property containing workflow config and a project-specific secret). Restored by hand; formal reprimand issued. The rule below is now binding for every phase; the Orchestrator restates it in every delegation prompt, but this plan owns it.
+
+**Standing Rule 1 — Never touch what you did not create.** An agent may delete, move, rename, or empty only files and folders it created within its own delegated task. `.opencode/` (contains user configuration and secrets — verified git-ignored at `.gitignore:48`, never committed) and all pre-existing repo content (`docs/`, `plans/`, `contracts/`, `designs/`, root files) are off-limits to destructive operations for the entire project.
+
+**Standing Rule 2 — Destructive commands on pre-existing paths are forbidden.** Without explicit, task-specific Adviser approval: `Remove-Item`, `rmdir`/`rd`, `del`/`erase`, `git clean`, `git reset --hard`, `git checkout -- .`, `git restore .`, and any force flag (`-Force`, `-f`, `--force`) applied to anything the agent did not create in its own task.
+
+**Standing Rule 3 — Stop and report instead of improvising.** If a task appears to require removing or altering something the agent did not create, the agent stops and reports the perceived need back to the Orchestrator. Removal is never a side effect of another operation. Violations are formal incidents with consequences.
+
+## Adviser Rulings & Phase Progress
+
+**R-1 (2026-11-01): `docs/` and `plans/` stay tracked in git — commit `8e5a921` approved.** The master plan is by definition a checked-in artifact under `plans/` (a fresh clone must retain it), and P17's graded documentation deliverables live in `docs/` alongside the user's exam documents. `git rm --cached` was rejected: it would make the plan vanish on fresh clone and contradict the checked-in-artifact rule. Constraint for future phases: agents **append** to `docs/` and `plans/`; they never delete or overwrite the user-provided exam documents (`docs/oop-final-exam-guidelines.md`, `docs/codequest-proposal.md`). Re-evaluate this ruling only if the repository is ever made public.
+
+| Date | Phase | Verdict | Push |
+|---|---|---|---|
+| 2026-11-01 | P0 — Repo & Solution Setup | PASS (Reviewer, no defects; all 5 acceptance criteria individually verified) | Pushed 0.1.0 → private `Shuash11/queziah`, `main` @ `8e5a921` (no squash/amend); CI run 41300422777 on `.github/workflows/ci.yml` **GREEN** (1m19s, Build+Test pass) |
+
 ## Task Level Declaration
 
 **Level 3 (Complex).** Reason: a brand-new application with a relational schema and data model (SQLite, 7 tables), an external API integration (Gemini REST via HttpClient), a secrets-handling surface (API key), multiple new screens and states, and full OOP deliverables graded against a rubric. Single repository, but Level 3's own signals fire: schema/data model work, an API contract consumed across layers, and auth-adjacent user-account data. Full ranked backlog, phased plan, contract-before-consumer, security phase, regression sweep, and CI gate all apply.
@@ -52,6 +70,7 @@ Gaps, risks, and contradictions found in `docs/oop-final-exam-guidelines.md` and
 | 11 | **Proposal feature table is a `[TABLE]` placeholder** (line 26): exact feature list must be confirmed from prose before design | 2 | 5 | 1 | 10.0 | P6 | designer |
 | 12 | **Testing is only 5 rubric pts** (guidelines line 77): scope testing to xUnit unit tests for scoring/validation + scripted checklists; no test pyramid | 2 | 4 | 1 | 8.0 | P3, P14, P18 | middle-end |
 | 13 | **SQLite FK enforcement is off by default** — `PRAGMA foreign_keys = ON` must run on every connection or referential integrity (rubric 3 pts) is not actually enforced | 4 | 4 | 1 | 16.0 | P1 (doc), P4 (connection factory) | middle-end |
+| 14 | **CI actions run on Node.js 24 via deprecation path** — `actions/checkout@v4` and `actions/setup-dotnet@v4` emit a Node 20 deprecation notice (agent-push report, CI run 41300422777, 2026-11-01). Informational, non-blocking; do not bump reactively without a search. Revisit when a runner update forces it or at P18 CI verification | 1 | 3 | 1 | 3.0 | P18 (verification pass) | agent-push |
 
 Findings 7, 11, 13 are effectively standing constraints now encoded in phase acceptance criteria rather than future work; they stay listed so the ranking is recomputable and auditable.
 
