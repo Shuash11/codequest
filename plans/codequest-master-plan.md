@@ -21,6 +21,18 @@ Incident 2026-11-01: an implementation agent deleted the user's `.opencode/` fol
 | Date | Phase | Verdict | Push |
 |---|---|---|---|
 | 2026-11-01 | P0 — Repo & Solution Setup | PASS (Reviewer, no defects; all 5 acceptance criteria individually verified) | Pushed 0.1.0 → private `Shuash11/queziah`, `main` @ `8e5a921` (no squash/amend); CI run 41300422777 on `.github/workflows/ci.yml` **GREEN** (1m19s, Build+Test pass) |
+| 2026-11-01 | P1 — Database Schema, Seed Data & 3NF | Implemented → Review FAIL (1 verified low defect: false parenthetical in seed.sql comment; 2 advisories) → fix `ea96a36` → targeted re-review **PASS** (all corrections verified, zero open defects). Commits `9ced7e5` + `ea96a36`. Reviewer skipped web-search (internal facts, verified by execution); sqlite.org FK-default-off re-confirmed (§2, updated 2026-10-25) | Approved at 0.1.0 (see R-2 amendment condition below) |
+
+**R-2 (2026-11-01): P1 schema design decisions ratified — downstream obligations binding on later phases.** These are schema contracts; changing any of them is a schema-change phase through the Adviser.
+
+1. **Derived fields omitted (3NF).** `quiz_attempts` stores only `score`; `submitted_answers` has no `is_correct`. Obligations: **P9** computes per-answer correctness by joining `choices.is_correct` and the score denominator by counting the quiz's questions; **P10** derives correctness live in the review view; **P11** computes all report aggregates from joins — none of these phases may re-add stored derived columns.
+2. **Password hashing — AMENDED from the P1 decision.** The stored format becomes **`pbkdf2-sha256:<iterations>:<salt-b64>:<hash-b64>`** — PBKDF2-HMAC-SHA256, **600,000 iterations**, random per-user salt. Basis: OWASP Password Storage Cheat Sheet (fetched 2026-11-01) states fast hashes such as SHA-256 are *not suitable* for password storage and recommends PBKDF2 at 600k iterations (also the NIST SP 800-63B-4 path). Implementation stays dependency-free: .NET's built-in `Rfc2898DeriveBytes` — no new package, keeping standing constraint #7 (explainability). The schema column (`schema.sql:32`, `TEXT NOT NULL`) needs no change; a fix commit updates the column comment and the seeded `demo` row (`seed.sql:44`) to the new format, followed by a targeted one-line factual re-review (the embedded hash must actually verify against `codequest123`). Obligations: **P7** implements a small `PasswordHasher` (hash + verify) with exactly these parameters, plus a unit test proving the seeded value verifies; **P15** records the disposition instead of flagging it.
+3. **App-level validations deferred by design.** **P4** must validate that an answered question belongs to the attempt's quiz; **P8** must enforce exactly-one-correct-choice per question; **P9** scores via the joins from decision 1.
+4. **No `approved_at`/`approved_by` audit columns.** **P13** flips `status` Draft→Approved only. If audit history is ever wanted, it is a schema-change phase through the Adviser — not an improvisation.
+5. **UNIQUE natural keys:** `(topic_id,title)`, `(quiz_id,position)`, `(question_id,choice_text)`. **P8** catches UNIQUE violations and shows friendly duplicate messages (feeds P14's message sweep).
+6. **`explanation NOT NULL`.** **P8**'s editor always supplies a value (empty string when none); **P10** and **P13** display it.
+7. **`topics.category` CHECK (`Programming`,`Cybersecurity`).** **P8**'s topic form uses a dropdown limited to these two values — never free text. Adding a category = schema-change phase.
+8. **`position` columns with UNIQUE per parent.** **P8** keeps positions unique and stable; reordering happens inside a transaction (P4's transaction helper).
 
 ## Task Level Declaration
 
