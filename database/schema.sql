@@ -29,7 +29,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE users (
     user_id       INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT    NOT NULL UNIQUE,          -- login name, e.g. 'demo'
-    password_hash TEXT    NOT NULL,                 -- 'sha256:<hex>'; the plaintext is NEVER stored
+    password_hash TEXT    NOT NULL,                 -- 'pbkdf2-sha256:<iterations>:<salt-b64>:<hash-b64>' - PBKDF2-HMAC-SHA256, 600,000 iterations (OWASP 2026 guidance; implemented in P7 via Rfc2898DeriveBytes); the plaintext is NEVER stored
     display_name  TEXT    NOT NULL,                 -- shown in the UI ("Demo Student")
     created_at    TEXT    NOT NULL                  -- ISO-8601 UTC, e.g. '2026-11-01T09:00:00Z'
 );

@@ -31,7 +31,7 @@
 --   submitted_answers  20 rows   (5 answered questions per attempt)
 --
 -- The password of the demo user is 'codequest123'; the table stores its
--- SHA-256 hash only, in the format 'sha256:<hex>'.
+-- PBKDF2-HMAC-SHA256 hash only, in the format 'pbkdf2-sha256:<iterations>:<salt-b64>:<hash-b64>'.
 -- =============================================================================
 
 PRAGMA foreign_keys = ON;
@@ -39,10 +39,10 @@ PRAGMA foreign_keys = ON;
 
 -- -----------------------------------------------------------------------------
 -- users — exactly one row (plan assumption #1: a single local user).
--- password_hash = SHA-256("codequest123")
+-- password_hash = PBKDF2-HMAC-SHA256("codequest123", random 16-byte salt, 600,000 iterations)
 -- -----------------------------------------------------------------------------
 INSERT INTO users (user_id, username, password_hash, display_name, created_at) VALUES
-    (1, 'demo', 'sha256:53297a55971d605e13924aff283e6f8dba6639a2d91715311118633e468ad0e9',
+    (1, 'demo', 'pbkdf2-sha256:600000:iCiatnQMd0AiHO3ww38HRg==:8vrsmmlXkmYgxd+YeaUNe70EGg0dG1QfxTggC/Unduo=',
         'Demo Student', '2026-11-01T09:00:00Z');
 
 
