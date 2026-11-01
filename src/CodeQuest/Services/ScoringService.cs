@@ -1,10 +1,11 @@
 // =============================================================================
 // CodeQuest — Phase P3: Core OOP Domain Layer
 // OOP rubric: ABSTRACTION — the concrete implementation behind IScoringService.
-// Look at: Score() below. It asks every question of the quiz whether the picked
-//          option is the one the answer key marks as correct, and counts the
-//          right answers — the math is correct/total, the same math the seeded
-//          sample data uses (for example 4 of 5 answers right = 80%).
+// Look at: Score() below. It walks the submitted answers one by one, finds the
+//          question each answer belongs to and checks that question's own answer
+//          key (IsCorrectChoice), then counts the right answers — the math is
+//          correct/total, the same math the seeded sample data uses (for example
+//          4 of 5 answers right = 80%).
 // Note:    nothing here is stored; the attempt row keeps the number of correct
 //          answers only (plan ruling R-2 #1).
 // =============================================================================

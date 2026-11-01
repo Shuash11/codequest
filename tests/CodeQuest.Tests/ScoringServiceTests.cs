@@ -1,9 +1,10 @@
 // =============================================================================
 // CodeQuest — Phase P3: Core OOP Domain Layer
 // Tests for: ScoringService (the correct/total math behind the quiz result).
-// Look at: the four cases below — all correct, mixed, none correct and an empty
-//          attempt. Every case builds its domain objects in memory, so the test
-//          proves the business logic alone, without a database.
+// Look at: the five cases below — all correct, mixed, none correct, an empty
+//          attempt and an answer of an unknown question. Every case builds its
+//          domain objects in memory, so the test proves the business logic alone,
+//          without a database.
 // Expected values are hand-computed the same way the seeded sample data is
 //          (database/seed.sql): 4 of 5 right = 80 %, 3 of 5 right = 60 %.
 // =============================================================================

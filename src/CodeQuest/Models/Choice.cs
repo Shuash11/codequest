@@ -1,9 +1,9 @@
 // =============================================================================
 // CodeQuest — Phase P3: Core OOP Domain Layer
 // OOP rubric: ENCAPSULATION — private fields, public properties.
-// Look at: the private fields below and the public properties that expose them;
-//          the child rows of the quiz (questions, and their choices) are held in a
-//          private list and are published only as a read-only view.
+// Look at: the five private scalar fields below and the public properties that
+//          expose them — a choice holds only its own values (id, question id, text,
+//          correct flag, position), never a child collection.
 // Table:   choices (database/schema.sql) — columns: choice_id, question_id,
 //          choice_text, is_correct, position.
 // =============================================================================
