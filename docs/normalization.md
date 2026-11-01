@@ -423,10 +423,10 @@ database (Python 3.12 `sqlite3` module, SQLite 3.45.3) in phase P1.
 |---|---|---|
 | Fresh database | `schema.sql` then `seed.sql` executed on a new empty database file | both scripts ran without an error; `PRAGMA integrity_check` = `ok`; `PRAGMA foreign_key_check` = empty |
 | Foreign keys enforced | `INSERT INTO questions … VALUES (…, quiz_id = 9999, …)` with `PRAGMA foreign_keys = ON` | **rejected** — `IntegrityError: FOREIGN KEY constraint failed` |
-| Foreign keys not enforced | the same `INSERT` on a copy of the seeded database with `PRAGMA foreign_keys = OFF` | **accepted** — the row was written (`rowid = 900`) |
+| Foreign keys not enforced | the same `INSERT` on a copy of the seeded database with `PRAGMA foreign_keys = OFF` | **accepted** — the row was written (rowid assigned) |
 | `quizzes.status` | `INSERT … status = 'Published'` (also `'approved'`, `'draft'`, `'ARCHIVED'`) | **rejected** — `IntegrityError: CHECK constraint failed: status IN ('Draft', 'Approved')` |
 | Explicit primary keys | `PRAGMA table_info` for all seven tables | every table has a primary key; six single-column `INTEGER PRIMARY KEY`, one composite `PRIMARY KEY (attempt_id, question_id)` |
-| Foreign key inventory | `PRAGMA foreign_key_list` for all seven tables | 9 foreign key constraints over 8 parent-child relationships (listed in section 9) |
+| Foreign key inventory | `PRAGMA foreign_key_list` for all seven tables | 9 foreign key constraints over 8 parent-child relationships (listed in section 9); the pragma prints 10 rows, because the composite foreign key on `submitted_answers` spans two columns (seq 0 and 1) under one constraint id |
 | Indexes on child keys | `PRAGMA index_list` / `PRAGMA index_info` | an index exists on every child foreign key column |
 | Answer key | `choices` grouped by `question_id` | every one of the 21 questions has exactly 4 options and exactly one with `is_correct = 1` |
 | Attempt consistency | `quiz_attempts.score` compared with the number of correct picks in `submitted_answers` | all four attempts match (4, 2, 5, 3) |

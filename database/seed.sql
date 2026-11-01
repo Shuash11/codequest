@@ -406,7 +406,7 @@ INSERT INTO submitted_answers (attempt_id, question_id, chosen_choice_id) VALUES
 --   Per difficulty
 --     Easy ........... 3 attempts (quizzes 1 and 3), 9/15 correct, average 60 %
 --     Medium ......... 1 attempt  (quiz 2), 5/5 correct, average 100 %
---     Hard ........... 0 attempts (both Hard quizzes are still Draft)
+--     Hard ........... 0 attempts (the one Hard quiz is still Draft)
 --
 --   "Needs practice" list (average below 70 %): C# (60 %) and SQL (60 %).
 -- =============================================================================
