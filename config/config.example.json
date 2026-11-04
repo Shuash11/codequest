@@ -1,3 +1,19 @@
-{
-  "geminiApiKey": "YOUR_GEMINI_API_KEY_HERE"
+﻿{
+  "aiProviders": [
+    {
+      "name": "nvidia",
+      "baseUrl": "https://integrate.api.nvidia.com/v1",
+      "apiKey": "PASTE_YOUR_KEY_HERE",
+      "model": "meta/llama-3.3-70b-instruct",
+      "enabled": true
+    },
+    {
+      "name": "openrouter",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKey": "PASTE_YOUR_KEY_HERE",
+      "model": "nvidia/nemotron-3.5-lightning:free",
+      "enabled": true
+    }
+  ],
+  "databasePath": "codequest.db"
 }

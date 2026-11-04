@@ -19,7 +19,7 @@ x86/
 *.userprefs
 
 # ---------------------------------------------------------------------------
-# Local secrets - the Gemini API key lives here and must never be committed.
+# Local secrets - the NVIDIA / OpenRouter AI provider keys live here (config.local.json) and must never be committed.
 # config/config.example.json is the committed template.
 # ---------------------------------------------------------------------------
 config/config.local.json
