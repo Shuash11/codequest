@@ -39,11 +39,15 @@ internal static class SqlValueMap
     /// <returns>The timestamp of the model.</returns>
     internal static DateTimeOffset FromStorage(string text)
     {
+        // The trailing 'Z' in the format is a literal, so the stored text is UTC
+        // without a real offset designator — parse it as UTC explicitly; with None
+        // the parser assigns the LOCAL offset and ToUniversalTime() shifts every
+        // read by -(local offset) on non-UTC machines.
         if (DateTimeOffset.TryParseExact(
                 text,
                 DateTimeFormat,
                 CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
                 out DateTimeOffset exact))
         {
             return exact.ToUniversalTime();
