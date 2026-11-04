@@ -1,27 +1,332 @@
+// =============================================================================
+// CodeQuest — Phase P7: UI Shell & Navigation
+// The main window of the design of record (spec 5.2): the sidebar/navigation
+// shell every later module lives in.
+// Look at: the layout — minimum window 1024×640 on Background; the leading
+//          sidebar (220px, Background, 1px SeparatorHairline right edge, 24px
+//          inset): "CodeQuest" (BodySemibold), 24px, the nav list (recipe 4.3
+//          rows), 16px, the account block (signed-in name in Caption
+//          TextSecondary, "Log out" as a secondary-style nav item — not pinned
+//          to the window bottom, §3.5). The trailing content area follows the
+//          screen anatomy (§5): content header row, 20px status strip, then
+//          the active module panel inset 24px (32px below the header block).
+// Nav entries (§5.2, one per feature cluster): Take quiz (P9, home, active
+//          after login), History (P10), Reports (P12), Generate quiz (P13),
+//          Review (P13), Topics (P8), Quiz management (P8). One item is
+//          active at a time and always matches the visible panel.
+// Lossless switching (§5.2, a structural rule): module panels are created
+//          ONCE and persist for the shell's lifetime — switching shows/hides,
+//          it never recreates, so in-progress state survives every round trip
+//          (P8–P13 build on this). P7 hosts one spec-styled placeholder card
+//          per module ("Coming in phase …") — no invented module content;
+//          the real screens arrive with P8–P13.
+// =============================================================================
+
+using CodeQuest.Models;
 using System.Drawing;
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
 /// <summary>
-/// Placeholder window used only so the Phase P0 scaffold builds and launches.
-/// The real navigation shell is implemented in Phase P7.
+/// The main shell (spec 5.2): sidebar navigation plus the module panel host.
 /// </summary>
 public sealed class MainForm : Form
 {
-    public MainForm()
+    /// <summary>The seven nav entries of spec 5.2, in sidebar order.</summary>
+    private static readonly (string Key, string Title, string Glyph, string PhaseNote)[] Modules =
     {
+        ("TakeQuiz", "Take quiz", "\uE80F", "Coming in phase P9."),
+        ("History", "History", "\uE823", "Coming in phase P10."),
+        ("Reports", "Reports", "\uE9D9", "Coming in phase P12."),
+        ("GenerateQuiz", "Generate quiz", "\uE710", "Coming in phase P13."),
+        ("Review", "Review", "\uE73E", "Coming in phase P13."),
+        ("Topics", "Topics", "\uE8EC", "Coming in phase P8."),
+        ("QuizManagement", "Quiz management", "\uE70F", "Coming in phase P8."),
+    };
+
+    private readonly UserAccount _user;
+    private Label _contentHeader = null!;  // assigned during construction (BuildContentArea)
+    private Label _statusStrip = null!;    // assigned during construction (BuildContentArea)
+    private Panel _moduleHost = null!;     // assigned during construction (BuildContentArea)
+    private readonly Dictionary<string, NavItemButton> _navItems = new();
+    private readonly Dictionary<string, Panel> _modulePanels = new();
+
+    /// <summary>Creates the shell for the account that just signed in.</summary>
+    public MainForm(UserAccount user)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        _user = user;
+
         Text = "CodeQuest";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(480, 240);
+        BackColor = UITheme.Background;
+        ClientSize = new Size(UITheme.Scaled(this, 1024), UITheme.Scaled(this, 640));
+        MinimumSize = new Size(UITheme.Scaled(this, 1024), UITheme.Scaled(this, 640));
 
-        var placeholder = new Label
+        Controls.Add(BuildContentArea());
+        Controls.Add(BuildSidebar());
+    }
+
+    /// <summary>True when the shell closed because the user logged out (Program returns to the login screen).</summary>
+    public bool ReturnedToLogin { get; private set; }
+
+    /// <summary>Builds the leading sidebar: app name, nav list, account block (§5.2).</summary>
+    private Panel BuildSidebar()
+    {
+        int inset = UITheme.Scaled(this, UITheme.Spacing24);
+        // Nav rows span the sidebar's inner width: 24px leading inset (§5.2),
+        // 16px margin to the right hairline — full-width hit areas (§4.3).
+        int navWidth = UITheme.Scaled(this, 220) - inset - UITheme.Scaled(this, UITheme.Spacing16);
+        int titleTop = inset;
+        int titleHeight = UITheme.Scaled(this, 22);
+        int navTop = titleTop + titleHeight + UITheme.Scaled(this, UITheme.Spacing24);
+        int rowHeight = UITheme.Scaled(this, 40);
+
+        var sidebar = new Panel
         {
-            Dock = DockStyle.Fill,
-            Text = "CodeQuest 0.1.0 - scaffold placeholder.",
-            TextAlign = ContentAlignment.MiddleCenter,
+            Dock = DockStyle.Left,
+            Width = UITheme.Scaled(this, 220),
+            BackColor = UITheme.Background,
         };
 
-        Controls.Add(placeholder);
+        // 1px SeparatorHairline right edge (§5.2).
+        sidebar.Paint += static (sender, e) =>
+        {
+            if (sender is Panel panel)
+            {
+                using var pen = new Pen(UITheme.SeparatorHairline);
+                e.Graphics.DrawLine(pen, panel.Width - 0.5f, 0f, panel.Width - 0.5f, panel.Height);
+            }
+        };
+
+        var title = new Label
+        {
+            Text = "CodeQuest",
+            Font = UITheme.BodySemibold,
+            ForeColor = UITheme.TextPrimary,
+            BackColor = UITheme.Background,
+            AutoSize = false,
+            Location = new Point(inset, titleTop),
+            Size = new Size(navWidth, titleHeight),
+        };
+        sidebar.Controls.Add(title);
+
+        for (int i = 0; i < Modules.Length; i++)
+        {
+            (string key, string moduleTitle, string glyph, _) = Modules[i];
+            var item = new NavItemButton
+            {
+                Name = "Nav" + key,
+                Text = moduleTitle,
+                Glyph = glyph,
+                Location = new Point(inset, navTop + i * rowHeight),
+                Size = new Size(navWidth, rowHeight),
+            };
+            item.Click += static (sender, e) =>
+            {
+                if (sender is NavItemButton nav && nav.Parent is Panel sidebarPanel)
+                {
+                    var shell = sidebarPanel.Parent as MainForm;
+                    shell?.ShowModule(nav.Name["Nav".Length..]);
+                }
+            };
+
+            _navItems[key] = item;
+            sidebar.Controls.Add(item);
+        }
+
+        // Account block, directly beneath the nav list (§5.2, §3.5).
+        int accountTop = navTop + Modules.Length * rowHeight + UITheme.Scaled(this, UITheme.Spacing16);
+
+        var signedInName = new Label
+        {
+            Name = "SignedInName",
+            Text = _user.DisplayName,
+            Font = UITheme.Caption,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.Background,
+            AutoSize = false,
+            Location = new Point(inset + UITheme.Scaled(this, UITheme.Spacing16), accountTop),
+            Size = new Size(navWidth, UITheme.Scaled(this, 18)),
+        };
+        sidebar.Controls.Add(signedInName);
+
+        var logout = new NavItemButton
+        {
+            Name = "NavLogout",
+            Text = "Log out",
+            SecondaryAction = true,
+            Location = new Point(inset, accountTop + signedInName.Height + UITheme.Scaled(this, UITheme.Spacing8)),
+            Size = new Size(navWidth, rowHeight),
+        };
+        logout.Click += static (sender, e) =>
+        {
+            if (sender is NavItemButton button && button.Parent is Panel sidebarPanel && sidebarPanel.Parent is MainForm shell)
+            {
+                shell.ReturnedToLogin = true;
+                shell.Close(); // log out returns to the login screen (Program loops back)
+            }
+        };
+        sidebar.Controls.Add(logout);
+
+        return sidebar;
+    }
+
+    /// <summary>Builds the trailing content area: header row, status strip, module host (§5 anatomy).</summary>
+    private Panel BuildContentArea()
+    {
+        int inset = UITheme.Scaled(this, UITheme.Spacing24);
+        int headerTop = inset;
+        int headerHeight = UITheme.Scaled(this, 30);
+        int statusTop = headerTop + headerHeight + UITheme.Scaled(this, UITheme.Spacing8);
+        int statusHeight = UITheme.Scaled(this, 20);
+        int hostTop = statusTop + statusHeight + UITheme.Scaled(this, UITheme.Spacing32);
+
+        var content = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = UITheme.Background,
+        };
+
+        _contentHeader = new Label
+        {
+            Name = "ContentHeaderLabel",
+            Text = string.Empty,
+            Font = UITheme.Title,
+            ForeColor = UITheme.TextPrimary,
+            BackColor = UITheme.Background,
+            AutoSize = true,
+            Location = new Point(inset, headerTop),
+        };
+
+        _statusStrip = new Label
+        {
+            Name = "StatusStripLabel",
+            Text = string.Empty,
+            Font = UITheme.Body,
+            ForeColor = UITheme.SuccessText,
+            BackColor = UITheme.Background,
+            AutoSize = true,
+            Location = new Point(inset, statusTop),
+        };
+
+        _moduleHost = new Panel
+        {
+            Name = "ModuleHost",
+            Location = new Point(inset, hostTop),
+            Size = new Size(ClientSize.Width - UITheme.Scaled(this, 220) - inset * 2, ClientSize.Height - hostTop - inset),
+            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+            BackColor = UITheme.Background,
+        };
+
+        foreach ((string key, string moduleTitle, _, string phaseNote) in Modules)
+        {
+            _modulePanels[key] = BuildPlaceholderPanel(key, moduleTitle, phaseNote);
+        }
+
+        content.Controls.Add(_contentHeader);
+        content.Controls.Add(_statusStrip);
+        content.Controls.Add(_moduleHost);
+        foreach (Panel panel in _modulePanels.Values)
+        {
+            _moduleHost.Controls.Add(panel); // the host owns the modules (§5.2: panel inset 24px below the header block)
+        }
+
+        return content;
+    }
+
+    /// <summary>
+    /// Builds one module's panel: a spec-styled placeholder card (§4.2) with
+    /// the module title and its "Coming in phase …" note — the real module
+    /// screens replace this content in P8–P13.
+    /// </summary>
+    private Panel BuildPlaceholderPanel(string key, string moduleTitle, string phaseNote)
+    {
+        var panel = new Panel
+        {
+            Name = key + "Panel",
+            Dock = DockStyle.Fill,
+            Visible = false,
+            BackColor = UITheme.Background,
+        };
+
+        var card = new CardPanel
+        {
+            Name = key + "Card",
+            Size = new Size(UITheme.Scaled(this, 560), UITheme.Scaled(this, 220)),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left,
+        };
+
+        int inset = UITheme.Scaled(this, UITheme.Spacing16);
+        var cardTitle = new Label
+        {
+            Text = moduleTitle,
+            Font = UITheme.BodySemibold,
+            ForeColor = UITheme.TextPrimary,
+            BackColor = UITheme.Surface,
+            AutoSize = false,
+            Location = new Point(inset, inset),
+            Size = new Size(card.Width - inset * 2, UITheme.Scaled(this, 22)),
+        };
+
+        var cardNote = new Label
+        {
+            Name = key + "Placeholder",
+            Text = phaseNote,
+            Font = UITheme.Caption,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.Surface,
+            AutoSize = false,
+            Location = new Point(inset, inset + cardTitle.Height + UITheme.Scaled(this, UITheme.Spacing8)),
+            Size = new Size(card.Width - inset * 2, UITheme.Scaled(this, 18)),
+        };
+
+        card.Controls.Add(cardTitle);
+        card.Controls.Add(cardNote);
+        panel.Controls.Add(card);
+        return panel;
+    }
+
+    /// <summary>
+    /// Shows one module: exactly one nav item is active and exactly one panel
+    /// is visible — the active item always matches the visible panel (§4.3).
+    /// The panels persist, so the switch is lossless (§5.2).
+    /// </summary>
+    private void ShowModule(string key)
+    {
+        if (!_modulePanels.ContainsKey(key))
+        {
+            return;
+        }
+
+        foreach ((string moduleKey, NavItemButton item) in _navItems)
+        {
+            item.Active = moduleKey == key;
+        }
+
+        foreach ((string moduleKey, Panel panel) in _modulePanels)
+        {
+            panel.Visible = moduleKey == key;
+        }
+
+        _contentHeader.Text = Modules.First(module => module.Key == key).Title;
+    }
+
+    /// <summary>
+    /// Shows the content-header status strip line (§5 screen anatomy, §4.11 —
+    /// success feedback is an inline strip line, never a dialog). The module
+    /// screens of P8+ call this; the P7 placeholders keep it empty.
+    /// </summary>
+    internal void ShowStatus(string message)
+    {
+        _statusStrip.Text = message;
+    }
+
+    /// <summary>Activates the home module ("Take quiz" is active after login, §5.2).</summary>
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        ShowModule("TakeQuiz");
     }
 }
