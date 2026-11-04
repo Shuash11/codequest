@@ -46,6 +46,16 @@ public class AiQuizProviderTests : IDisposable
 
     private readonly List<string> _tempFiles = new();
 
+    /// <summary>
+    /// Creates the scratch folder before any test writes into it: CI runners
+    /// are fresh machines, so the folder must be self-provisioning — the same
+    /// ensure the sibling test classes already perform.
+    /// </summary>
+    public AiQuizProviderTests()
+    {
+        Directory.CreateDirectory(TempDirectory);
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
