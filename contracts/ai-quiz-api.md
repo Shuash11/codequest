@@ -299,7 +299,7 @@ JSON guarantee.
 |---|---|---|
 | `topic` (echo, verified) | — | topic resolution uses the **user's topic picker selection** (an existing `topics` row); the echo is a generation-consistency check only |
 | (picker selection) | `quizzes.topic_id` | NOT NULL; FK → `topics` ON DELETE RESTRICT |
-| `title` | `quizzes.title` | NOT NULL; **UNIQUE per `(topic_id, title)`** — P5 de-duplicates at insert (e.g. `" (2)"` suffix) so the insert never violates the constraint |
+| `title` | `quizzes.title` | NOT NULL; **UNIQUE per `(topic_id, title)`** — P8/P13 de-duplicates at insert (e.g. `" (2)"` suffix) so the insert never violates the constraint |
 | `difficulty` (echo, verified) | `quizzes.difficulty` | CHECK `('Easy','Medium','Hard')`; difficulty is a **quiz-level** column — the `questions` table has no difficulty column, and none is invented |
 | — (app sets) | `quizzes.status` | `'Draft'` at insert (§9) |
 | — (app sets) | `quizzes.created_at` | ISO-8601 UTC, app-generated; never model-supplied |
@@ -321,6 +321,7 @@ transaction (P4's transaction helper).
 All six classes, each with its detection rule, the tier it fails, and the next-tier behavior.
 Every failure produces a typed reason string (§2, §7.7) — **no exception ever crosses to the
 UI**, and no reason string ever contains API-key material.
+Truly unexpected local exceptions (non-HTTP, outside the six classes' detection rules) map to the class-1 bucket with the exception type name only in the reason string — no message text, no key material (key-leak-safe).
 
 ### 7.1 Class 1 — HTTP error (non-429)
 
