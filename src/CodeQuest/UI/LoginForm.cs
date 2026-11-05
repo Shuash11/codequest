@@ -100,7 +100,7 @@ public sealed class LoginForm : Form
             Size = new Size(cardWidth, cardHeight),
         };
 
-        _username = new InputField
+        _username = new InputField(accessibleName: "Username")
         {
             Name = "UsernamePanel",
             PlaceholderText = "Username",
@@ -109,7 +109,7 @@ public sealed class LoginForm : Form
         };
         NameInnerBox(_username, "UsernameField");
 
-        _password = new InputField(reserveErrorLine: true)
+        _password = new InputField(reserveErrorLine: true, accessibleName: "Password")
         {
             Name = "PasswordPanel",
             PlaceholderText = "Password",

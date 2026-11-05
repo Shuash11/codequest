@@ -29,8 +29,13 @@ public sealed class InputField : Panel
     private readonly Label _errorLine = new();
     private bool _borderError;
 
-    /// <summary>Creates the field at the recipe's 32px height (plus the reserved error slot when asked).</summary>
-    public InputField(bool reserveErrorLine = false)
+    /// <summary>
+    /// Creates the field at the recipe's 32px height (plus the reserved error
+    /// slot when asked). <paramref name="accessibleName"/> names the inner text
+    /// box for screen readers (WCAG 4.1.2) — the placeholder must not be the
+    /// field's only accessible name.
+    /// </summary>
+    public InputField(bool reserveErrorLine = false, string? accessibleName = null)
     {
         SetStyle(ControlStyles.UserPaint, true);
         SetStyle(ControlStyles.AllPaintingInWmPaint, true);
@@ -45,6 +50,7 @@ public sealed class InputField : Panel
         _box.Font = UITheme.Body;
         _box.BackColor = UITheme.Surface;
         _box.ForeColor = UITheme.TextPrimary;
+        _box.AccessibleName = accessibleName;
         _box.GotFocus += static (sender, e) => RepaintOwner(sender);
         _box.LostFocus += static (sender, e) => RepaintOwner(sender);
         _box.TextChanged += static (sender, e) => RepaintOwner(sender);
