@@ -126,6 +126,9 @@ public static class UITheme
     /// <summary>Destructive flat button disabled (recipe 4.1).</summary>
     public static readonly Color DangerDisabled = ColorTranslator.FromHtml("#F5B5B7");
 
+    /// <summary>Unselected-segment hover on the segmented control (recipe 4.9's derived quiet step).</summary>
+    public static readonly Color SegmentHover = ColorTranslator.FromHtml("#ECECF1");
+
     // ------------------------------------------------------------------ §2.2
     // The 3-step size hierarchy plus the two in-size weight variants, and the
     // system glyph font for the few icons that earn their place (§3.7).

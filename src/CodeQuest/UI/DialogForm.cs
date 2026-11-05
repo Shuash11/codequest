@@ -103,15 +103,40 @@ public sealed class DialogForm : Form
     }
 
     /// <summary>
-    /// Builds and shows one dialog card. The primary button is the filled,
-    /// default (trailing) one; the optional secondary is a plain button to its
-    /// left. The secondary answers with DialogResult.No, the primary with OK,
-    /// so the caller can tell the two apart without comparing captions.
+    /// The confirmation dialog of spec 4.11 (used by the P8 management
+    /// screens): a title that names the situation, one sentence of
+    /// consequence, the confirmed action as a specific verb on the filled
+    /// (destructive) button and a "Cancel" secondary that is never the
+    /// default. Returns true when the user confirmed.
     /// </summary>
-    private static DialogResult Show(IWin32Window? owner, string title, string message, string primaryText, string? secondaryText)
+    /// <param name="title">The situation in one line ("Delete this topic?").</param>
+    /// <param name="message">The consequence sentence ("This topic will be removed. This cannot be undone.").</param>
+    /// <param name="confirmText">The specific verb ("Delete").</param>
+    public static bool ShowConfirm(string title, string message, string confirmText)
+    {
+        DialogResult result = Show(
+            owner: Form.ActiveForm,
+            title: title,
+            message: message,
+            primaryText: confirmText,
+            secondaryText: "Cancel",
+            primaryVariant: UITheme.FlatButtonVariant.Destructive);
+
+        return result == DialogResult.OK;
+    }
+
+    /// <summary>
+    /// Builds and shows one dialog card. The primary button is the filled,
+    /// default (trailing) one — the recipe's primary variant unless the caller
+    /// passes the destructive one (the confirmations of §4.11); the optional
+    /// secondary is a plain button to its left. The secondary answers with
+    /// DialogResult.No, the primary with OK, so the caller can tell the two
+    /// apart without comparing captions.
+    /// </summary>
+    private static DialogResult Show(IWin32Window? owner, string title, string message, string primaryText, string? secondaryText, UITheme.FlatButtonVariant primaryVariant = UITheme.FlatButtonVariant.Primary)
     {
         using var dialog = new DialogForm(title);
-        var primary = new FlatButton { Text = primaryText, Variant = UITheme.FlatButtonVariant.Primary };
+        var primary = new FlatButton { Text = primaryText, Variant = primaryVariant };
         var secondary = secondaryText is null ? null : new FlatButton { Text = secondaryText, Variant = UITheme.FlatButtonVariant.Secondary };
 
         primary.DialogResult = DialogResult.OK;
