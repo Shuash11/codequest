@@ -1,5 +1,5 @@
 // =============================================================================
-// CodeQuest — Phase P7: UI Shell & Navigation
+// CodeQuest — Phase P7: UI Shell & Navigation (extended in Phase P8)
 // The main window of the design of record (spec 5.2): the sidebar/navigation
 // shell every later module lives in.
 // Look at: the layout — minimum window 1024×640 on Background; the leading
@@ -17,11 +17,19 @@
 // Lossless switching (§5.2, a structural rule): module panels are created
 //          ONCE and persist for the shell's lifetime — switching shows/hides,
 //          it never recreates, so in-progress state survives every round trip
-//          (P8–P13 build on this). P7 hosts one spec-styled placeholder card
-//          per module ("Coming in phase …") — no invented module content;
-//          the real screens arrive with P8–P13.
+//          (search text and filters stay; the data reloads on show).
+//          P7 hosts one spec-styled placeholder card per module ("Coming in
+//          phase …"); P8 replaces the Topics and Quiz-management placeholders
+//          with the real management screens — the other placeholders stay
+//          until P9/P10/P12/P13.
+// Status strip (§4.11, §5 anatomy): module panels report success and failure
+//          lines through <see cref="ShowStatus"/> — success lines in
+//          SuccessText auto-clear after ~4 seconds, failure/blocked lines in
+//          DangerText stay until the next feedback.
 // =============================================================================
 
+using CodeQuest.Data;
+using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
 using System.Drawing;
 using System.Windows.Forms;
@@ -41,22 +49,36 @@ public sealed class MainForm : Form
         ("Reports", "Reports", "\uE9D9", "Coming in phase P12."),
         ("GenerateQuiz", "Generate quiz", "\uE710", "Coming in phase P13."),
         ("Review", "Review", "\uE73E", "Coming in phase P13."),
-        ("Topics", "Topics", "\uE8EC", "Coming in phase P8."),
-        ("QuizManagement", "Quiz management", "\uE70F", "Coming in phase P8."),
+        ("Topics", "Topics", "\uE8EC", ""),
+        ("QuizManagement", "Quiz management", "\uE70F", ""),
     };
+
+    /// <summary>How long a success strip line stays before it auto-clears (§4.11).</summary>
+    private const int StatusAutoClearMilliseconds = 4000;
 
     private readonly UserAccount _user;
     private Label _contentHeader = null!;  // assigned during construction (BuildContentArea)
     private Label _statusStrip = null!;    // assigned during construction (BuildContentArea)
     private Panel _moduleHost = null!;     // assigned during construction (BuildContentArea)
+    private readonly System.Windows.Forms.Timer _statusClearTimer = new() { Interval = StatusAutoClearMilliseconds };
     private readonly Dictionary<string, NavItemButton> _navItems = new();
-    private readonly Dictionary<string, Panel> _modulePanels = new();
+    private readonly Dictionary<string, Control> _modulePanels = new();
 
-    /// <summary>Creates the shell for the account that just signed in.</summary>
-    public MainForm(UserAccount user)
+    /// <summary>Creates the shell for the account that just signed in, over the application database.</summary>
+    public MainForm(UserAccount user, Db database)
     {
         ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(database);
         _user = user;
+
+        // The repositories of the management screens (P8). The screens talk to
+        // the interfaces of the data layer — never to SQLite directly.
+        var topics = new TopicRepository(database);
+        var quizzes = new QuizRepository(database);
+        var questions = new QuestionRepository(database);
+        var choices = new ChoiceRepository(database);
+        var attempts = new AttemptRepository(database);
+        var answers = new SubmittedAnswerRepository(database);
 
         Text = "CodeQuest";
         StartPosition = FormStartPosition.CenterScreen;
@@ -64,7 +86,20 @@ public sealed class MainForm : Form
         ClientSize = new Size(UITheme.Scaled(this, 1024), UITheme.Scaled(this, 640));
         MinimumSize = new Size(UITheme.Scaled(this, 1024), UITheme.Scaled(this, 640));
 
-        Controls.Add(BuildContentArea());
+        _statusClearTimer.Tick += static (sender, e) =>
+        {
+            if (sender is System.Windows.Forms.Timer timer)
+            {
+                timer.Stop();
+                if (timer.Tag is MainForm shell)
+                {
+                    shell._statusStrip.Text = string.Empty;
+                }
+            }
+        };
+        _statusClearTimer.Tag = this;
+
+        Controls.Add(BuildContentArea(topics, quizzes, questions, choices, attempts, answers));
         Controls.Add(BuildSidebar());
     }
 
@@ -174,7 +209,13 @@ public sealed class MainForm : Form
     }
 
     /// <summary>Builds the trailing content area: header row, status strip, module host (§5 anatomy).</summary>
-    private Panel BuildContentArea()
+    private Panel BuildContentArea(
+        TopicRepository topics,
+        QuizRepository quizzes,
+        QuestionRepository questions,
+        ChoiceRepository choices,
+        AttemptRepository attempts,
+        SubmittedAnswerRepository answers)
     {
         int inset = UITheme.Scaled(this, UITheme.Spacing24);
         int headerTop = inset;
@@ -211,30 +252,62 @@ public sealed class MainForm : Form
             Location = new Point(inset, statusTop),
         };
 
+        // The module host fills the content area below the header block; the
+        // padding carries the §5 insets (24px sides/bottom, header block on
+        // top). Dock + padding keeps the host correct at every window size —
+        // anchored bounds here would capture their distances against the
+        // panel's pre-layout size and distort the first resize.
+        content.Padding = new Padding(inset, hostTop, inset, inset);
+
         _moduleHost = new Panel
         {
             Name = "ModuleHost",
-            Location = new Point(inset, hostTop),
-            Size = new Size(ClientSize.Width - UITheme.Scaled(this, 220) - inset * 2, ClientSize.Height - hostTop - inset),
-            Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
+            Dock = DockStyle.Fill,
             BackColor = UITheme.Background,
         };
 
         foreach ((string key, string moduleTitle, _, string phaseNote) in Modules)
         {
-            _modulePanels[key] = BuildPlaceholderPanel(key, moduleTitle, phaseNote);
+            Control module = key switch
+            {
+                // The P8 management screens replace their placeholders (spec
+                // 5.3, 5.4); the other modules keep the P7 placeholder cards.
+                "Topics" => BuildModulePanel(new TopicManageForm(topics, quizzes), key),
+                "QuizManagement" => BuildModulePanel(
+                    new QuizManageForm(quizzes, topics, questions, choices, attempts, answers), key),
+                _ => BuildPlaceholderPanel(key, moduleTitle, phaseNote),
+            };
+
+            _modulePanels[key] = module;
         }
 
         content.Controls.Add(_contentHeader);
         content.Controls.Add(_statusStrip);
         content.Controls.Add(_moduleHost);
-        foreach (Panel panel in _modulePanels.Values)
+        foreach (Control panel in _modulePanels.Values)
         {
             _moduleHost.Controls.Add(panel); // the host owns the modules (§5.2: panel inset 24px below the header block)
         }
 
         return content;
     }
+
+    /// <summary>
+    /// Wraps a real module screen as the shell's module panel: the same panel
+    /// name and persistence rules as the placeholders (§5.2), wired to the
+    /// shell's status strip.
+    /// </summary>
+    private Control BuildModulePanel(ModulePanel module, string key)
+    {
+        module.Name = key + "Panel";
+        module.StatusRequested += HandleModuleStatus;
+
+        return module;
+    }
+
+    /// <summary>A module's feedback line goes to the shell's status strip.</summary>
+    private void HandleModuleStatus(object? sender, StatusEventArgs e)
+        => ShowStatus(e.Message, e.Success);
 
     /// <summary>
     /// Builds one module's panel: a spec-styled placeholder card (§4.2) with
@@ -291,7 +364,8 @@ public sealed class MainForm : Form
     /// <summary>
     /// Shows one module: exactly one nav item is active and exactly one panel
     /// is visible — the active item always matches the visible panel (§4.3).
-    /// The panels persist, so the switch is lossless (§5.2).
+    /// The panels persist, so the switch is lossless (§5.2); a real module
+    /// screen reloads its data on show so the rows are always current.
     /// </summary>
     private void ShowModule(string key)
     {
@@ -305,9 +379,15 @@ public sealed class MainForm : Form
             item.Active = moduleKey == key;
         }
 
-        foreach ((string moduleKey, Panel panel) in _modulePanels)
+        foreach ((string moduleKey, Control panel) in _modulePanels)
         {
-            panel.Visible = moduleKey == key;
+            bool visible = moduleKey == key;
+            panel.Visible = visible;
+
+            if (visible && panel is IModulePanel module)
+            {
+                module.RefreshData();
+            }
         }
 
         _contentHeader.Text = Modules.First(module => module.Key == key).Title;
@@ -315,12 +395,20 @@ public sealed class MainForm : Form
 
     /// <summary>
     /// Shows the content-header status strip line (§5 screen anatomy, §4.11 —
-    /// success feedback is an inline strip line, never a dialog). The module
-    /// screens of P8+ call this; the P7 placeholders keep it empty.
+    /// feedback is an inline strip line, never a dialog). Success lines show
+    /// in SuccessText and auto-clear after ~4 seconds; failure/blocked lines
+    /// show in DangerText and stay until the next feedback.
     /// </summary>
-    internal void ShowStatus(string message)
+    internal void ShowStatus(string message, bool success = true)
     {
         _statusStrip.Text = message;
+        _statusStrip.ForeColor = success ? UITheme.SuccessText : UITheme.DangerText;
+
+        _statusClearTimer.Stop();
+        if (success)
+        {
+            _statusClearTimer.Start();
+        }
     }
 
     /// <summary>Activates the home module ("Take quiz" is active after login, §5.2).</summary>

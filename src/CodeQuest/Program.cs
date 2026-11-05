@@ -70,7 +70,7 @@ internal static class Program
             }
 
             bool backToLogin;
-            using (MainForm shell = new(signedIn))
+            using (MainForm shell = new(signedIn, db))
             {
                 Application.Run(shell);
                 backToLogin = shell.ReturnedToLogin;
