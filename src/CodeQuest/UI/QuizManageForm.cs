@@ -185,12 +185,12 @@ public sealed class QuizManageForm : ModulePanel
         _list.Grid.AddTextColumn("QuizQuestionCount", "Questions", 11f, minimumWidth: 74);
         _list.Grid.AddBadgeColumn("QuizStatus", "Status", 96);
         _list.Grid.AddTextColumn("QuizCreated", "Created", 15f, minimumWidth: 108);
-        _list.Grid.AddActionColumn("QuizQuestions", QuestionsAction, GridActionKind.Secondary);
-        _list.Grid.AddActionColumn("QuizEdit", EditAction, GridActionKind.Secondary);
-        _list.Grid.AddActionColumn("QuizDelete", DeleteAction, GridActionKind.Destructive);
+        _list.Grid.AddActionColumn(QuestionsAction, QuestionsAction, GridActionKind.Secondary);
+        _list.Grid.AddActionColumn(EditAction, EditAction, GridActionKind.Secondary);
+        _list.Grid.AddActionColumn(DeleteAction, DeleteAction, GridActionKind.Destructive);
         _list.Grid.ActionClicked += static (sender, e) =>
         {
-            if (sender is IosListGrid grid && grid.Parent is ListCardGrid card && card.Parent is QuizManageForm form)
+            if (sender is IosListGrid grid && grid.FindAncestor<QuizManageForm>() is { } form)
             {
                 form.HandleRowAction(e);
             }

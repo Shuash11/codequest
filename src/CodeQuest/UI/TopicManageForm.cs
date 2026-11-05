@@ -120,11 +120,11 @@ public sealed class TopicManageForm : ModulePanel
         _list.Grid.AddTextColumn("TopicCategory", "Category", 20f, minimumWidth: 110);
         _list.Grid.AddTextColumn("TopicQuizCount", "Quizzes", 12f, minimumWidth: 78);
         _list.Grid.AddTextColumn("TopicCreated", "Created", 18f, minimumWidth: 94);
-        _list.Grid.AddActionColumn("TopicEdit", EditAction, GridActionKind.Secondary);
-        _list.Grid.AddActionColumn("TopicDelete", DeleteAction, GridActionKind.Destructive);
+        _list.Grid.AddActionColumn(EditAction, EditAction, GridActionKind.Secondary);
+        _list.Grid.AddActionColumn(DeleteAction, DeleteAction, GridActionKind.Destructive);
         _list.Grid.ActionClicked += static (sender, e) =>
         {
-            if (sender is IosListGrid grid && grid.Parent is ListCardGrid card && card.Parent is TopicManageForm form)
+            if (sender is IosListGrid grid && grid.FindAncestor<TopicManageForm>() is { } form)
             {
                 form.HandleRowAction(e);
             }

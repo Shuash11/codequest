@@ -486,13 +486,7 @@ public sealed class ListCardGrid : Panel
             AutoSize = true,
             Visible = false,
         };
-        _emptyAction.Click += static (sender, e) =>
-        {
-            if (sender is FlatButton button && button.Parent is ListCardGrid card)
-            {
-                card.EmptyActionClicked?.Invoke(card, EventArgs.Empty);
-            }
-        };
+        _emptyAction.Click += (_, _) => EmptyActionClicked?.Invoke(this, EventArgs.Empty);
 
         _emptyPanel = new Panel
         {
@@ -536,6 +530,7 @@ public sealed class ListCardGrid : Panel
         _emptyAction.Text = actionText ?? string.Empty;
         _emptyAction.Visible = actionText is not null;
         _emptyPanel.Visible = true;
+        _emptyPanel.BringToFront(); // both panels dock Fill — without this the grid paints over the empty state
         LayoutEmptyState();
     }
 
@@ -570,5 +565,32 @@ public sealed class ListCardGrid : Panel
                 (_card.Width - _emptyAction.Width) / 2,
                 above.Bottom + actionGap);
         }
+    }
+}
+
+/// <summary>
+/// Parent-chain resolution for control events. The recipe's containers nest
+/// (the grid sits inside the §4.2 card inside the module panel), so handlers
+/// resolve their owning form by walking up the chain instead of testing the
+/// immediate Parent — the immediate parent is an implementation detail of the
+/// composition and changes when the containers change.
+/// </summary>
+public static class ControlTree
+{
+    /// <summary>
+    /// The first control of type <typeparamref name="T"/> in the parent chain
+    /// starting at <paramref name="control"/> (itself included), or null.
+    /// </summary>
+    public static T? FindAncestor<T>(this Control? control) where T : Control
+    {
+        for (Control? current = control; current is not null; current = current.Parent)
+        {
+            if (current is T ancestor)
+            {
+                return ancestor;
+            }
+        }
+
+        return null;
     }
 }

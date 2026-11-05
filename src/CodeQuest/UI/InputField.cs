@@ -53,7 +53,7 @@ public sealed class InputField : Panel
         _box.AccessibleName = accessibleName;
         _box.GotFocus += static (sender, e) => RepaintOwner(sender);
         _box.LostFocus += static (sender, e) => RepaintOwner(sender);
-        _box.TextChanged += static (sender, e) => RepaintOwner(sender);
+        _box.TextChanged += static (sender, e) => ForwardTextChanged(sender);
         Controls.Add(_box);
 
         _errorLine.AutoSize = true;
@@ -214,12 +214,29 @@ public sealed class InputField : Panel
         }
     }
 
-    /// <summary>The text box repaints its border owner on focus/text changes.</summary>
+    /// <summary>The text box repaints its border owner on focus changes.</summary>
     private static void RepaintOwner(object? sender)
     {
         if (sender is Control box && box.Parent is InputField owner)
         {
             owner.Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// Forwards the inner text box's text changes to the field: the border
+    /// repaints and the field's own TextChanged event fires. The Text
+    /// override delegates to the inner box, so without this forwarding the
+    /// field's subscribers never hear anything — the live search (spec 5.3,
+    /// 5.4) would filter only on a reload, and the dialog forms' inline
+    /// error-clearing handlers would stay silent.
+    /// </summary>
+    private static void ForwardTextChanged(object? sender)
+    {
+        if (sender is Control box && box.Parent is InputField owner)
+        {
+            owner.Invalidate();
+            owner.OnTextChanged(EventArgs.Empty);
         }
     }
 }

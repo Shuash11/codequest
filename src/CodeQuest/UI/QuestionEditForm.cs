@@ -164,7 +164,7 @@ public sealed class QuestionEditForm : Form
         };
         _list.Grid.ActionClicked += static (sender, e) =>
         {
-            if (sender is IosListGrid grid && grid.Parent is ListCardGrid card && card.Parent is QuestionEditForm form)
+            if (sender is IosListGrid grid && grid.FindAncestor<QuestionEditForm>() is { } form)
             {
                 form.HandleRowAction(e);
             }
