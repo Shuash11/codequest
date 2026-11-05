@@ -50,7 +50,7 @@ public sealed class InputArea : Panel
         _box.AccessibleName = accessibleName;
         _box.GotFocus += static (sender, e) => RepaintOwner(sender);
         _box.LostFocus += static (sender, e) => RepaintOwner(sender);
-        _box.TextChanged += static (sender, e) => RepaintOwner(sender);
+        _box.TextChanged += static (sender, e) => ForwardTextChanged(sender);
         Controls.Add(_box);
 
         _errorLine.AutoSize = true;
@@ -161,12 +161,28 @@ public sealed class InputArea : Panel
         _errorLine.SetBounds(horizontalPadding, Height - LineHeight, Width, LineHeight);
     }
 
-    /// <summary>The text box repaints its border owner on focus/text changes.</summary>
+    /// <summary>The text box repaints its border owner on focus changes.</summary>
     private static void RepaintOwner(object? sender)
     {
         if (sender is Control box && box.Parent is InputArea owner)
         {
             owner.Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// Forwards the inner text box's text changes to the area: the border
+    /// repaints and the area's own TextChanged event fires. The Text
+    /// override delegates to the inner box, so without this forwarding the
+    /// area's subscribers never hear anything — the question form's inline
+    /// error-clearing handlers (spec 5.5) would stay silent.
+    /// </summary>
+    private static void ForwardTextChanged(object? sender)
+    {
+        if (sender is Control box && box.Parent is InputArea owner)
+        {
+            owner.Invalidate();
+            owner.OnTextChanged(EventArgs.Empty);
         }
     }
 }
