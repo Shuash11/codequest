@@ -1,48 +1,49 @@
 // =============================================================================
-// CodeQuest — Phase P7: UI Shell & Navigation
-// The login screen of the design of record (spec 5.1) — the first runnable
-// user path. Resolves plan backlog #5: the users table gets its purpose.
-// Look at: the layout — centered fixed window (420×460) on Background; app
+// CodeQuest — UI Shell & Navigation (login, name-only)
+// The login screen, revised by owner directive D1 (queued 2026-11-04, folded
+// into the revised plan's I1): the user enters a NAME and the system records
+// who is using it — no password. This supersedes design-of-record spec 5.1's
+// password flow; the spec amendment rides the I5 designer pass.
+// Look at: the layout — centered fixed window (420×380) on Background; app
 //          name "CodeQuest" (Title), subtitle "Programming and cybersecurity
 //          practice quizzes" (Caption, TextSecondary), 24px, one card (§4.2)
-//          holding the Username field, the masked Password field, 16px, the
-//          full-width "Sign in" primary button (§4.1); the inline error line
-//          slots under the password field (§4.4). Enter submits; the tab
-//          order is username → password → button.
-// States (§5.1): default → validating ("Signing in…" note, button disabled
-//          while the stored hash is verified) → success (the shell opens —
-//          no dialog) or error (the inline line "Incorrect username or
-//          password." in DangerText, non-blocking, the password field clears,
-//          the user stays on login). Unknown users get the SAME generic error
-//          — no account enumeration. A database read failure is not a login
+//          holding the Name field (with its inline error line, §4.4) and the
+//          full-width "Sign in" primary button (§4.1). Enter submits; the tab
+//          order is name → button.
+// States (§5.1 adapted): default → resolving (button disabled during the
+//          find-or-create) → success (the shell opens — no dialog) or the
+//          inline error "Enter your name to continue." (DangerText,
+//          non-blocking). The FIRST sign-in with a name creates the account
+//          (find-or-create on users.username); later sign-ins with the same
+//          name resolve to the same account, so attempts keep attributing to
+//          one user. The schema's password_hash column is left in place but
+//          unused (empty string) — the D1 disposition; PasswordHasher was
+//          removed with this directive. A database failure is not a login
 //          failure: it surfaces through the application's §4.11 unexpected
-//          dialog (wired in Program), never as the credential error.
+//          dialog (wired in Program), never as an inline credential error.
 // =============================================================================
 
 using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
-using CodeQuest.Services;
 using System.Drawing;
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
 /// <summary>
-/// The login screen (spec 5.1). Program shows it modally; DialogResult.OK
-/// carries the signed-in account to the shell.
+/// The login screen (spec 5.1, name-only per directive D1). Program shows it
+/// modally; DialogResult.OK carries the resolved account to the shell.
 /// </summary>
 public sealed class LoginForm : Form
 {
-    private const string IncorrectCredentialsMessage = "Incorrect username or password.";
-    private const string SigningInMessage = "Signing in…";
+    private const string EmptyNameMessage = "Enter your name to continue.";
 
     private readonly UserRepository _users;
-    private readonly InputField _username;
-    private readonly InputField _password;
+    private readonly InputField _name;
     private readonly FlatButton _signIn;
     private bool _signingIn;
 
-    /// <summary>Creates the login screen for the user repository to validate against.</summary>
+    /// <summary>Creates the login screen for the user repository to resolve against.</summary>
     public LoginForm(UserRepository users)
     {
         ArgumentNullException.ThrowIfNull(users);
@@ -54,12 +55,12 @@ public sealed class LoginForm : Form
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = UITheme.Background;
-        ClientSize = new Size(UITheme.Scaled(this, 420), UITheme.Scaled(this, 460));
+        ClientSize = new Size(UITheme.Scaled(this, 420), UITheme.Scaled(this, 380));
 
-        // Vertical block: title + 4 + subtitle + 24 + card(186), centered.
+        // Vertical block: title + 4 + subtitle + 24 + card(138), centered.
         int titleHeight = UITheme.Scaled(this, 32);
         int subtitleHeight = UITheme.Scaled(this, 18);
-        int cardHeight = UITheme.Scaled(this, 186);
+        int cardHeight = UITheme.Scaled(this, 138);
         int blockTop = (ClientSize.Height - (titleHeight + UITheme.Scaled(this, UITheme.Spacing4) + subtitleHeight
             + UITheme.Scaled(this, UITheme.Spacing24) + cardHeight)) / 2;
 
@@ -88,8 +89,8 @@ public sealed class LoginForm : Form
         int cardWidth = ClientSize.Width - UITheme.Scaled(this, UITheme.Spacing24) * 2;
         int inset = UITheme.Scaled(this, UITheme.Spacing16);
         int fieldWidth = cardWidth - inset * 2;
-        int fieldHeight = UITheme.Scaled(this, 32);
-        int passwordHeight = UITheme.Scaled(this, 58); // 32px field + reserved 8px gap + caption line (§5.1)
+        int fieldHeight = UITheme.Scaled(this, 58); // 32px field + reserved 8px gap + caption line (§4.4)
+        int buttonHeight = UITheme.Scaled(this, 32);
 
         var card = new CardPanel
         {
@@ -100,39 +101,25 @@ public sealed class LoginForm : Form
             Size = new Size(cardWidth, cardHeight),
         };
 
-        _username = new InputField(accessibleName: "Username")
+        _name = new InputField(reserveErrorLine: true, accessibleName: "Name")
         {
-            Name = "UsernamePanel",
-            PlaceholderText = "Username",
+            Name = "NamePanel",
+            PlaceholderText = "Your name",
             Location = new Point(inset, inset),
             Size = new Size(fieldWidth, fieldHeight),
         };
-        NameInnerBox(_username, "UsernameField");
-
-        _password = new InputField(reserveErrorLine: true, accessibleName: "Password")
-        {
-            Name = "PasswordPanel",
-            PlaceholderText = "Password",
-            Location = new Point(inset, inset + fieldHeight + UITheme.Scaled(this, UITheme.Spacing16)),
-            Size = new Size(fieldWidth, passwordHeight),
-        };
-        NameInnerBox(_password, "PasswordField");
-        _password.SetPasswordMask(true);
+        NameInnerBox(_name, "NameField");
 
         _signIn = new FlatButton
         {
             Name = "SignInButton",
             Text = "Sign in",
-            Location = new Point(
-                inset,
-                inset + fieldHeight + UITheme.Scaled(this, UITheme.Spacing16) + passwordHeight
-                    + UITheme.Scaled(this, UITheme.Spacing16)),
-            Size = new Size(fieldWidth, fieldHeight),
+            Location = new Point(inset, inset + fieldHeight + UITheme.Scaled(this, UITheme.Spacing16)),
+            Size = new Size(fieldWidth, buttonHeight),
         };
         _signIn.Click += HandleSignInClick;
 
-        card.Controls.Add(_username);
-        card.Controls.Add(_password);
+        card.Controls.Add(_name);
         card.Controls.Add(_signIn);
         Controls.Add(titleLabel);
         Controls.Add(subtitleLabel);
@@ -140,27 +127,27 @@ public sealed class LoginForm : Form
 
         AcceptButton = _signIn;
 
-        // Tab order: username → password → button (spec 5.1).
-        _username.TabIndex = 0;
-        _password.TabIndex = 1;
-        _signIn.TabIndex = 2;
+        // Tab order: name → button.
+        _name.TabIndex = 0;
+        _signIn.TabIndex = 1;
 
         Shown += static (sender, e) =>
         {
             if (sender is LoginForm form)
             {
-                form._username.FocusInput();
+                form._name.FocusInput();
             }
         };
     }
 
-    /// <summary>The account that passed verification; set together with DialogResult.OK.</summary>
+    /// <summary>The account resolved for this session; set together with DialogResult.OK.</summary>
     public UserAccount? AuthenticatedUser { get; private set; }
 
     /// <summary>
-    /// The sign-in flow of spec 5.1: read the fields, look the account up,
-    /// verify the stored hash, open the shell on success or show the inline
-    /// error on failure — never a dialog for the credential error (§4.11).
+    /// The sign-in flow (D1): read the name, find or create the account, open
+    /// the shell on success or show the inline error for an empty field —
+    /// never a dialog for the inline error (§4.11's dialog is for unexpected
+    /// failures only).
     /// </summary>
     private void HandleSignInClick(object? sender, EventArgs e)
     {
@@ -171,10 +158,9 @@ public sealed class LoginForm : Form
 
         _signingIn = true;
         _signIn.Enabled = false;
-        _password.ShowNote(SigningInMessage);
-        Refresh(); // paint the validating state before the (blocking) verification starts
+        Refresh(); // paint the disabled state before the (fast, blocking) database calls
 
-        UserAccount? user = TryAuthenticate(_username.Text, _password.Text);
+        UserAccount? user = ResolveUser(_name.Text);
 
         _signingIn = false;
         if (user is not null)
@@ -185,28 +171,41 @@ public sealed class LoginForm : Form
         }
 
         _signIn.Enabled = true;
-        _password.ShowError(IncorrectCredentialsMessage);
-        _password.ClearText();
-        _password.FocusInput();
+        _name.ShowError(EmptyNameMessage);
+        _name.FocusInput();
     }
 
     /// <summary>
-    /// Validates one credential pair against the users table. Returns null for
-    /// an unknown user or a wrong password (both become the same generic
-    /// inline error); a database failure is deliberately not caught here —
-    /// it is not a login failure and travels to the application's §4.11
-    /// unexpected dialog.
+    /// Finds the account for the entered name or creates it on first use.
+    /// Returns null only for an empty/whitespace name (the caller shows the
+    /// inline error). A database failure is deliberately not caught here —
+    /// it is not a sign-in decision and travels to the application's §4.11
+    /// unexpected dialog. The stored password_hash is left empty: the column
+    /// is unused since D1 (disposition recorded in docs/security-notes.md).
     /// </summary>
-    private UserAccount? TryAuthenticate(string username, string password)
+    private UserAccount? ResolveUser(string rawName)
     {
-        UserAccount? user = _users.GetByUsername(username);
-
-        if (user is null || !PasswordHasher.Verify(user.PasswordHash, password))
+        string name = rawName.Trim();
+        if (name.Length == 0)
         {
             return null;
         }
 
-        return user;
+        UserAccount? user = _users.GetByUsername(name);
+        if (user is not null)
+        {
+            return user;
+        }
+
+        var created = new UserAccount
+        {
+            Username = name,
+            DisplayName = name,
+            PasswordHash = string.Empty, // unused column since directive D1
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        _users.Add(created);
+        return created;
     }
 
     /// <summary>Names the field's inner text box so tests can address it.</summary>
