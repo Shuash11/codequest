@@ -54,24 +54,27 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private readonly IScoringService _scoring;
     private readonly UserAccount _user;
 
-    private readonly ListCardGrid _list;
-    private readonly Panel _runView;
-    private readonly Label _runTitle = null!;
-    private readonly Label _runProgressLabel = null!;
-    private readonly ProgressTrack _runProgress = null!;
-    private readonly Label _questionText = null!;
-    private readonly Panel _choiceStack = null!;
-    private readonly FlatButton _previousButton = null!;
-    private readonly FlatButton _nextButton = null!;
-    private readonly Panel _resultView;
-    private readonly Label _resultScore = null!;
-    private readonly Label _resultPercent = null!;
-    private readonly Label _resultContext = null!;
-    private readonly Panel _resultListCard = null!;
-    private readonly Panel _resultActions = null!;
-    private readonly FlatButton _viewAnswersButton = null!;
-    private readonly FlatButton _retakeButton = null!;
-    private readonly FlatButton _doneButton = null!;
+    // The run view and the result view assign their controls in builder
+    // methods (readonly fields are constructor-only in C#, so these are not
+    // readonly — each is assigned exactly once, in the constructor's build).
+    private ListCardGrid _list;
+    private Panel _runView;
+    private Label _runTitle = null!;
+    private Label _runProgressLabel = null!;
+    private ProgressTrack _runProgress = null!;
+    private Label _questionText = null!;
+    private Panel _choiceStack = null!;
+    private FlatButton _previousButton = null!;
+    private FlatButton _nextButton = null!;
+    private Panel _resultView;
+    private Label _resultScore = null!;
+    private Label _resultPercent = null!;
+    private Label _resultContext = null!;
+    private Panel _resultListCard = null!;
+    private Panel _resultActions = null!;
+    private FlatButton _viewAnswersButton = null!;
+    private FlatButton _retakeButton = null!;
+    private FlatButton _doneButton = null!;
     private AttemptReviewForm? _reviewPanel; // the §5.9 drill-in state, created on first open
 
     private Dictionary<int, string> _topicNames = new();
@@ -819,8 +822,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         for (int i = 0; i < quiz.Questions.Count; i++)
         {
             Question question = quiz.Questions[i];
-            bool answered = _selections.Length > i && _selections[i] is { } chosenId;
-            bool correct = answered
+            int? selected = _selections.Length > i ? _selections[i] : null;
+            bool correct = selected is { } chosenId
                 && question.IsCorrectChoice(question.Choices.FirstOrDefault(choice => choice.ChoiceId == chosenId));
 
             var row = new Panel
