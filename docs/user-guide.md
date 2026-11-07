@@ -108,7 +108,21 @@ account's daily quota, and public keys get revoked):
    ```
 
 4. Save the file. Keys stay on your machine — the app never sends them
-   anywhere except OpenRouter's own API, and they are never logged or shown.
+   anywhere except the provider's own API, and they are never logged or shown.
+
+**Backup providers (verified free tiers):** if OpenRouter's free quota runs
+out (its free tier allows ~50 generated quizzes per day per account), swap in
+one of these — both verified free, no credit card, and speak the same
+protocol, so it's a config edit only:
+
+| Provider | baseUrl | Free limits | Example model |
+|---|---|---|---|
+| **Groq** (recommended backup) | `https://api.groq.com/openai/v1` | 30/min, 1,000/day | `openai/gpt-oss-120b` |
+| **Google Gemini** | `https://generativelanguage.googleapis.com/v1beta/openai` | free tier via AI Studio | `gemini-3.8-flash` |
+
+Get a Groq key at console.groq.com (no card) and put it in a third
+`aiProviders` entry — the app tries providers in order, so a failed tier
+falls through to the next one automatically.
 
 The app is deliberately designed so that **no key is baked into the program**:
 your key is your account and your quota, and the developer's key is never
