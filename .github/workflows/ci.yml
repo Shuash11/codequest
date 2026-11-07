@@ -47,6 +47,14 @@ jobs:
             )
           } | ConvertTo-Json -Depth 5 | Set-Content 'publish/config/config.local.json'
 
+      - name: Seed the demo database (schema + sample records)
+        shell: pwsh
+        run: >
+          python -c "import sqlite3; con = sqlite3.connect('publish/codequest.db');
+          con.executescript(open('database/schema.sql', encoding='utf-8').read());
+          con.executescript(open('database/seed.sql', encoding='utf-8').read());
+          con.commit(); con.close()"
+
       - name: Upload exe artifact
         uses: actions/upload-artifact@v4
         with:
@@ -54,4 +62,5 @@ jobs:
           path: |
             publish/CodeQuest.exe
             publish/config/config.local.json
+            publish/codequest.db
           if-no-files-found: error
