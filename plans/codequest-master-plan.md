@@ -22,7 +22,7 @@ A fun desktop quiz app for programming & cybersecurity (final exam project, C#/.
 
 ## Open blockers (owner actions)
 
-1. **Paste AI keys** into `config/config.local.json` (P2 shape): NVIDIA key (required), OpenRouter key (recommended). Needed before I4; the P5 live smoke test also depends on it. Owner pastes personally — agents never touch this file.
+1. **AI keys — partially resolved 2026-11-08:** the owner's OpenRouter key is now in `config/config.local.json` (git-ignored; model `nvidia/nemotron-3-ultra-550b-a55b:free`, verified against the live catalog). The NVIDIA entry remains empty (skipped by the chain). **The key was pasted into a chat session in plain text — it must be rotated** (openrouter.ai → Keys → delete, create new, paste into the config file personally). The live generation path runs the moment the app is started with this config (the CI exe artifact is self-contained and needs no SDK).
 2. Approve this revised plan — **superseded 2026-11-07: owner approved execution, I1 started.**
 
 Owner decision (2026-11-07): **verification runs on CI only** — the local .NET SDK stays at 9, so every check lands via GitHub Actions (build+test on .NET 10). Consequence: the red→fix→green loop runs through pushes, so each increment commits in small coherent slices and watches CI per push.
