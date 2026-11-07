@@ -487,7 +487,7 @@ public sealed class GenerateQuizForm : ModulePanel
         _busyBlock.Visible = true;
         _busyBlock.BringToFront();
         _elapsedTimer.Start();
-        FindAncestor<MainForm>()?.SetSidebarEnabled(enabled: false);
+        this.FindAncestor<MainForm>()?.SetSidebarEnabled(enabled: false);
         Refresh(); // paint the busy state before the (off-thread) call starts
 
         // The P5 chain call is synchronous and can block ~2 minutes — it runs
@@ -575,7 +575,7 @@ public sealed class GenerateQuizForm : ModulePanel
         _busyBlock.Visible = false;
         _elapsedTimer.Stop();
         SetFormEnabled(enabled: true);
-        FindAncestor<MainForm>()?.SetSidebarEnabled(enabled: true);
+        this.FindAncestor<MainForm>()?.SetSidebarEnabled(enabled: true);
 
         if (readyOnly)
         {
@@ -633,18 +633,18 @@ public sealed class GenerateQuizForm : ModulePanel
             return;
         }
 
-        FindAncestor<MainForm>()?.NavigateToReview(_savedDraftQuizId);
+        this.FindAncestor<MainForm>()?.NavigateToReview(_savedDraftQuizId);
     }
 
     /// <summary>The failure banner's "Browse quizzes": the take-quiz list (the offline path).</summary>
     private void NavigateHome()
     {
-        FindAncestor<MainForm>()?.NavigateToModule("TakeQuiz");
+        this.FindAncestor<MainForm>()?.NavigateToModule("TakeQuiz");
     }
 
     /// <summary>The empty state's "Go to topics".</summary>
     private void NavigateToTopics()
     {
-        FindAncestor<MainForm>()?.NavigateToModule("Topics");
+        this.FindAncestor<MainForm>()?.NavigateToModule("Topics");
     }
 }
