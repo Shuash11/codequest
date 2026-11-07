@@ -82,10 +82,40 @@ dialog "Leave this quiz? / Your answers so far will be discarded." appears —
 3. Try deleting the seeded quiz "C# Core Concepts": blocked with a friendly
    message (it already has attempts — the foreign key protects the history).
 
-## 6. Generate a quiz (needs internet + configured provider keys)
+## 6. Generate a quiz (needs internet + a provider key)
 
 1. Open **Generate quiz**. Pick a topic, a difficulty, and a question count
    (5–20). The note reads "Needs an internet connection…"
+
+### One-time setup: your free AI key
+
+Quiz generation runs through OpenRouter's **free** models. Every user brings
+their own free key — nobody shares one (sharing a key would mean sharing one
+account's daily quota, and public keys get revoked):
+
+1. Create a free account at **openrouter.ai** (no credit card needed).
+2. Open **Keys** → **Create key**, and copy it (starts with `sk-or-v1-…`).
+3. Next to the app, open `config/config.local.json` and paste the key into
+   the `openrouter` entry's `"apiKey"` value:
+
+   ```json
+   {
+     "aiProviders": [
+       { "name": "nvidia",     "baseUrl": "https://integrate.api.nvidia.com/v1", "apiKey": "", "model": "meta/llama-3.3-70b-instruct" },
+       { "name": "openrouter", "baseUrl": "https://openrouter.ai/api/v1",        "apiKey": "sk-or-v1-YOUR-KEY", "model": "nvidia/nemotron-3-ultra-550b-a55b:free" }
+     ]
+   }
+   ```
+
+4. Save the file. Keys stay on your machine — the app never sends them
+   anywhere except OpenRouter's own API, and they are never logged or shown.
+
+The app is deliberately designed so that **no key is baked into the program**:
+your key is your account and your quota, and the developer's key is never
+exposed inside the download.
+
+### Generating
+
 2. Press **Generate**.
    - **Expected (online, keys configured):** the busy block — a sweeping
      progress bar and a live elapsed-seconds counter (the window stays
