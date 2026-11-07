@@ -51,7 +51,7 @@ public sealed class MainForm : Form
     {
         ("TakeQuiz", "Take quiz", "\uE80F", ""),
         ("History", "History", "\uE823", ""),
-        ("Reports", "Reports", "\uE9D9", "Coming in phase P12."),
+        ("Reports", "Reports", "\uE9D9", ""),
         ("GenerateQuiz", "Generate quiz", "\uE710", "Coming in phase P13."),
         ("Review", "Review", "\uE73E", "Coming in phase P13."),
         ("Topics", "Topics", "\uE8EC", ""),
@@ -107,10 +107,12 @@ public sealed class MainForm : Form
 
         // The scoring of the quiz-taking screen (P9) is a pure service — the
         // UI depends on the IScoringService contract only (plan decision:
-        // business logic behind interfaces).
+        // business logic behind interfaces). The report builder (I3) follows
+        // the same pattern: the reports screen consumes IReportService only.
         IScoringService scoring = new ScoringService();
+        IReportService reports = new ReportService(attempts, quizzes, topics);
 
-        Controls.Add(BuildContentArea(topics, quizzes, questions, choices, attempts, answers, scoring));
+        Controls.Add(BuildContentArea(topics, quizzes, questions, choices, attempts, answers, scoring, reports));
         Controls.Add(BuildSidebar());
     }
 
@@ -236,7 +238,8 @@ public sealed class MainForm : Form
         ChoiceRepository choices,
         AttemptRepository attempts,
         SubmittedAnswerRepository answers,
-        IScoringService scoring)
+        IScoringService scoring,
+        IReportService reports)
     {
         int inset = UITheme.Scaled(this, UITheme.Spacing24);
         int headerTop = inset;
@@ -297,6 +300,7 @@ public sealed class MainForm : Form
                 "TakeQuiz" => BuildModulePanel(
                     new QuizTakeForm(quizzes, questions, topics, attempts, answers, scoring, _user), key),
                 "History" => BuildModulePanel(new HistoryForm(_user, attempts, quizzes, topics, answers), key),
+                "Reports" => BuildModulePanel(new ReportsForm(_user, reports), key),
                 "Topics" => BuildModulePanel(new TopicManageForm(topics, quizzes), key),
                 "QuizManagement" => BuildModulePanel(
                     new QuizManageForm(quizzes, topics, questions, choices, attempts, answers), key),
