@@ -2,7 +2,7 @@
 
 ## Status
 
-`active`. This revision **replaces the 19-phase process-heavy plan** at the owner's direction ("over-engineered — simplify"). Remaining work is now **6 increments** with proportionate verification. The prior plan's full history lives in git (through commit `a9af1c8` + superseded working-tree notes).
+`complete (2026-11-08)` — all six increments delivered, reviewed where gated, CI green at `10fd8da`. **One owner action remains:** paste the AI provider keys into `config/config.local.json` to exercise the live generation path (the only behavior never verified — see I4's disclosure). This revision replaced the 19-phase process-heavy plan at the owner's direction ("over-engineered — simplify"). Prior history lives in git.
 
 **Owner confirmations (2026-11-07):**
 1. "Public APIs for questions" = the **free AI model endpoints** (NVIDIA / OpenRouter) — already built in the provider chain. No new scope.
@@ -81,9 +81,9 @@ Each increment: implement → focused checks → independent review where named 
 - CI: two red runs (missing `CodeQuest.Data` import; named-arg casing) → fixed; run GREEN with all report tests passing; tokens-only clean. Per the revised plan, I3 relies on CI + self-checks (no separate reviewer gate).
 
 ### I4 — AI quiz generation & review/approve
-**Depends on:** **owner keys pasted** + P5 live smoke (one real generation call per provider, evidence saved); I1–I2. **Status: implemented, CI green; review in flight; LIVE PATH UNVERIFIED (keys never pasted — owner action).**
+**Depends on:** **owner keys pasted** + P5 live smoke (one real generation call per provider, evidence saved); I1–I2. **Status: COMPLETE 2026-11-08 (live path still unverified — owner keys).**
 - Delivered: `GenerateQuizForm` (§5.11: options card, off-UI-thread chain call with marquee + elapsed counter + Cancel-with-discard, typed-failure banner with plain-language class mapping + offline pointer, empty state, title de-dup per R-5 #1) + `QuizReviewForm` (§5.12: draft list, review drill-in with the AI claim highlighted-not-validated, Approve = status flip only (R-2 #4), Edit via the §5.5 editor, Discard behind the confirm) + `ProgressTrack.Marquee` (§4.13) + shell deep-links (NavigateToReview/NavigateToModule) and the sidebar lock during generation.
-- Reviewer gate: dispatched (independent review of commit `7dc1cf6`) — verdict integrates before the 1.0.0 tag.
+- Reviewer gate: **FAIL** (2 HIGH + 9 MEDIUM + 3 LOW) → **all 14 fixed** in `c9c9807` + follow-ups: H1 review cards rebuilt after visibility + width-guarded resize rebuild; H2 per-request generation tokens (a cancelled/superseded completion is discarded, never saved, never touching the newer run's state); M1 marquee re-armed per run; M2 save failure routed to the strip (the old throw was unobserved-task-invisible); M3 `chain:empty-provider-list` → the no-provider banner; M4 logout locks with the sidebar; M5-M9 header/banner/caption/explanation layout fixes; L1 timer disposed; L2 comment honesty; L3 scaled marquee. Clean sweep: threading, R-2 #4, atomic save, key safety, tokens-only, file scope, draft-never-startable all verified.
 - **Disclosed limitation:** the live AI path (real generation through NVIDIA/OpenRouter) has never been exercised — the owner has not pasted keys into `config/config.local.json` (still the P5 blocker). The offline/not-configured path is code-verified and is exactly the designed failure state; the online path is the one remaining unverified behavior of the app.
 
 ### I5 — Hardening: validation sweep, security notes, grey theme
@@ -92,10 +92,10 @@ Each increment: implement → focused checks → independent review where named 
 - CI: one red run (`LiveSetting` not overridable in this target → switched to `RaiseAutomationNotification`, the mechanism WinForms actually exposes) → fixed; run GREEN.
 
 ### I6 — Docs, demo readiness & regression
-**Depends on:** I1–I5 PASS. **Status: docs delivered; CI green pending; 1.0.0 tag after the I4 review verdict.**
+**Depends on:** I1–I5 PASS. **Status: COMPLETE 2026-11-08.**
 - Delivered: `docs/erd.md` finalized (schema unchanged since P1; D1 password_hash disposition noted), `docs/normalization.md` finalized, `docs/oop-explanation.md` (four concepts → verified class/file:line evidence), `docs/system-description.md`, `docs/user-guide.md` (= the demo script: sign-in → take → history → reports → management → generate → review/approve, offline path rehearsed).
 - Fresh-clone proof: the CI Windows runner IS the fresh machine — every green run is a clean clone's build+test+publish. The scripted desktop UI rehearsal cannot be automated in this environment (no .NET 10 runtime locally, by owner decision); the demo script above is the rehearsal recipe for the owner's machine. Disclosed, not skipped.
-- Version: **1.0.0** tag after the I4 review verdict lands and CI is green.
+- Version: **1.0.0** tagged after the I4 review findings were fixed and CI went green.
 
 ## Verification strategy
 
