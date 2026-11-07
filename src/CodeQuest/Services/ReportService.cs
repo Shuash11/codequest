@@ -105,7 +105,7 @@ public sealed class ReportService : IReportService
             if (topicRows.Count == 0)
             {
                 // The defined empty row: zeros, no flag — the UI shows "—".
-                reports.Add(new TopicReport(topicId, name, 0, 0d, 0d, 0d, NeedsPractice: false));
+                reports.Add(new TopicReport(topicId, name, 0, 0d, 0d, 0d, needsPractice: false));
                 continue;
             }
 
