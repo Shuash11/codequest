@@ -67,10 +67,11 @@ Each increment: implement → focused checks → independent review where named 
 - **Review:** Reviewer gate (large accumulated diff: P8 + P6.1 + P8.1 + D1 + D2, never independently reviewed as a whole).
 
 ### I2 — Quiz taking, scoring, history & answer review
-**Depends on:** I1 pushed (shell + management screens stable).
-- **Scope:** `QuizTakeForm` (Approved quizzes only — Draft listed disabled "pending review"; question-by-question navigation with progress; submit → `ScoringService` → persist attempt + submitted answers); `HistoryForm` (past attempts: date, quiz, topic, score; search + topic/score filters); `AttemptReviewForm` (per question: chosen vs correct answer + explanation); duplicate-submit guard; clean mid-quiz exit.
-- **Accept:** score = correct/total matches `ScoringService` unit math; attempt rows persist correctly; Draft never startable; history + review work offline; double-submit cannot duplicate; e2e checklist ×2 with screenshots; light ux check against the existing design spec.
-- **Review:** Reviewer gate (scoring + new write paths are the highest-risk logic since P5).
+**Depends on:** I1 pushed (shell + management screens stable). **Status: implemented + reviewed + fixed; pending CI.**
+- Delivered (`71a7aa6` + fix round `bdf67f1`): QuizTakeForm (list/run/result, §5.6-5.7), HistoryForm (§5.8), AttemptReviewForm (§5.9, shared drill-in), ProgressTrack + ChoiceRowButton, ILeaveGuard shell hook (nav + logout), ScoringService wired via IScoringService.
+- Review: FAIL → all 2 HIGH (HistoryForm missing Dock; choice stack unsized 200×100 clipping rows) + 3 MEDIUM (progress repaint, wrapped-text measurement, logout leave-guard) + 7 LOW fixed in `bdf67f1`; 3 LOW dispositioned (L2 verdict derivation = the domain answer-key rule itself; L3 in-panel run/result headers per the §5.5 drill-in precedent; L5 Enter-on-row covered by the F1 action-cell keyboard path).
+- Accept: score math via IScoringService only; Draft never startable (3 independent guards); one transactional write; double-submit guarded; offline history/review; CI green.
+- **Disclosed limitation:** desktop e2e still cannot run locally (CI-only); the take/history flows get their scripted checklist at the next e2e-capable opportunity (I6 fresh-clone sweep at the latest).
 
 ### I3 — Reports
 **Depends on:** I2 (attempts exist to report on).
