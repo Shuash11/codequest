@@ -160,9 +160,21 @@ public sealed class LoginForm : Form
         _signIn.Enabled = false;
         Refresh(); // paint the disabled state before the (fast, blocking) database calls
 
-        UserAccount? user = ResolveUser(_name.Text);
+        UserAccount? user;
+        try
+        {
+            user = ResolveUser(_name.Text);
+        }
+        finally
+        {
+            // A database failure is not a sign-in decision (approved D1
+            // disposition): it propagates to the §4.11 unexpected dialog in
+            // Program — and when the user returns via "Try again", the form
+            // must be usable again, so the guard and button reset always run.
+            _signingIn = false;
+            _signIn.Enabled = true;
+        }
 
-        _signingIn = false;
         if (user is not null)
         {
             AuthenticatedUser = user;
@@ -170,7 +182,6 @@ public sealed class LoginForm : Form
             return;
         }
 
-        _signIn.Enabled = true;
         _name.ShowError(EmptyNameMessage);
         _name.FocusInput();
     }
@@ -181,7 +192,8 @@ public sealed class LoginForm : Form
     /// inline error). A database failure is deliberately not caught here —
     /// it is not a sign-in decision and travels to the application's §4.11
     /// unexpected dialog. The stored password_hash is left empty: the column
-    /// is unused since D1 (disposition recorded in docs/security-notes.md).
+    /// is unused since directive D1 — its security disposition is recorded in
+    /// the revised plan and in docs/security-notes.md when I5 creates it.
     /// </summary>
     private UserAccount? ResolveUser(string rawName)
     {

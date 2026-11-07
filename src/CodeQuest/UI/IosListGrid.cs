@@ -259,16 +259,14 @@ public sealed class IosListGrid : DataGridView
         Columns.Add(column);
     }
 
-    /// <summary>
-    /// The grid keeps the base <see cref="DataGridView.DataGridViewAccessibleObject"/>:
-    /// it resolves its row children through the rows' own
-    /// <see cref="DataGridViewRow.AccessibilityObject"/> — which the
-    /// <see cref="ActionRowTemplate"/> subclasses so each row describes its
-    /// actions in column order (recipe 4.6, F1) — and walks cleanly under UIA.
-    /// A custom grid-level accessible object that re-routes GetChild to the row
-    /// objects was probed to hang the UIA tree walk (P8.1 probe evidence), so
-    /// the grid-level tree stays with the framework.
-    /// </summary>
+    // Grid-level accessibility decision (P8.1 probe evidence): the grid keeps
+    // the base DataGridView.DataGridViewAccessibleObject — it resolves its row
+    // children through the rows' own DataGridViewRow.AccessibilityObject
+    // (which the ActionRowTemplate subclasses so each row describes its
+    // actions in column order, recipe 4.6/F1) and walks cleanly under UIA.
+    // A custom grid-level accessible object that re-routed GetChild to the row
+    // objects was probed to hang the UIA tree walk, so the grid-level tree
+    // stays with the framework.
 
     /// <summary>Tracks the hovered action cell for the secondary hover paint.</summary>
     protected override void OnCellMouseEnter(DataGridViewCellEventArgs e)
@@ -736,6 +734,7 @@ public sealed class ListCardGrid : Panel
             BackColor = UITheme.Background,
             AutoSize = true,
             Visible = false,
+            Dock = DockStyle.Bottom, // the bottom strip of the container (§4.6); invisible docks take no space
             Padding = new Padding(0, UITheme.Scaled(this, UITheme.Spacing8), 0, 0), // 8px below the card (§4.6)
         };
 

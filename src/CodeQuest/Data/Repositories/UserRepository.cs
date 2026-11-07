@@ -2,11 +2,11 @@
 // CodeQuest — Phase P4: Data Access Layer
 // OOP rubric: ABSTRACTION — UserRepository is the concrete implementation
 //              behind the IUserRepository contract of phase P3.
-// Look at: GetByUsername() below — the lookup the login screen (P7) validates
-//          against: the account is found by its exact login name; the caller
-//          receives the stored hash and verifies the password against it
-//          (PasswordHasher, phase P7) — this repository never sees a plaintext
-//          password, only the stored hash travels through it.
+// Look at: GetByUsername() below — the lookup the login screen uses to resolve
+//          the entered name: the account is found by its exact login name, or
+//          created on first use (name-only sign-in, directive D1; the
+//          password_hash column is NOT NULL in the schema and stays in place
+//          but unused — callers store an empty string since D1).
 // Table:   users (database/schema.sql) — the username is unique in the schema,
 //          so a duplicate registration surfaces as a DuplicateEntityException
 //          (plan ruling R-2 #5).

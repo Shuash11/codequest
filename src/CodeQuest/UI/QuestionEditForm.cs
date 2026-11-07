@@ -581,7 +581,6 @@ public sealed class QuestionFormPanel : Panel
     private readonly Label _blockError;
     private readonly FlatButton _save;
     private readonly FlatButton _cancel;
-    private readonly int _markLabelWidth;
     private int _correctIndex = -1;
     private bool _suppressCorrectTracking; // guards the checkbox bookkeeping
 
@@ -620,8 +619,6 @@ public sealed class QuestionFormPanel : Panel
         _correctMarks = new MarkedCheckBox[ChoiceRowCount];
         _correctMarkLabels = new Label[ChoiceRowCount];
         _choiceFields = new InputField[ChoiceRowCount];
-        _markLabelWidth = TextRenderer.MeasureText(
-            string.Format(CorrectMarkLabelFormat, ChoiceRowCount), UITheme.Body).Width;
 
         for (int i = 0; i < ChoiceRowCount; i++)
         {

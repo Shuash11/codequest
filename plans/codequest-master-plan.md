@@ -14,9 +14,8 @@ A fun desktop quiz app for programming & cybersecurity (final exam project, C#/.
 
 ## Current state (verified 2026-11-07)
 
-- **Built & committed locally** (HEAD `a9af1c8`, 7 commits ahead of `origin/main` — push was gated by the old plan's ux process, not by defects): repo+CI (P0), schema+seed+3NF (P1), AI contract (P2/P2.1), OOP domain layer (P3), data access layer (P4), AI provider chain + offline provider + generation service (P5), design spec (P6) + accessibility amendments (P6.1), login+shell (P7), **topic/quiz/question CRUD with search/filter (P8)**.
-- **Uncommitted in the working tree:** the P8.1 accessibility/feedback fix round in flight — `SegmentedControl`, `MarkedCheckBox`, `StatusBadge`, `TopicManageForm`, `QuizManageForm`, `QuestionEditForm`, `MainForm`, `InputArea`/`InputField`, new `GridRowActionsTests.cs`.
-- **Tests:** 8 xUnit files (scoring, repositories, AI provider, password hasher, form validation, list filter, grid row actions, scaffold). Last recorded full run: 88/88 (2026-11-06).
+- **Built & committed locally** (HEAD beyond `a9af1c8`, ahead of `origin/main` — push gated on the I1 review, not defects): repo+CI (P0), schema+seed+3NF (P1), AI contract (P2/P2.1), OOP domain layer (P3), data access layer (P4), AI provider chain + offline provider + generation service (P5), design spec (P6) + accessibility amendments (P6.1), login+shell (P7), **topic/quiz/question CRUD with search/filter (P8)**, **P8.1 accessibility fixes (commit `33fab04`)**.
+- **Tests:** 7 xUnit files (scoring, repositories, AI provider, form validation, list filter, grid row actions, scaffold). Last recorded full run: 88/88 pre-P8.1 (2026-11-06); the P8.1 round replaced the 23 hasher tests with grid-action tests — CI run is the authority.
 - **CI:** `.github/workflows/ci.yml` — Windows runner, .NET 10 SDK, build + test. Green through the P7 era on `origin/main` (`ae7dd74`).
 - **Local build/test currently impossible:** this machine has .NET SDK **9.0.306**; the project targets `net10.0-windows` (error NETSDK1045). Until the .NET 10 SDK is installed here, **CI is the only verification path**.
 - **`config/config.local.json` is still the pre-P2 shape** (no NVIDIA key, no model set) → no live AI generation possible yet.
@@ -58,7 +57,7 @@ Owner decision (2026-11-07): **verification runs on CI only** — the local .NET
 Each increment: implement → focused checks → independent review where named → push → CI green. Flake rule: a step that cannot be reproduced twice is a defect.
 
 ### I1 — Land the in-flight work + quick wins
-**Depends on:** nothing (verification via CI — owner decision 2026-11-07). **Status: in progress.**
+**Depends on:** nothing (verification via CI — owner decision 2026-11-07). **Status: implemented, in independent review** (commits `b90c0eb` plan revision, `33fab04` P8.1 fixes, `1021f44` D1 name-only login, `9db6ecc` D2 CI exe). Push gates on the Reviewer verdict; CI green + exe artifact closes the increment.
 - **Scope:** (a) verify/finish the uncommitted P8.1 fixes — keyboard-operable grid row actions with visible focus, accessible custom controls (name = visible label, perceivable checked state), strip-feedback token, editor surface per amended spec; (b) **name-only sign-in (owner directive D1):** `LoginForm` takes a name only; remove `PasswordHasher` + its 23 tests; dispose the seeded hash column usage (schema drop is a separate decision — default: leave column, mark unused); (c) **CI publishes a downloadable .exe (D2):** add `dotnet publish -r win-x64 --self-contained -p:PublishSingleFile=true` + artifact upload to the existing workflow; (d) push the accumulated local work.
 - **Accept:** full suite green locally and in CI; keyboard-only user reaches every grid action (×2); UIA names = visible labels; login works name-only end-to-end; CI green **and** produces the exe artifact; demo DB untouched.
 - **Review:** Reviewer gate (large accumulated diff: P8 + P6.1 + P8.1 + D1 + D2, never independently reviewed as a whole).
