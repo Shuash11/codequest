@@ -3,19 +3,20 @@
 // with the live-region contract the P8 accessibility review asked for — the
 // strip was invisible to assistive technology, so success and blocked
 // verdicts never reached AT users.
-// Look at: the accessible object — role StatusBar-equivalent text with the
-//          Polite live setting, so a verdict announced through ShowStatus is
-//          spoken without stealing focus (the live-region equivalent WinForms
-//          offers). The accessible name equals the visible purpose ("Status").
+// Look at: OnTextChanged raises a UIA automation notification with the new
+//          verdict (ImportantMostRecent — announced without stealing focus),
+//          which is the live-region mechanism WinForms actually exposes. The
+//          accessible name equals the visible purpose ("Status").
 // =============================================================================
 
 using System.Windows.Forms;
+using System.Windows.Forms.Automation;
 
 namespace CodeQuest.UI;
 
 /// <summary>
 /// The shell's status strip label: a verdict line announced to assistive
-/// technology as a polite live region (the I5 accessibility fix).
+/// technology as an automation notification (the I5 accessibility fix).
 /// </summary>
 public sealed class LiveStatusLabel : Label
 {
@@ -25,18 +26,21 @@ public sealed class LiveStatusLabel : Label
         AccessibleName = "Status"; // the label's purpose, announced with the verdict
     }
 
-    /// <summary>The accessible object carries the polite live setting.</summary>
-    protected override AccessibleObject CreateAccessibilityInstance() => new LiveStatusLabelAccessibleObject(this);
-
-    /// <summary>Polite live region: verdicts are announced without focus changes.</summary>
-    private sealed class LiveStatusLabelAccessibleObject : Control.ControlAccessibleObject
+    /// <summary>Announces every new verdict to assistive technology.</summary>
+    protected override void OnTextChanged(EventArgs e)
     {
-        public LiveStatusLabelAccessibleObject(LiveStatusLabel owner) : base(owner)
+        base.OnTextChanged(e);
+
+        if (Text.Length == 0)
         {
+            return; // a cleared strip is not a verdict worth announcing
         }
 
-        /// <summary>Polite: announce when idle, never interrupt the user.</summary>
-        public override System.Windows.Forms.Automation.AutomationLiveSetting LiveSetting
-            => System.Windows.Forms.Automation.AutomationLiveSetting.Polite;
+        // The live-region mechanism WinForms exposes: ImportantMostRecent
+        // announces without stealing focus, replacing a pending announcement.
+        _ = AccessibilityObject.RaiseAutomationNotification(
+            AutomationNotificationKind.Other,
+            AutomationNotificationProcessing.ImportantMostRecent,
+            Text);
     }
 }
