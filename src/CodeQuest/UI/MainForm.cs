@@ -52,8 +52,8 @@ public sealed class MainForm : Form
         ("TakeQuiz", "Take quiz", "\uE80F", ""),
         ("History", "History", "\uE823", ""),
         ("Reports", "Reports", "\uE9D9", ""),
-        ("GenerateQuiz", "Generate quiz", "\uE710", "Coming in phase P13."),
-        ("Review", "Review", "\uE73E", "Coming in phase P13."),
+        ("GenerateQuiz", "Generate quiz", "\uE710", ""),
+        ("Review", "Review", "\uE73E", ""),
         ("Topics", "Topics", "\uE8EC", ""),
         ("QuizManagement", "Quiz management", "\uE70F", ""),
     };
@@ -62,6 +62,7 @@ public sealed class MainForm : Form
     private const int StatusAutoClearMilliseconds = 4000;
 
     private readonly UserAccount _user;
+    private readonly AppConfig _config;
     private Label _contentHeader = null!;  // assigned during construction (BuildContentArea)
     private Label _statusStrip = null!;    // assigned during construction (BuildContentArea)
     private Panel _moduleHost = null!;     // assigned during construction (BuildContentArea)
@@ -70,12 +71,14 @@ public sealed class MainForm : Form
     private readonly Dictionary<string, Control> _modulePanels = new();
     private string _activeModule = string.Empty; // the module key currently on screen (§5.2)
 
-    /// <summary>Creates the shell for the account that just signed in, over the application database.</summary>
-    public MainForm(UserAccount user, Db database)
+    /// <summary>Creates the shell for the account that just signed in, over the application database and configuration.</summary>
+    public MainForm(UserAccount user, Db database, AppConfig config)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(config);
         _user = user;
+        _config = config;
 
         // The repositories of the management screens (P8). The screens talk to
         // the interfaces of the data layer — never to SQLite directly.
@@ -109,10 +112,13 @@ public sealed class MainForm : Form
         // UI depends on the IScoringService contract only (plan decision:
         // business logic behind interfaces). The report builder (I3) follows
         // the same pattern: the reports screen consumes IReportService only.
+        // The generation chain (I4) consumes the configuration read once at
+        // startup (contract 8).
         IScoringService scoring = new ScoringService();
         IReportService reports = new ReportService(attempts, quizzes, topics);
+        var generation = new QuizGenerationService(_config);
 
-        Controls.Add(BuildContentArea(topics, quizzes, questions, choices, attempts, answers, scoring, reports));
+        Controls.Add(BuildContentArea(topics, quizzes, questions, choices, attempts, answers, scoring, reports, generation));
         Controls.Add(BuildSidebar());
     }
 
@@ -239,7 +245,8 @@ public sealed class MainForm : Form
         AttemptRepository attempts,
         SubmittedAnswerRepository answers,
         IScoringService scoring,
-        IReportService reports)
+        IReportService reports,
+        QuizGenerationService generation)
     {
         int inset = UITheme.Scaled(this, UITheme.Spacing24);
         int headerTop = inset;
@@ -301,6 +308,9 @@ public sealed class MainForm : Form
                     new QuizTakeForm(quizzes, questions, topics, attempts, answers, scoring, _user), key),
                 "History" => BuildModulePanel(new HistoryForm(_user, attempts, quizzes, topics, answers), key),
                 "Reports" => BuildModulePanel(new ReportsForm(_user, reports), key),
+                "GenerateQuiz" => BuildModulePanel(new GenerateQuizForm(quizzes, topics, generation, _user), key),
+                "Review" => BuildModulePanel(
+                    new QuizReviewForm(quizzes, topics, questions, choices, answers), key),
                 "Topics" => BuildModulePanel(new TopicManageForm(topics, quizzes), key),
                 "QuizManagement" => BuildModulePanel(
                     new QuizManageForm(quizzes, topics, questions, choices, attempts, answers), key),
@@ -437,6 +447,39 @@ public sealed class MainForm : Form
 
         _contentHeader.Text = Modules.First(module => module.Key == key).Title;
         _activeModule = key;
+    }
+
+    /// <summary>
+    /// The navigation entry points the module panels use (spec 5.11's
+    /// "Review now" deep-link and "Browse quizzes"): a nav-equivalent switch
+    /// through the same guard rules as a sidebar click.
+    /// </summary>
+    internal void NavigateToModule(string key) => ShowModule(key);
+
+    /// <summary>
+    /// The §5.11 "Review now" deep-link: the Review module with one freshly
+    /// generated draft already open in its review view.
+    /// </summary>
+    internal void NavigateToReview(int quizId)
+    {
+        ShowModule("Review");
+
+        if (_modulePanels.TryGetValue("Review", out Control? panel) && panel is QuizReviewForm review)
+        {
+            review.OpenQuiz(quizId);
+        }
+    }
+
+    /// <summary>
+    /// The §5.11 busy state disables the sidebar items — one unambiguous
+    /// locked state while a generation runs off the UI thread.
+    /// </summary>
+    internal void SetSidebarEnabled(bool enabled)
+    {
+        foreach (NavItemButton item in _navItems.Values)
+        {
+            item.Enabled = enabled;
+        }
     }
 
     /// <summary>

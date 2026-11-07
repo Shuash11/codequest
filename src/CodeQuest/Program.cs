@@ -29,9 +29,9 @@ internal static class Program
 
         // Bootstrap order per plan P7: config → theme → login → shell. The
         // config is loaded once at startup (a missing or malformed file degrades
-        // to "no providers configured" — it never throws); the AI provider chain
-        // consumer arrives with P13 (the offline P7 path needs no provider).
-        _ = AppConfig.Load();
+        // to "no providers configured" — it never throws); the generation chain
+        // (I4) consumes exactly this instance (contract 8).
+        AppConfig config = AppConfig.Load();
 
         UITheme.Apply();
 
@@ -70,7 +70,7 @@ internal static class Program
             }
 
             bool backToLogin;
-            using (MainForm shell = new(signedIn, db))
+            using (MainForm shell = new(signedIn, db, config))
             {
                 Application.Run(shell);
                 backToLogin = shell.ReturnedToLogin;

@@ -20,6 +20,9 @@ namespace CodeQuest.UI;
 public sealed class ProgressTrack : Control
 {
     private double _value;
+    private bool _marquee;
+    private int _marqueeX;
+    private readonly System.Windows.Forms.Timer _marqueeTimer = new() { Interval = 60 };
 
     /// <summary>Creates the track at the recipe's 8px height.</summary>
     public ProgressTrack()
@@ -29,6 +32,65 @@ public sealed class ProgressTrack : Control
         BackColor = UITheme.Background;
         Height = UITheme.Scaled(this, 8);
         TabStop = false; // a read-only indicator is not a Tab stop
+
+        // The §4.13 marquee: an Accent segment sweeps the track while real
+        // work runs. No percent, no fake progress — the promise is activity.
+        _marqueeTimer.Tick += static (sender, e) =>
+        {
+            if (sender is System.Windows.Forms.Timer timer && timer.Tag is ProgressTrack track)
+            {
+                track._marqueeX += Math.Max(track.Width / 24, 6);
+                if (track._marqueeX > track.Width + 60)
+                {
+                    track._marqueeX = -60;
+                }
+
+                track.Invalidate();
+            }
+        };
+        _marqueeTimer.Tag = this;
+    }
+
+    /// <summary>Stops the marquee timer when the control is disposed.</summary>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _marqueeTimer.Stop();
+            _marqueeTimer.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    /// <summary>
+    /// The §4.13 indeterminate mode: an Accent segment sweeps while a long
+    /// operation runs (generation's duration is unknowable — no percent).
+    /// </summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public bool Marquee
+    {
+        get => _marquee;
+        set
+        {
+            if (_marquee == value)
+            {
+                return;
+            }
+
+            _marquee = value;
+            if (_marquee)
+            {
+                _marqueeX = -60;
+                _marqueeTimer.Start();
+            }
+            else
+            {
+                _marqueeTimer.Stop();
+            }
+
+            Invalidate();
+        }
     }
 
     /// <summary>
@@ -68,6 +130,18 @@ public sealed class ProgressTrack : Control
         using (var trackBrush = new SolidBrush(UITheme.Fill))
         {
             DrawPill(e.Graphics, trackBrush, track);
+        }
+
+        if (_marquee)
+        {
+            // The sweeping segment (§4.13): activity, never a percent. The
+            // clip keeps the sweep inside the pill at both edges.
+            e.Graphics.SetClip(track);
+            Rectangle segment = new(_marqueeX, 0, 60, Height);
+            using var segmentBrush = new SolidBrush(UITheme.Accent);
+            DrawPill(e.Graphics, segmentBrush, segment);
+            e.Graphics.ResetClip();
+            return;
         }
 
         int fillWidth = (int)Math.Round(Width * _value);
