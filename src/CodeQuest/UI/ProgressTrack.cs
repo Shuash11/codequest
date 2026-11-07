@@ -33,12 +33,23 @@ public sealed class ProgressTrack : Control
     /// <summary>
     /// The answered fraction (0..1). Values outside the range are clamped —
     /// the run computes the fraction from its own counts, so the clamp is a
-    /// display guarantee, never a data correction.
+    /// display guarantee, never a data correction. The control is
+    /// owner-drawn, so a new value schedules its own repaint.
     /// </summary>
     public double Value
     {
         get => _value;
-        set => _value = Math.Clamp(value, 0d, 1d);
+        set
+        {
+            double clamped = Math.Clamp(value, 0d, 1d);
+            if (_value == clamped)
+            {
+                return;
+            }
+
+            _value = clamped;
+            Invalidate(); // the pill paints the fraction — a new value must repaint
+        }
     }
 
     /// <summary>Paints the Fill pill and the Accent segment (recipe 4.13).</summary>

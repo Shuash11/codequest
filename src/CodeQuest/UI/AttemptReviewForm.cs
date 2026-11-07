@@ -49,8 +49,9 @@ public sealed class AttemptReviewForm : UserControl
     private readonly Label _reviewTitle = null!;
     private readonly Label _scoreLine = null!;
     private readonly Panel _body = null!;
-    private Quiz? _openQuiz; // the attempt being reviewed — rebuilt on resize (pre-layout widths)
+    private Quiz? _openQuiz; // the attempt being reviewed — rebuilt on width change (pre-layout widths)
     private IReadOnlyList<SubmittedAnswer> _openSubmitted = Array.Empty<SubmittedAnswer>();
+    private int _lastBodyWidth; // the width the cards were last built at (resize rebuild guard)
 
     /// <summary>Raised when the panel's "Back" is pressed; the host restores its list state.</summary>
     public event EventHandler? BackRequested;
@@ -164,16 +165,19 @@ public sealed class AttemptReviewForm : UserControl
     }
 
     /// <summary>
-    /// Rebuilds the question cards when the panel's size changes: the panel
-    /// may be laid out (Dock = Fill) only after it becomes visible, so the
-    /// card widths from the moment of Open() are not final.
+    /// Rebuilds the question cards when the panel's WIDTH changes (the layout
+    /// is width-driven): the panel may be laid out (Dock = Fill) only after it
+    /// becomes visible, so the card widths from the moment of Open() are not
+    /// final. Height-only resizes do not re-layout anything.
     /// </summary>
     protected override void OnResize(EventArgs eventargs)
     {
         base.OnResize(eventargs);
 
-        if (_openQuiz is not null)
+        int width = _body.ClientSize.Width;
+        if (_openQuiz is not null && width != _lastBodyWidth)
         {
+            _lastBodyWidth = width;
             BuildQuestionCards(_openQuiz, _openSubmitted);
         }
     }
@@ -223,7 +227,7 @@ public sealed class AttemptReviewForm : UserControl
         int inset = UITheme.Scaled(this, UITheme.Spacing16);
         int contentWidth = Math.Max(cardWidth - inset * 2, 1);
         int textHeight = TextRenderer.MeasureText(
-            question.QuestionText, UITheme.Body, new Size(contentWidth, int.MaxValue)).Height;
+            question.QuestionText, UITheme.Body, new Size(contentWidth, int.MaxValue), TextFormatFlags.WordBreak).Height;
 
         int height = inset
             + UITheme.Scaled(this, 18) // the "Question N" top line
@@ -241,8 +245,12 @@ public sealed class AttemptReviewForm : UserControl
         height += UITheme.Scaled(this, UITheme.Spacing12);
         string explanation = question.Explanation.Length == 0 ? NoExplanationText : question.Explanation;
         int explanationHeight = TextRenderer.MeasureText(
-            explanation, UITheme.Body, new Size(Math.Max(contentWidth - UITheme.Scaled(this, UITheme.Spacing12) * 2, 1), int.MaxValue)).Height;
-        height += explanationHeight + UITheme.Scaled(this, UITheme.Spacing12) * 2 + inset;
+            explanation,
+            UITheme.Body,
+            new Size(Math.Max(contentWidth - UITheme.Scaled(this, UITheme.Spacing12) * 2, 1), int.MaxValue),
+            TextFormatFlags.WordBreak).Height;
+        // The inset box: 12px top padding + 16px caption + text + 12px bottom padding (L6).
+        height += explanationHeight + UITheme.Scaled(this, 40) + inset;
 
         return height;
     }
@@ -301,7 +309,7 @@ public sealed class AttemptReviewForm : UserControl
         card.Controls.Add(markWord);
 
         int textHeight = TextRenderer.MeasureText(
-            question.QuestionText, UITheme.Body, new Size(contentWidth, int.MaxValue)).Height;
+            question.QuestionText, UITheme.Body, new Size(contentWidth, int.MaxValue), TextFormatFlags.WordBreak).Height;
         var questionText = new Label
         {
             Name = $"ReviewQuestionText{index}",
@@ -415,8 +423,11 @@ public sealed class AttemptReviewForm : UserControl
         int explanationHeight = TextRenderer.MeasureText(
             explanation,
             UITheme.Body,
-            new Size(Math.Max(contentWidth - UITheme.Scaled(this, UITheme.Spacing12) * 2, 1), int.MaxValue)).Height;
-        int boxHeight = explanationHeight + UITheme.Scaled(this, UITheme.Spacing12) * 2;
+            new Size(Math.Max(contentWidth - UITheme.Scaled(this, UITheme.Spacing12) * 2, 1), int.MaxValue),
+            TextFormatFlags.WordBreak).Height;
+        // 12px top padding + 16px caption + text + 12px bottom padding — the
+        // text sits at y = 28 inside the box, so 24px of padding clips it (L6).
+        int boxHeight = explanationHeight + UITheme.Scaled(this, 40);
 
         var explanationBox = new Panel
         {

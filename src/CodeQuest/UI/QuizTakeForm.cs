@@ -165,7 +165,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             return true; // no run in progress — leaving needs no confirmation
         }
 
-        if (!DialogForm.ShowConfirm(LeaveTitle, LeaveMessage, LeaveConfirmText))
+        if (!DialogForm.ShowConfirm(LeaveTitle, LeaveMessage, LeaveConfirmText, secondaryText: "Stay"))
         {
             return false; // Stay: the run continues, the switch is cancelled
         }
@@ -373,7 +373,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             BackColor = UITheme.Surface,
             AutoSize = false,
         };
-        _choiceStack = new Panel { Name = "RunChoiceStack", BackColor = UITheme.Surface };
+        _choiceStack = new Panel { Name = "RunChoiceStack", BackColor = UITheme.Surface, AutoScroll = true };
         card.Controls.Add(_questionText);
         card.Controls.Add(_choiceStack);
 
@@ -403,7 +403,12 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _runProgressLabel.Size = new Size(header.Width, UITheme.Scaled(this, 18));
     }
 
-    /// <summary>Lays out the question card's text and choice rows (§5.6 moment 2).</summary>
+    /// <summary>
+    /// Lays out the question card's text and choice rows (§5.6 moment 2). The
+    /// choice stack is sized to the card's remaining space and the rows are
+    /// positioned relative to it — an unsized container would clip the rows
+    /// to the Panel's default 200×100 bounds.
+    /// </summary>
     private void LayoutQuestionCard()
     {
         if (_questionText.Parent is not CardPanel card)
@@ -412,22 +417,28 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
 
         int inset = UITheme.Scaled(this, UITheme.Spacing16);
+        int contentWidth = Math.Max(card.Width - inset * 2, 1);
         int textHeight = TextRenderer.MeasureText(
             _questionText.Text.Length == 0 ? " " : _questionText.Text,
             _questionText.Font,
-            new Size(Math.Max(card.Width - inset * 2, 1), int.MaxValue))
+            new Size(contentWidth, int.MaxValue),
+            TextFormatFlags.WordBreak) // multi-line questions wrap — measure wrapped (M2)
             .Height;
 
         _questionText.Location = new Point(inset, inset);
-        _questionText.Size = new Size(card.Width - inset * 2, textHeight);
+        _questionText.Size = new Size(contentWidth, textHeight);
 
-        int top = inset + textHeight + UITheme.Scaled(this, UITheme.Spacing12);
+        int stackTop = inset + textHeight + UITheme.Scaled(this, UITheme.Spacing12);
+        _choiceStack.Location = new Point(inset, stackTop);
+        _choiceStack.Size = new Size(contentWidth, Math.Max(card.Height - stackTop - inset, 1));
+
+        int top = 0;
         int rowHeight = UITheme.Scaled(this, 36);
         int rowGap = UITheme.Scaled(this, UITheme.Spacing8);
         foreach (ChoiceRowButton row in _choiceRows)
         {
-            row.Location = new Point(inset, top);
-            row.Size = new Size(Math.Max(card.Width - inset * 2, 1), rowHeight);
+            row.Location = new Point(0, top); // stack-relative — the stack clips at the card's content edge
+            row.Size = new Size(_choiceStack.Width, rowHeight);
             top += rowHeight + rowGap;
         }
     }
@@ -845,21 +856,36 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
                 Size = new Size(UITheme.Scaled(this, 90), rowHeight),
                 TextAlign = ContentAlignment.MiddleLeft,
             };
+            var number = new Label
+            {
+                Name = $"ResultQuestionNumber{i}",
+                Text = $"Question {i + 1}",
+                Font = UITheme.Caption,
+                ForeColor = UITheme.TextSecondary,
+                BackColor = UITheme.Surface,
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Location = new Point(UITheme.Scaled(this, 24) + UITheme.Scaled(this, 90), 0),
+                Size = new Size(UITheme.Scaled(this, 96), rowHeight),
+            };
             var detail = new Label
             {
-                Name = $"ResultQuestion{i}",
-                Text = $"Question {i + 1}   {question.QuestionText}",
+                Name = $"ResultQuestionText{i}",
+                Text = question.QuestionText,
                 Font = UITheme.Body,
                 ForeColor = UITheme.TextPrimary,
                 BackColor = UITheme.Surface,
                 AutoSize = false,
                 AutoEllipsis = true,
                 TextAlign = ContentAlignment.MiddleLeft,
-                Location = new Point(UITheme.Scaled(this, 24) + UITheme.Scaled(this, 90), 0),
-                Size = new Size(row.Width - UITheme.Scaled(this, 24) - UITheme.Scaled(this, 90), rowHeight),
+                Location = new Point(UITheme.Scaled(this, 24) + UITheme.Scaled(this, 90) + UITheme.Scaled(this, 96), 0),
+                Size = new Size(
+                    Math.Max(row.Width - UITheme.Scaled(this, 24) - UITheme.Scaled(this, 90) - UITheme.Scaled(this, 96), 1),
+                    rowHeight),
             };
             row.Controls.Add(mark);
             row.Controls.Add(verdict);
+            row.Controls.Add(number);
             row.Controls.Add(detail);
             _resultListCard.Controls.Add(row);
             top += rowHeight;
@@ -943,12 +969,11 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private void ShowList(bool announceCompletion)
     {
         bool announce = announceCompletion && _awaitingSavedAnnouncement;
-        _awaitingSavedAnnouncement = false;
-
         RefreshData();
 
         if (announce)
         {
+            _awaitingSavedAnnouncement = false; // consumed — the completion's strip was shown
             ReportStatus(ResultSavedMessage, success: true);
         }
 

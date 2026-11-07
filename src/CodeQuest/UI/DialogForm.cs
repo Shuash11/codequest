@@ -112,14 +112,15 @@ public sealed class DialogForm : Form
     /// <param name="title">The situation in one line ("Delete this topic?").</param>
     /// <param name="message">The consequence sentence ("This topic will be removed. This cannot be undone.").</param>
     /// <param name="confirmText">The specific verb ("Delete").</param>
-    public static bool ShowConfirm(string title, string message, string confirmText)
+    /// <param name="secondaryText">The dismiss verb ("Cancel"; spec 5.6's leave confirmation says "Stay").</param>
+    public static bool ShowConfirm(string title, string message, string confirmText, string secondaryText = "Cancel")
     {
         DialogResult result = Show(
             owner: Form.ActiveForm,
             title: title,
             message: message,
             primaryText: confirmText,
-            secondaryText: "Cancel",
+            secondaryText: secondaryText,
             primaryVariant: UITheme.FlatButtonVariant.Destructive);
 
         return result == DialogResult.OK;

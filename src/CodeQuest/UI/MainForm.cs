@@ -18,10 +18,10 @@
 //          ONCE and persist for the shell's lifetime — switching shows/hides,
 //          it never recreates, so in-progress state survives every round trip
 //          (search text and filters stay; the data reloads on show).
-//          P7 hosts one spec-styled placeholder card per module ("Coming in
-//          phase …"); P8 replaces the Topics and Quiz-management placeholders
-//          with the real management screens — the other placeholders stay
-//          until P9/P10/P12/P13.
+//          P7 hosted one spec-styled placeholder card per module ("Coming in
+//          phase …"); P8 replaced the Topics and Quiz-management placeholders,
+//          I2 the Take-quiz and History screens (spec 5.6-5.9) — the Reports
+//          and P13 placeholders stay until their phases.
 // Status strip (§4.11, §5 anatomy): module panels report success and failure
 //          lines through <see cref="ShowStatus"/> — the INTERIM §2.6/§4.11
 //          rule (F3, until the R-D3 theme re-issue) renders ALL verdict lines
@@ -210,6 +210,15 @@ public sealed class MainForm : Form
         {
             if (sender is NavItemButton button && button.Parent is Panel sidebarPanel && sidebarPanel.Parent is MainForm shell)
             {
+                // §5.6/§5.2: the leave-confirmation applies to log out too —
+                // a mid-quiz run is confirmed before the shell closes.
+                if (shell._modulePanels.TryGetValue(shell._activeModule, out Control? current)
+                    && current is ILeaveGuard leaving
+                    && !leaving.ConfirmLeave())
+                {
+                    return; // Stay: the shell stays open, the run continues
+                }
+
                 shell.ReturnedToLogin = true;
                 shell.Close(); // log out returns to the login screen (Program loops back)
             }

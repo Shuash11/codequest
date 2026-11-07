@@ -67,6 +67,7 @@ public sealed class HistoryForm : ModulePanel
         _topics = topics;
         _answers = answers;
 
+        Dock = DockStyle.Fill; // the shell hosts module panels unsized — every module fills its host
         BackColor = UITheme.Background;
 
         int toolbarHeight = UITheme.Scaled(this, 32);
@@ -180,10 +181,10 @@ public sealed class HistoryForm : ModulePanel
         ApplyFilter();
     }
 
-    /// <summary>Rebuilds the topic filter items ("All topics" + one per topic).</summary>
+    /// <summary>Rebuilds the topic filter items ("All topics" + one per topic), preserving the selection BY NAME.</summary>
     private void RebuildTopicFilter()
     {
-        int previous = _topicFilter.SelectedIndex;
+        string? previous = _topicFilter.SelectedItem as string; // topics.name is UNIQUE — the name identifies the choice
 
         _topicFilter.Items.Clear();
         _topicFilter.Items.Add(AllTopicsLabel);
@@ -192,7 +193,8 @@ public sealed class HistoryForm : ModulePanel
             _topicFilter.Items.Add(name);
         }
 
-        _topicFilter.SelectedIndex = previous >= 0 && previous < _topicFilter.Items.Count ? previous : 0;
+        int index = previous is null ? 0 : _topicFilter.Items.IndexOf(previous);
+        _topicFilter.SelectedIndex = index >= 0 ? index : 0;
     }
 
     /// <summary>Applies the live search and the topic/score filters to the grid.</summary>
