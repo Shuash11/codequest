@@ -28,6 +28,23 @@ sitting at the machine), and never turn a failure into a crash or a leak.
 - History sweep: `git log -p` for the key-format patterns finds nothing (the
   keys were never pasted by any agent; the owner pastes them personally into
   the git-ignored file).
+- **Distribution key injection (deliberate tradeoff, documented 2026-11-08):**
+  the owner directed that the downloadable CI build work out of the box for a
+  **single client** (the instructor). The CI workflow therefore writes
+  `config/config.local.json` into the published artifact from the repository
+  secret `OPENROUTER_API_KEY` — the key exists in the artifact, **by design**.
+  This is acceptable *for this project's actual scope* and would not be for a
+  real product: the repository is private (artifact access requires repo
+  access), the audience is one person, the models are free-tier, and the
+  quota is the owner's own 50 requests/day. The key never enters the
+  repository, the source, or the build logs (GitHub masks secret values).
+  **Consequences the owner accepted:** anyone holding the artifact holds the
+  key (extractable from the config next to the exe); the free-tier quota is
+  shared with the owner's own use; and if the key is ever leaked or abused it
+  must be rotated in the GitHub secret and locally. **The production answer
+  remains what it was:** each user brings their own free key
+  (`docs/user-guide.md` §6) or a small server-side proxy holds a key
+  server-side — never a client-side injection.
 - **Disposition (D1, name-only sign-in):** the PBKDF2 password hasher
   delivered in the shell phase was removed together with its tests when the
   owner directed name-only sign-in. The `users.password_hash` column remains

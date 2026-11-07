@@ -34,9 +34,24 @@ jobs:
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
           -o publish
 
+      - name: Write runtime config (AI provider key from repo secret)
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path 'publish/config' | Out-Null
+          @{
+            aiProviders = @(
+              @{ name = 'nvidia'; baseUrl = 'https://integrate.api.nvidia.com/v1'; apiKey = ''; model = 'meta/llama-3.3-70b-instruct' },
+              @{ name = 'openrouter'; baseUrl = 'https://openrouter.ai/api/v1'; apiKey = $env:OPENROUTER_API_KEY; model = 'nvidia/nemotron-3-ultra-550b-a55b:free' }
+            )
+          } | ConvertTo-Json -Depth 5 | Set-Content 'publish/config/config.local.json'
+
       - name: Upload exe artifact
         uses: actions/upload-artifact@v4
         with:
           name: CodeQuest-win-x64
-          path: publish/CodeQuest.exe
+          path: |
+            publish/CodeQuest.exe
+            publish/config/config.local.json
           if-no-files-found: error
