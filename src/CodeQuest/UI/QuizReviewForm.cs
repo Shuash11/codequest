@@ -408,6 +408,7 @@ public sealed class QuizReviewForm : ModulePanel
             existing.Dispose();
         }
         _questionStack.Controls.Clear();
+        _lastStackWidth = _questionStack.ClientSize.Width; // the width this build used (the resize guard compares against it)
 
         int inset = UITheme.Scaled(this, UITheme.Spacing16);
         int cardWidth = Math.Max(_questionStack.ClientSize.Width - inset * 2, 1);
