@@ -67,9 +67,11 @@ Each increment: implement → focused checks → independent review where named 
 - **Review:** Reviewer gate (large accumulated diff: P8 + P6.1 + P8.1 + D1 + D2, never independently reviewed as a whole).
 
 ### I2 — Quiz taking, scoring, history & answer review
-**Depends on:** I1 pushed (shell + management screens stable). **Status: implemented + reviewed + fixed; pending CI.**
+**Depends on:** I1 pushed (shell + management screens stable). **Status: COMPLETE 2026-11-07.**
 - Delivered (`71a7aa6` + fix round `bdf67f1`): QuizTakeForm (list/run/result, §5.6-5.7), HistoryForm (§5.8), AttemptReviewForm (§5.9, shared drill-in), ProgressTrack + ChoiceRowButton, ILeaveGuard shell hook (nav + logout), ScoringService wired via IScoringService.
 - Review: FAIL → all 2 HIGH (HistoryForm missing Dock; choice stack unsized 200×100 clipping rows) + 3 MEDIUM (progress repaint, wrapped-text measurement, logout leave-guard) + 7 LOW fixed in `bdf67f1`; 3 LOW dispositioned (L2 verdict derivation = the domain answer-key rule itself; L3 in-panel run/result headers per the §5.5 drill-in precedent; L5 Enter-on-row covered by the F1 action-cell keyboard path).
+- CI arc: red run 42427142837 (CS0246 missing Drawing2D usings ×2 files; CS0191 readonly fields assigned in builder methods; CS0165 pattern-variable flow) → fixed `a724b3a`; red run 42378242030 (WFO1000 error-level designer-serialization analyzer on the three new control properties + CS8602) → fixed `e9de3f1`; **run 42378461542 GREEN (build+test+publish+artifact, exit 0)**.
+- Lesson recorded: CI-only verification makes compile-level static sweeps (usings, readonly-assignment rules, analyzer conventions, nullable flow) the reviewer's AND the implementer's job before every push — both missed the CS0191 class; the honest fix loop was two CI cycles.
 - Accept: score math via IScoringService only; Draft never startable (3 independent guards); one transactional write; double-submit guarded; offline history/review; CI green.
 - **Disclosed limitation:** desktop e2e still cannot run locally (CI-only); the take/history flows get their scripted checklist at the next e2e-capable opportunity (I6 fresh-clone sweep at the latest).
 
