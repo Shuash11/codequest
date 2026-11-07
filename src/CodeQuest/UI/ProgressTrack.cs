@@ -82,7 +82,7 @@ public sealed class ProgressTrack : Control
             _marquee = value;
             if (_marquee)
             {
-                _marqueeX = -Scaled(this, 60);
+                _marqueeX = -UITheme.Scaled(this, 60);
                 _marqueeTimer.Start();
             }
             else
