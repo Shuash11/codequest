@@ -1,7 +1,8 @@
 # CodeQuest — Database Normalization (1NF → 2NF → 3NF)
 
-*Phase P1 deliverable — drafted from `database/schema.sql` (the deployed schema is
-the single source of truth). Finalised in phase P17.*
+*Final (increment I6, 2026-11-08) — written against `database/schema.sql` (the
+deployed schema is the single source of truth). The analysis below was drafted
+in phase P1 and re-verified against the unchanged schema at delivery.*
 
 ## 1. Purpose and scope
 

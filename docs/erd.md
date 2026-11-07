@@ -1,8 +1,11 @@
 # CodeQuest — Entity Relationship Diagram (ERD)
 
-*Phase P1 deliverable — a draft sketch of the seven tables of
-`database/schema.sql`. The diagram is redrawn and finalised in phase P17
-against the deployed schema.*
+*Final (increment I6, 2026-11-08) — drawn from `database/schema.sql`, which is
+the single source of truth. The schema has not changed since the P1 draft, so
+the diagram below is the deployed shape. One disposition note: the owner
+directive D1 (name-only sign-in) made `users.password_hash` unused at runtime
+— accounts created through the UI store an empty string there; the column
+stays in the schema and in this diagram (see `docs/security-notes.md`).*
 
 ## 1. Diagram (Mermaid)
 

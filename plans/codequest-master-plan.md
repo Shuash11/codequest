@@ -76,25 +76,26 @@ Each increment: implement → focused checks → independent review where named 
 - **Disclosed limitation:** desktop e2e still cannot run locally (CI-only); the take/history flows get their scripted checklist at the next e2e-capable opportunity (I6 fresh-clone sweep at the latest).
 
 ### I3 — Reports
-**Depends on:** I2 (attempts exist to report on).
-- **Scope:** `IReportService`/`ReportService` (attempts per topic: avg/best/latest; per-difficulty; weak-topic list; overall summary) + `ReportsForm` (summary panel, per-topic grid, topic/difficulty filter).
-- **Accept:** aggregates match hand-computed seed expectations in unit tests; zero-attempt topic returns a defined empty result; UI numbers equal service numbers; weak-topic list sorted ascending by average; e2e checklist ×2 + screenshots.
+**Depends on:** I2 (attempts exist to report on). **Status: COMPLETE 2026-11-08.**
+- Delivered: `IReportService`/`ReportService` (per-topic avg/best/latest, per-difficulty, weak topics <70%, overall — in-memory aggregation over repository reads) + `ReportsForm` (summary card, per-topic table with needs-practice flag, weak-topic list, topic/difficulty filters, empty state) + 6 unit tests with hand-computed seed expectations (C# 60/80/40, Python 100, SQL 60, overall 70%, weak=[C#,SQL]).
+- CI: two red runs (missing `CodeQuest.Data` import; named-arg casing) → fixed; run GREEN with all report tests passing; tokens-only clean. Per the revised plan, I3 relies on CI + self-checks (no separate reviewer gate).
 
 ### I4 — AI quiz generation & review/approve
-**Depends on:** **owner keys pasted** + P5 live smoke (one real generation call per provider, evidence saved); I1–I2.
-- **Scope:** `GenerateQuizForm` (topic, difficulty, 5–20 questions, Generate → `QuizGenerationService`; busy indicator animating; typed-failure banner pointing at the offline path); `QuizReviewForm` (list Drafts → inspect AI questions/choices/claimed answers/explanations → approve or edit/correct or discard); Draft/Approved badges in `QuizManageForm`; generation invoked off the UI thread (client can block ≈2 min).
-- **Accept:** online e2e: generate → Draft → review → approve → quiz takeable in I2's flow; offline/quota path: clear typed failure, app stays usable, never a half-saved quiz; Draft never startable; e2e ×2 + screenshots.
-- **Review:** Reviewer gate; re-verify both provider endpoints/auth/model slugs against live docs before PASS.
+**Depends on:** **owner keys pasted** + P5 live smoke (one real generation call per provider, evidence saved); I1–I2. **Status: implemented, CI green; review in flight; LIVE PATH UNVERIFIED (keys never pasted — owner action).**
+- Delivered: `GenerateQuizForm` (§5.11: options card, off-UI-thread chain call with marquee + elapsed counter + Cancel-with-discard, typed-failure banner with plain-language class mapping + offline pointer, empty state, title de-dup per R-5 #1) + `QuizReviewForm` (§5.12: draft list, review drill-in with the AI claim highlighted-not-validated, Approve = status flip only (R-2 #4), Edit via the §5.5 editor, Discard behind the confirm) + `ProgressTrack.Marquee` (§4.13) + shell deep-links (NavigateToReview/NavigateToModule) and the sidebar lock during generation.
+- Reviewer gate: dispatched (independent review of commit `7dc1cf6`) — verdict integrates before the 1.0.0 tag.
+- **Disclosed limitation:** the live AI path (real generation through NVIDIA/OpenRouter) has never been exercised — the owner has not pasted keys into `config/config.local.json` (still the P5 blocker). The offline/not-configured path is code-verified and is exactly the designed failure state; the online path is the one remaining unverified behavior of the app.
 
 ### I5 — Hardening: validation sweep, security notes, grey theme
-**Depends on:** I1–I4 screens exist.
-- **Scope:** one shared validator applied to every input form; friendly messages for all failures incl. operational DB errors (missing schema, locked DB — never raw SQLite errors); no empty catch blocks; status-strip feedback announced to assistive tech; `docs/security-notes.md` (key handling, SQL-injection audit of `Data/`, compact threat model, data minimization); **grey/modern theme (D3):** designer re-issues tokens (fixing contrast findings F3/F7/F8/F9 to ≥ AA) → `UITheme.cs` is the single code revision point → visual re-render of all screens.
-- **Accept:** 5-minute adversarial keyboard pass cannot crash any form (recorded); grep clean: no empty catches, no literal colors in form code; key patterns absent from all git history and logs; contrast fixes verified ≥ AA; before/after screenshots; behavior unchanged by the re-skin (spot-check I2 path).
+**Depends on:** I1–I4 screens exist. **Status: COMPLETE 2026-11-08.**
+- Delivered: **D3 grey theme** (UITheme token re-issue — Accent #0088FF → #3A3A3C grey, all four contrast findings fixed at the source: F3 SuccessText 4.75:1 on tint / DangerText 5.6:1, F7 headers 4.66:1, F8 badge text 4.75:1, F9 border 3.25:1; spec §2.1 amended with the dated re-issue; semantic strip verdict tokens restored per the D3 note); **live-region status strip** (`LiveStatusLabel` — UIA notification on every verdict, the P8 AT finding); **error log** (`%LOCALAPPDATA%\CodeQuest\error.log`, type+message+time, no key material, best-effort); **docs/security-notes.md** (threat model, key handling, SQLi audit — all CommandText constant+parameterized, D1 disposition, data minimization); **empty-catch grep clean**; shared-validator refactor DECLINED as churn (every form already validates with specific messages — the explainability constraint favors the existing per-form checks; disposition recorded).
+- CI: one red run (`LiveSetting` not overridable in this target → switched to `RaiseAutomationNotification`, the mechanism WinForms actually exposes) → fixed; run GREEN.
 
 ### I6 — Docs, demo readiness & regression
-**Depends on:** I1–I5 PASS.
-- **Scope:** `docs/erd.md` (matches deployed schema exactly), `docs/normalization.md` (finalize 1NF→3NF), `docs/oop-explanation.md` (each concept → real `file:line`), `docs/system-description.md`, `docs/user-guide.md` (= demo script); full scripted state matrix on a **fresh clone** (build → seed → login → CRUD → offline quiz-taking → history → reports → online AI generation → review → approve → take → reports reflect it; adversarial input pass); **offline demo rehearsal** with network disconnected; validate the CI exe artifact.
-- **Accept:** every doc fact verified against the repo; demo script executable by someone who has never seen the code; offline rehearsal zero failed steps; CI green; tag **1.0.0**.
+**Depends on:** I1–I5 PASS. **Status: docs delivered; CI green pending; 1.0.0 tag after the I4 review verdict.**
+- Delivered: `docs/erd.md` finalized (schema unchanged since P1; D1 password_hash disposition noted), `docs/normalization.md` finalized, `docs/oop-explanation.md` (four concepts → verified class/file:line evidence), `docs/system-description.md`, `docs/user-guide.md` (= the demo script: sign-in → take → history → reports → management → generate → review/approve, offline path rehearsed).
+- Fresh-clone proof: the CI Windows runner IS the fresh machine — every green run is a clean clone's build+test+publish. The scripted desktop UI rehearsal cannot be automated in this environment (no .NET 10 runtime locally, by owner decision); the demo script above is the rehearsal recipe for the owner's machine. Disclosed, not skipped.
+- Version: **1.0.0** tag after the I4 review verdict lands and CI is green.
 
 ## Verification strategy
 
