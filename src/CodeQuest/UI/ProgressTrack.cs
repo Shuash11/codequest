@@ -37,6 +37,7 @@ public sealed class ProgressTrack : Control
     /// display guarantee, never a data correction. The control is
     /// owner-drawn, so a new value schedules its own repaint.
     /// </summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public double Value
     {
         get => _value;

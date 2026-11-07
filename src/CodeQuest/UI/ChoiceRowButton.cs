@@ -43,9 +43,11 @@ public sealed class ChoiceRowButton : Control
     }
 
     /// <summary>The choice this row represents (the row paints its text).</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string ChoiceText { get => Text; set => Text = value; }
 
     /// <summary>Whether this row is the question's current selection.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public bool IsSelected
     {
         get => _selected;

@@ -201,7 +201,7 @@ public sealed class HistoryForm : ModulePanel
     private void ApplyFilter()
     {
         string searchText = _search.Text.Trim();
-        string? topicFilterName = _topicFilter.SelectedIndex is > 0 ? _topicFilter.Items[_topicFilter.SelectedIndex].ToString() : null;
+        string? topicFilterName = _topicFilter.SelectedIndex is > 0 ? _topicFilter.Items[_topicFilter.SelectedIndex]?.ToString() : null;
         int scoreBucket = _scoreFilter.SelectedIndex; // 0 any, 1 ≥80, 2 50–79, 3 <50
 
         IReadOnlyList<QuizAttempt> attempts = _attempts.GetByUser(_user.UserId);
