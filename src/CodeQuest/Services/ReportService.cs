@@ -12,6 +12,7 @@
 //          instructor can ask exactly when a topic "needs practice".
 // =============================================================================
 
+using CodeQuest.Data;
 using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
 
