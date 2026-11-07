@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeQuest — AI-powered programming & cybersecurity quizzes</title>
+<meta name="description" content="A free Windows desktop app that generates AI quizzes for programming and cybersecurity, scores them instantly, and tracks what to practice next.">
+<meta property="og:title" content="CodeQuest — Learn. Get quizzed. Improve.">
+<meta property="og:description" content="Free Windows app: AI-generated programming & cybersecurity quizzes, instant scoring, answer review, and performance reports.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233A3A3C'/%3E%3Ctext x='16' y='22' font-family='Segoe UI' font-size='16' font-weight='700' fill='%23fff' text-anchor='middle'%3ECQ%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#F5F5F7; --surface:#FFFFFF; --text:#1D1D1F; --text-2:#6E6E73; --text-3:#98989D;
+    --accent:#3A3A3C; --accent-hover:#2C2C2E; --line:#E9E9EE; --success:#157A38;
+    --radius:16px; --radius-sm:10px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.6;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  ::selection{background:#d9d9de}
+
+  /* ---------- nav ---------- */
+  nav{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px clamp(20px,6vw,72px);
+    background:rgba(245,245,247,.72); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid rgba(0,0,0,.05);
+  }
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; font-size:17px; letter-spacing:-.01em}
+  .brand .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+  .nav-links{display:flex; gap:26px; font-size:14px; color:var(--text-2)}
+  .nav-links a{color:inherit; text-decoration:none; transition:color .2s}
+  .nav-links a:hover{color:var(--text)}
+  .nav-cta{background:var(--accent); color:#fff !important; padding:8px 18px; border-radius:99px; font-weight:600}
+  .nav-cta:hover{background:var(--accent-hover)}
+  @media(max-width:720px){.nav-links a:not(.nav-cta){display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{
+    max-width:1160px; margin:0 auto; padding:150px clamp(20px,6vw,72px) 40px;
+    display:grid; grid-template-columns:1.05fr .95fr; gap:56px; align-items:center;
+  }
+  @media(max-width:920px){.hero{grid-template-columns:1fr; padding-top:120px}}
+  .pill{
+    display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600;
+    color:var(--text-2); background:var(--surface); border:1px solid var(--line);
+    padding:6px 14px; border-radius:99px; margin-bottom:22px;
+  }
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
+  h1{
+    font-size:clamp(38px,5.4vw,60px); line-height:1.06; letter-spacing:-.03em; font-weight:700;
+    margin-bottom:20px;
+  }
+  h1 em{font-style:normal; color:var(--text-3)}
+  .hero p.lede{font-size:18px; color:var(--text-2); max-width:520px; margin-bottom:34px}
+  .cta-row{display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+  .btn{
+    display:inline-flex; align-items:center; gap:10px; text-decoration:none; cursor:pointer;
+    font-weight:600; font-size:15.5px; border-radius:99px; padding:15px 30px;
+    transition:transform .18s ease, box-shadow .18s ease, background .18s ease;
+  }
+  .btn-primary{background:var(--accent); color:#fff; box-shadow:0 8px 24px rgba(29,29,31,.18)}
+  .btn-primary:hover{background:var(--accent-hover); transform:translateY(-2px); box-shadow:0 12px 30px rgba(29,29,31,.22)}
+  .btn-ghost{color:var(--text); background:var(--surface); border:1px solid var(--line)}
+  .btn-ghost:hover{transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.06)}
+  .meta-line{margin-top:18px; font-size:13px; color:var(--text-3)}
+  .meta-line b{color:var(--text-2); font-weight:600}
+
+  /* ---------- app mock ---------- */
+  .mock-wrap{display:flex; justify-content:center}
+  .mock{
+    width:100%; max-width:470px; background:var(--surface); border-radius:22px;
+    box-shadow:0 30px 80px rgba(29,29,31,.14), 0 2px 8px rgba(29,29,31,.05);
+    border:1px solid rgba(0,0,0,.05); overflow:hidden;
+    transform:rotate(1.2deg); transition:transform .5s cubic-bezier(.2,.8,.2,1);
+  }
+  .mock:hover{transform:rotate(0deg) scale(1.015)}
+  .mock-bar{display:flex; gap:6px; padding:13px 16px; border-bottom:1px solid var(--line)}
+  .mock-bar i{width:11px;height:11px;border-radius:50%;background:#E9E9EE;display:block}
+  .mock-bar i:first-child{background:#d9d9de}
+  .mock-body{padding:26px 26px 30px}
+  .mock-kicker{font-size:11px; font-weight:600; color:var(--text-3); letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px}
+  .mock-q{font-size:16.5px; font-weight:600; letter-spacing:-.01em; margin-bottom:6px}
+  .mock-progress{height:6px; border-radius:99px; background:var(--line); margin:14px 0 22px; overflow:hidden}
+  .mock-progress i{display:block; height:100%; width:40%; border-radius:99px; background:var(--accent)}
+  .choice{
+    display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:11px;
+    border:1px solid var(--line); margin-bottom:9px; font-size:14px; color:var(--text);
+  }
+  .choice .ring{width:17px;height:17px;border-radius:50%;border:1.5px solid #C7C7CC;flex-shrink:0}
+  .choice.sel{background:#E0E0E5; border-color:transparent}
+  .choice.sel .ring{background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 3.5px #fff}
+  .choice .tag{margin-left:auto; font-size:10.5px; font-weight:700; color:var(--text-2); letter-spacing:.04em; text-transform:uppercase}
+  .mock-foot{display:flex; justify-content:space-between; align-items:center; margin-top:18px}
+  .mock-foot .score{font-size:12px; color:var(--text-2)}
+  .mock-foot .next{background:var(--accent); color:#fff; font-size:13px; font-weight:600; padding:9px 22px; border-radius:99px}
+  .mock-ai{
+    position:absolute; margin:-64px 0 0 42px; background:var(--surface); border-radius:14px;
+    box-shadow:0 16px 40px rgba(29,29,31,.16); padding:12px 16px; font-size:12.5px;
+    display:flex; gap:10px; align-items:center; transform:rotate(-1.6deg);
+  }
+  .mock-ai .spark{color:#B3241F; font-weight:700}
+  .mock-ai b{display:block; font-size:12.5px}
+  .mock-ai span{color:var(--text-2); font-size:11.5px}
+
+  /* ---------- sections ---------- */
+  section{max-width:1160px; margin:0 auto; padding:70px clamp(20px,6vw,72px)}
+  .kicker{font-size:12.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text-3); margin-bottom:12px}
+  h2{font-size:clamp(26px,3.2vw,36px); letter-spacing:-.02em; line-height:1.15; margin-bottom:14px}
+  .section-sub{color:var(--text-2); font-size:16.5px; max-width:560px}
+
+  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:44px}
+  @media(max-width:920px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:620px){.grid{grid-template-columns:1fr}}
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:26px; transition:transform .25s ease, box-shadow .25s ease;
+  }
+  .card:hover{transform:translateY(-4px); box-shadow:0 16px 40px rgba(29,29,31,.08)}
+  .card .icon{
+    width:42px; height:42px; border-radius:11px; background:var(--bg); border:1px solid var(--line);
+    display:grid; place-items:center; margin-bottom:16px;
+  }
+  .card .icon svg{width:20px; height:20px; stroke:var(--text); fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
+  .card h3{font-size:16px; letter-spacing:-.01em; margin-bottom:7px}
+  .card p{font-size:14px; color:var(--text-2)}
+
+  /* steps */
+  .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:44px}
+  @media(max-width:920px){.steps{grid-template-columns:1fr}}
+  .step{position:relative; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:28px}
+  .step .num{
+    font-size:13px; font-weight:700; color:var(--text-2); width:34px; height:34px; border-radius:50%;
+    background:var(--bg); border:1px solid var(--line); display:grid; place-items:center; margin-bottom:16px;
+  }
+  .step h3{font-size:16px; margin-bottom:7px}
+  .step p{font-size:14px; color:var(--text-2)}
+  .step code{font-size:12.5px; background:var(--bg); border:1px solid var(--line); padding:2px 7px; border-radius:6px}
+
+  /* tech strip */
+  .chips{display:flex; flex-wrap:wrap; gap:10px; margin-top:30px}
+  .chip{
+    font-size:13px; font-weight:600; color:var(--text-2); background:var(--surface);
+    border:1px solid var(--line); border-radius:99px; padding:8px 17px;
+  }
+
+  /* cta band */
+  .band{
+    background:var(--accent); border-radius:24px; color:#fff; text-align:center;
+    padding:clamp(44px,6vw,72px) clamp(24px,6vw,72px); margin:30px clamp(20px,6vw,72px);
+  }
+  .band h2{color:#fff; margin-bottom:10px}
+  .band p{color:rgba(255,255,255,.72); margin-bottom:30px}
+  .band .btn{background:#fff; color:var(--text)}
+  .band .btn:hover{transform:translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,.25)}
+  .band .fine{font-size:12.5px; color:rgba(255,255,255,.55); margin-top:18px}
+
+  footer{
+    max-width:1160px; margin:0 auto; padding:40px clamp(20px,6vw,72px) 60px;
+    display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap;
+    color:var(--text-3); font-size:13.5px; border-top:1px solid var(--line);
+  }
+  footer a{color:var(--text-2); text-decoration:none}
+  footer a:hover{color:var(--text)}
+
+  /* reveal */
+  .reveal{opacity:0; transform:translateY(26px); transition:opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1)}
+  .reveal.in{opacity:1; transform:none}
+  @media(prefers-reduced-motion:reduce){
+    .reveal{opacity:1; transform:none; transition:none}
+    html{scroll-behavior:auto}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand"><span class="mark">CQ</span> CodeQuest</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="#tech">Technology</a>
+    <a class="nav-cta" href="https://github.com/Shuash11/codequest/releases/latest/download/CodeQuest-1.0.0-win-x64.zip">Download</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div>
+    <span class="pill"><span class="dot"></span> Version 1.0.0 · free · Windows 10 / 11</span>
+    <h1>AI-built quizzes for <em>programming</em> & cybersecurity.</h1>
+    <p class="lede">
+      Pick a topic, a difficulty, and a length — CodeQuest generates the quiz, scores it
+      instantly, explains every answer, and shows you exactly what to practice next.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/Shuash11/codequest/releases/latest/download/CodeQuest-1.0.0-win-x64.zip">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download for Windows
+      </a>
+      <a class="btn btn-ghost" href="#how">How it works</a>
+    </div>
+    <p class="meta-line"><b>45 MB</b> · no installer — extract & run · works offline · AI key included for evaluation</p>
+  </div>
+
+  <div class="mock-wrap">
+    <div style="position:relative">
+      <div class="mock">
+        <div class="mock-bar"><i></i><i></i><i></i></div>
+        <div class="mock-body">
+          <div class="mock-kicker">C# · Question 2 of 5</div>
+          <div class="mock-q">Which C# collection guarantees unique keys and offers fast lookup by key?</div>
+          <div class="mock-progress"><i></i></div>
+          <div class="choice"><span class="ring"></span> List<T></div>
+          <div class="choice sel"><span class="ring"></span> Dictionary<TKey, TValue> <span class="tag">Selected</span></div>
+          <div class="choice"><span class="ring"></span> Queue<T></div>
+          <div class="choice"><span class="ring"></span> Array</div>
+          <div class="mock-foot">
+            <span class="score">Answered 2 of 5</span>
+            <span class="next">Next</span>
+          </div>
+        </div>
+      </div>
+      <div class="mock-ai"><span class="spark">✦</span><span><b>AI-generated quiz</b><span>reviewed & approved</span></span></div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="kicker reveal">Features</div>
+  <h2 class="reveal">Everything a study session needs.</h2>
+  <p class="section-sub reveal">Seven connected modules, one clean desktop app — built with C# and a normalized SQLite database.</p>
+  <div class="grid">
+    <div class="card reveal">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect x="4" y="12" width="16" height="8" rx="2"/><path d="M2 12h20"/></svg></div>
+      <h3>AI quiz generation</h3>
+      <p>Pick topic, difficulty and length (5–20 questions). The provider chain authors a fresh quiz in seconds.</p>
+    </div>
+    <div class="card reveal">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg></div>
+      <h3>Human review gate</h3>
+      <p>Generated quizzes land as drafts. Every question, answer and explanation is checked before students see it.</p>
+    </div>
+    <div class="card reveal">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+      <h3>Instant scoring</h3>
+      <p>Auto-scored the moment you submit — percentage, per-question verdicts, and the reasoning behind each answer.</p>
+    </div>
+    <div class="card reveal">
+      <div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <h3>Works offline</h3>
+      <p>Taking quizzes, scoring, history and reports run entirely on your machine. The network is only for new questions.</p>
+    </div>
+    <div class="card reveal">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.8L7 14.3"/></svg></div>
+      <h3>Performance reports</h3>
+      <p>Averages, best runs and a needs-practice list per topic — sorted weakest first, with topic and difficulty filters.</p>
+    </div>
+    <div class="card reveal">
+      <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <h3>Private by design</h3>
+      <p>Everything is stored in a local SQLite database on your machine. No telemetry, no accounts, no tracking.</p>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="kicker reveal">How it works</div>
+  <h2 class="reveal">Three steps, zero setup.</h2>
+  <p class="section-sub reveal">No installer, no dependencies, no account. The download carries everything — app, database and configuration.</p>
+  <div class="steps">
+    <div class="step reveal">
+      <div class="num">1</div>
+      <h3>Download & extract</h3>
+      <p>Grab the ZIP below and extract it anywhere. Inside: the app, the seeded database, and the ready configuration.</p>
+    </div>
+    <div class="step reveal">
+      <div class="num">2</div>
+      <h3>Run <code>CodeQuest.exe</code></h3>
+      <p>Double-click to launch. Sign in with a name — that's the whole login. Your attempts are saved locally from the first session.</p>
+    </div>
+    <div class="step reveal">
+      <div class="num">3</div>
+      <h3>Take a quiz, watch the report</h3>
+      <p>Take a seeded quiz, review every answer with explanations, then open <b>Reports</b> to see your weakest topics ranked.</p>
+    </div>
+  </div>
+</section>
+
+<section id="tech">
+  <div class="kicker reveal">Under the hood</div>
+  <h2 class="reveal">Built like a real product, scaled to a course project.</h2>
+  <p class="section-sub reveal">A normalized relational schema, a layered object-oriented design, and a tested provider chain — the same patterns production teams use, sized honestly.</p>
+  <div class="chips reveal">
+    <span class="chip">C# · .NET 10</span>
+    <span class="chip">Windows Forms</span>
+    <span class="chip">SQLite · 3NF schema</span>
+    <span class="chip">ADO.NET · parameterized SQL</span>
+    <span class="chip">AI provider chain — NVIDIA + OpenRouter</span>
+    <span class="chip">xUnit test suite</span>
+    <span class="chip">CI build & release</span>
+    <span class="chip">WCAG-conscious UI tokens</span>
+  </div>
+</section>
+
+<div class="band reveal">
+  <h2>Ready to try it?</h2>
+  <p>Extract, run, and take your first AI-generated quiz in under a minute.</p>
+  <a class="btn" href="https://github.com/Shuash11/codequest/releases/latest/download/CodeQuest-1.0.0-win-x64.zip">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Download CodeQuest — free
+  </a>
+  <p class="fine">Windows 10 / 11 · 45 MB · the AI evaluation key is included in the package</p>
+</div>
+
+<footer>
+  <div>CodeQuest — a final-year project by Joashua · C# OOP & Database Development</div>
+  <div><a href="https://github.com/Shuash11/codequest">Source & releases</a> · evaluation build for course review</div>
+</footer>
+
+<script>
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) { entry.target.classList.add('in'); io.unobserve(entry.target); }
+    });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+</script>
+</body>
+</html>
