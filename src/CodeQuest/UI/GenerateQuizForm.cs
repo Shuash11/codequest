@@ -300,9 +300,9 @@ public sealed class GenerateQuizForm : ModulePanel
                 form.OpenReviewNow();
             }
         };
-        actionCard.Controls.Add(_generate);
-        actionCard.Controls.Add(_reviewNow);
-        actionCard.Controls.Add(note);
+        _actionCard.Controls.Add(_generate);
+        _actionCard.Controls.Add(_reviewNow);
+        _actionCard.Controls.Add(note);
 
         // The busy block (§5.11 busy state): marquee + status + Cancel.
         _busyBlock = new Panel
