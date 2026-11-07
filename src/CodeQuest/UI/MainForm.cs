@@ -214,7 +214,7 @@ public sealed class MainForm : Form
             Location = new Point(inset, accountTop + signedInName.Height + UITheme.Scaled(this, UITheme.Spacing8)),
             Size = new Size(navWidth, rowHeight),
         };
-        logout.Click += static (sender, e) =>
+        _logoutButton.Click += static (sender, e) =>
         {
             if (sender is NavItemButton button && button.Parent is Panel sidebarPanel && sidebarPanel.Parent is MainForm shell)
             {
@@ -231,7 +231,7 @@ public sealed class MainForm : Form
                 shell.Close(); // log out returns to the login screen (Program loops back)
             }
         };
-        sidebar.Controls.Add(logout);
+        sidebar.Controls.Add(_logoutButton);
 
         return sidebar;
     }
