@@ -22,6 +22,19 @@ public interface IModulePanel
 }
 
 /// <summary>
+/// A module panel whose in-progress state needs a confirmation before the
+/// shell navigates away (§5.6: leaving a running quiz asks first).
+/// </summary>
+public interface ILeaveGuard
+{
+    /// <summary>
+    /// Asks whether navigation away from this module may proceed. False
+    /// cancels the switch — the shell stays on this module untouched.
+    /// </summary>
+    bool ConfirmLeave();
+}
+
+/// <summary>
 /// The base of every real module screen: a persisted, shell-hosted panel
 /// (§5.2) that reports feedback lines to the shell's status strip.
 /// </summary>

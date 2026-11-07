@@ -35,6 +35,7 @@
 using CodeQuest.Data;
 using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
+using CodeQuest.Services;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -48,8 +49,8 @@ public sealed class MainForm : Form
     /// <summary>The seven nav entries of spec 5.2, in sidebar order.</summary>
     private static readonly (string Key, string Title, string Glyph, string PhaseNote)[] Modules =
     {
-        ("TakeQuiz", "Take quiz", "\uE80F", "Coming in phase P9."),
-        ("History", "History", "\uE823", "Coming in phase P10."),
+        ("TakeQuiz", "Take quiz", "\uE80F", ""),
+        ("History", "History", "\uE823", ""),
         ("Reports", "Reports", "\uE9D9", "Coming in phase P12."),
         ("GenerateQuiz", "Generate quiz", "\uE710", "Coming in phase P13."),
         ("Review", "Review", "\uE73E", "Coming in phase P13."),
@@ -67,6 +68,7 @@ public sealed class MainForm : Form
     private readonly System.Windows.Forms.Timer _statusClearTimer = new() { Interval = StatusAutoClearMilliseconds };
     private readonly Dictionary<string, NavItemButton> _navItems = new();
     private readonly Dictionary<string, Control> _modulePanels = new();
+    private string _activeModule = string.Empty; // the module key currently on screen (§5.2)
 
     /// <summary>Creates the shell for the account that just signed in, over the application database.</summary>
     public MainForm(UserAccount user, Db database)
@@ -103,7 +105,12 @@ public sealed class MainForm : Form
         };
         _statusClearTimer.Tag = this;
 
-        Controls.Add(BuildContentArea(topics, quizzes, questions, choices, attempts, answers));
+        // The scoring of the quiz-taking screen (P9) is a pure service — the
+        // UI depends on the IScoringService contract only (plan decision:
+        // business logic behind interfaces).
+        IScoringService scoring = new ScoringService();
+
+        Controls.Add(BuildContentArea(topics, quizzes, questions, choices, attempts, answers, scoring));
         Controls.Add(BuildSidebar());
     }
 
@@ -219,7 +226,8 @@ public sealed class MainForm : Form
         QuestionRepository questions,
         ChoiceRepository choices,
         AttemptRepository attempts,
-        SubmittedAnswerRepository answers)
+        SubmittedAnswerRepository answers,
+        IScoringService scoring)
     {
         int inset = UITheme.Scaled(this, UITheme.Spacing24);
         int headerTop = inset;
@@ -274,8 +282,12 @@ public sealed class MainForm : Form
         {
             Control module = key switch
             {
-                // The P8 management screens replace their placeholders (spec
-                // 5.3, 5.4); the other modules keep the P7 placeholder cards.
+                // The P8 management screens and the P9/P10 learning screens
+                // replace their placeholders (spec 5.3-5.8); the P12/P13
+                // placeholders stay until their phases.
+                "TakeQuiz" => BuildModulePanel(
+                    new QuizTakeForm(quizzes, questions, topics, attempts, answers, scoring, _user), key),
+                "History" => BuildModulePanel(new HistoryForm(_user, attempts, quizzes, topics, answers), key),
                 "Topics" => BuildModulePanel(new TopicManageForm(topics, quizzes), key),
                 "QuizManagement" => BuildModulePanel(
                     new QuizManageForm(quizzes, topics, questions, choices, attempts, answers), key),
@@ -375,7 +387,18 @@ public sealed class MainForm : Form
     /// </summary>
     private void ShowModule(string key)
     {
-        if (!_modulePanels.ContainsKey(key))
+        if (!_modulePanels.ContainsKey(key) || key == _activeModule)
+        {
+            return;
+        }
+
+        // The §5.6 mid-run guard: the module being LEFT may hold an
+        // in-progress state (a running quiz). It confirms first — Stay
+        // cancels the whole switch, leaving strip and panels untouched.
+        if (_activeModule.Length > 0
+            && _modulePanels.TryGetValue(_activeModule, out Control? current)
+            && current is ILeaveGuard leaving
+            && !leaving.ConfirmLeave())
         {
             return;
         }
@@ -400,6 +423,7 @@ public sealed class MainForm : Form
         }
 
         _contentHeader.Text = Modules.First(module => module.Key == key).Title;
+        _activeModule = key;
     }
 
     /// <summary>
