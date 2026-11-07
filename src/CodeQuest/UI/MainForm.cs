@@ -20,8 +20,9 @@
 //          (search text and filters stay; the data reloads on show).
 //          P7 hosted one spec-styled placeholder card per module ("Coming in
 //          phase …"); P8 replaced the Topics and Quiz-management placeholders,
-//          I2 the Take-quiz and History screens (spec 5.6-5.9) — the Reports
-//          and P13 placeholders stay until their phases.
+//          I2 the Take-quiz and History screens (spec 5.6-5.9), and I3/I4 the
+//          Reports, Generate-quiz and Review screens (spec 5.10-5.12) — all
+//          seven nav entries are real modules.
 // Status strip (§4.11, §5 anatomy): module panels report success and failure
 //          lines through <see cref="ShowStatus"/> — the SEMANTIC verdict tokens (F3 final, D3 re-issue): SuccessText for success, DangerText for failure/blocked - both AA on Background
 //          the semantic text tokens keep their on-Surface uses. Success lines
@@ -66,6 +67,7 @@ public sealed class MainForm : Form
     private Panel _moduleHost = null!;     // assigned during construction (BuildContentArea)
     private readonly System.Windows.Forms.Timer _statusClearTimer = new() { Interval = StatusAutoClearMilliseconds };
     private readonly Dictionary<string, NavItemButton> _navItems = new();
+    private NavItemButton _logoutButton = null!; // not a nav item, but it locks with them (the I4 busy state)
     private readonly Dictionary<string, Control> _modulePanels = new();
     private string _activeModule = string.Empty; // the module key currently on screen (§5.2)
 
@@ -204,7 +206,7 @@ public sealed class MainForm : Form
         };
         sidebar.Controls.Add(signedInName);
 
-        var logout = new NavItemButton
+        _logoutButton = new NavItemButton
         {
             Name = "NavLogout",
             Text = "Log out",
@@ -299,9 +301,8 @@ public sealed class MainForm : Form
         {
             Control module = key switch
             {
-                // The P8 management screens and the P9/P10 learning screens
-                // replace their placeholders (spec 5.3-5.8); the P12/P13
-                // placeholders stay until their phases.
+                // Every nav entry is a real module screen now (spec 5.3-5.12);
+                // the switch keeps the placeholder fallback for safety.
                 "TakeQuiz" => BuildModulePanel(
                     new QuizTakeForm(quizzes, questions, topics, attempts, answers, scoring, _user), key),
                 "History" => BuildModulePanel(new HistoryForm(_user, attempts, quizzes, topics, answers), key),
@@ -478,6 +479,8 @@ public sealed class MainForm : Form
         {
             item.Enabled = enabled;
         }
+
+        _logoutButton.Enabled = enabled; // §5.11: the WHOLE sidebar locks — no half-locked state
     }
 
     /// <summary>

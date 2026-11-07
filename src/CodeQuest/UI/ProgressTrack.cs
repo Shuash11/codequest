@@ -39,10 +39,11 @@ public sealed class ProgressTrack : Control
         {
             if (sender is System.Windows.Forms.Timer timer && timer.Tag is ProgressTrack track)
             {
-                track._marqueeX += Math.Max(track.Width / 24, 6);
-                if (track._marqueeX > track.Width + 60)
+                int segmentWidth = UITheme.Scaled(track, 60);
+                track._marqueeX += Math.Max(track.Width / 24, UITheme.Scaled(track, 6));
+                if (track._marqueeX > track.Width + segmentWidth)
                 {
-                    track._marqueeX = -60;
+                    track._marqueeX = -segmentWidth;
                 }
 
                 track.Invalidate();
@@ -81,7 +82,7 @@ public sealed class ProgressTrack : Control
             _marquee = value;
             if (_marquee)
             {
-                _marqueeX = -60;
+                _marqueeX = -Scaled(this, 60);
                 _marqueeTimer.Start();
             }
             else
@@ -137,7 +138,7 @@ public sealed class ProgressTrack : Control
             // The sweeping segment (§4.13): activity, never a percent. The
             // clip keeps the sweep inside the pill at both edges.
             e.Graphics.SetClip(track);
-            Rectangle segment = new(_marqueeX, 0, 60, Height);
+            Rectangle segment = new(_marqueeX, 0, UITheme.Scaled(this, 60), Height);
             using var segmentBrush = new SolidBrush(UITheme.Accent);
             DrawPill(e.Graphics, segmentBrush, segment);
             e.Graphics.ResetClip();

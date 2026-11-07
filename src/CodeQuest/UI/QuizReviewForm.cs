@@ -64,6 +64,7 @@ public sealed class QuizReviewForm : ModulePanel
     private Panel _questionStack = null!;
     private QuestionEditForm? _editor; // the §5.5 drill-in, created on first open
     private int _openQuizId;
+    private int _lastStackWidth; // the width the question cards were last built at (the H1 resize rebuild)
 
     private Dictionary<int, string> _topicNames = new();
 
@@ -99,7 +100,7 @@ public sealed class QuizReviewForm : ModulePanel
             BackColor = UITheme.Background,
             AutoSize = false,
             Location = new Point(0, 0),
-            Size = new Size(Width, captionHeight),
+            Size = new Size(Math.Max(Width, 1), captionHeight),
         };
 
         _list = new ListCardGrid
@@ -143,7 +144,16 @@ public sealed class QuizReviewForm : ModulePanel
         }
         _topicNames = names;
 
+        _listCaption.Width = Math.Max(Width, 1); // the caption was built at the pre-layout width (M6)
+
         LoadDraftRows();
+    }
+
+    /// <summary>Keeps the list caption full-width as the module resizes (M6).</summary>
+    protected override void OnResize(EventArgs eventargs)
+    {
+        base.OnResize(eventargs);
+        _listCaption.Width = Math.Max(Width, 1);
     }
 
     /// <summary>
@@ -224,7 +234,7 @@ public sealed class QuizReviewForm : ModulePanel
         {
             Name = "ReviewDrillInHeader",
             Dock = DockStyle.Top,
-            Height = UITheme.Scaled(this, 40),
+            Height = UITheme.Scaled(this, 58),
             BackColor = UITheme.Background,
         };
         var back = new FlatButton
@@ -252,13 +262,13 @@ public sealed class QuizReviewForm : ModulePanel
             AutoEllipsis = true,
             TextAlign = ContentAlignment.MiddleLeft,
             Location = new Point(UITheme.Scaled(this, 90) + UITheme.Scaled(this, UITheme.Spacing12), 0),
-            Size = new Size(UITheme.Scaled(this, 320), UITheme.Scaled(this, 32)),
+            Size = new Size(UITheme.Scaled(this, 200), UITheme.Scaled(this, 32)),
         };
         _reviewBadge = new StatusBadge
         {
             Name = "ReviewDrillInBadge",
             Status = QuizStatus.Draft,
-            Location = new Point(UITheme.Scaled(this, 90) + UITheme.Scaled(this, 320) + UITheme.Scaled(this, UITheme.Spacing12), 0),
+            Location = new Point(UITheme.Scaled(this, 90) + UITheme.Scaled(this, 200) + UITheme.Scaled(this, UITheme.Spacing12), 4),
             Size = new Size(UITheme.Scaled(this, 96), UITheme.Scaled(this, 24)),
         };
         _approve = new FlatButton
@@ -316,9 +326,9 @@ public sealed class QuizReviewForm : ModulePanel
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Background,
             AutoSize = false,
-            Location = new Point(Width - UITheme.Scaled(this, 420), 0),
+            Location = new Point(Width - UITheme.Scaled(this, 344), UITheme.Scaled(this, 36)),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
-            Size = new Size(UITheme.Scaled(this, 250), UITheme.Scaled(this, 32)),
+            Size = new Size(UITheme.Scaled(this, 344), UITheme.Scaled(this, 18)),
             TextAlign = ContentAlignment.MiddleRight,
             Visible = false,
         };
@@ -340,7 +350,30 @@ public sealed class QuizReviewForm : ModulePanel
 
         review.Controls.Add(_questionStack);
         review.Controls.Add(header);
+
+        // The H1 fix: a Dock=Fill container is laid out only once visible, so
+        // the cards build at the pre-layout width first; the width-driven
+        // rebuild below corrects them the moment the real size arrives.
+        _reviewView.Resize += static (sender, e) =>
+        {
+            if (sender is Panel view && view.Visible && view.FindAncestor<QuizReviewForm>() is { } form)
+            {
+                form.RebuildIfWidthChanged();
+            }
+        };
+
         return review;
+    }
+
+    /// <summary>Rebuilds the question cards when the stack's WIDTH actually changes.</summary>
+    private void RebuildIfWidthChanged()
+    {
+        if (_openQuizId != 0
+            && _quizzes.GetById(_openQuizId) is { } quiz
+            && _questionStack.ClientSize.Width != _lastStackWidth)
+        {
+            BuildQuestionCards(quiz);
+        }
     }
 
     /// <summary>Loads one draft and renders its review view (§5.12).</summary>
@@ -361,9 +394,9 @@ public sealed class QuizReviewForm : ModulePanel
         _approve.Enabled = hasQuestions; // §5.12: zero questions → Approve disabled
         _approveHint.Visible = !hasQuestions;
 
-        BuildQuestionCards(quiz);
-        _reviewView.Visible = true;
+        _reviewView.Visible = true; // visible FIRST — the stack is laid out only now (the H1 fix)
         _reviewView.BringToFront();
+        BuildQuestionCards(quiz);
     }
 
     /// <summary>Builds one §5.12 card per AI question (claim highlighted, not validated).</summary>
@@ -387,10 +420,18 @@ public sealed class QuizReviewForm : ModulePanel
 
             int textHeight = TextRenderer.MeasureText(
                 question.QuestionText, UITheme.Body, new Size(cardWidth - inset * 2, int.MaxValue), TextFormatFlags.WordBreak).Height;
+            string explanation = question.Explanation.Length == 0 ? NoExplanationText : question.Explanation;
+            int explanationTextHeight = TextRenderer.MeasureText(
+                explanation,
+                UITheme.Body,
+                new Size(Math.Max(cardWidth - inset * 2, 1), int.MaxValue),
+                TextFormatFlags.WordBreak).Height;
+            int explanationBlockHeight = UITheme.Scaled(this, 18) + UITheme.Scaled(this, explanationTextHeight);
             int cardHeight = inset + textHeight + UITheme.Scaled(this, UITheme.Spacing12)
                 + (question.Choices.Count * UITheme.Scaled(this, 30))
                 + UITheme.Scaled(this, UITheme.Spacing12)
-                + UITheme.Scaled(this, 60)
+                + explanationBlockHeight
+                + UITheme.Scaled(this, 12)
                 + inset;
 
             var card = new CardPanel
@@ -460,9 +501,9 @@ public sealed class QuizReviewForm : ModulePanel
                 choiceTop += UITheme.Scaled(this, 30);
             }
 
-            // The explanation inset: the AI's claimed reasoning, always rendered.
+            // The explanation inset: the AI's claimed reasoning, always rendered,
+            // measured so multi-line reasoning is never clipped (M8).
             int explanationTop = choiceTop + UITheme.Scaled(this, UITheme.Spacing12);
-            string explanation = question.Explanation.Length == 0 ? NoExplanationText : question.Explanation;
             var explanationCaption = new Label
             {
                 Name = $"ReviewExplanationCaption{i}",
@@ -482,8 +523,8 @@ public sealed class QuizReviewForm : ModulePanel
                 ForeColor = UITheme.TextPrimary,
                 BackColor = UITheme.Fill,
                 AutoSize = false,
-                Location = new Point(inset, explanationTop + UITheme.Scaled(this, 20)),
-                Size = new Size(cardWidth - inset * 2, UITheme.Scaled(this, 40) - UITheme.Scaled(this, 20)),
+                Location = new Point(inset, explanationTop + UITheme.Scaled(this, 18)),
+                Size = new Size(cardWidth - inset * 2, explanationTextHeight),
             };
             card.Controls.Add(explanationCaption);
             card.Controls.Add(explanationText);
@@ -534,6 +575,13 @@ public sealed class QuizReviewForm : ModulePanel
                 {
                     editor.Visible = false;
                     form.EditorClosed();
+                }
+            };
+            _editor.StatusRequested += static (sender, e) =>
+            {
+                if (sender is QuestionEditForm editor && editor.FindAncestor<QuizReviewForm>() is { } form)
+                {
+                    form.ReportStatus(e.Message, e.Success); // the editor's feedback rides the shell strip (M7)
                 }
             };
             Controls.Add(_editor);

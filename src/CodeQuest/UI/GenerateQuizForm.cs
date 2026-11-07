@@ -16,9 +16,10 @@
 // Success: the quiz saves as Draft (nothing auto-approves, R-2 #4), the title
 // is de-duplicated against the topic's existing quizzes (the R-5 #1 insert-
 // time rule), the strip announces it, and "Review now" deep-links to §5.12.
-// The live path needs configured provider keys (config/config.local.json);
-// without them the chain ends in the typed not-configured failure — which is
-// exactly the offline path this screen is designed to show.
+// Without configured keys — a fresh clone's state — the chain ends in the
+// chain-level typed failure and the banner shows the no-provider message with
+// the offline pointer: exactly the offline path this screen is designed for.
+// The live path needs the owner's keys in config/config.local.json.
 // =============================================================================
 
 using CodeQuest.Data.Repositories;
@@ -51,6 +52,7 @@ public sealed class GenerateQuizForm : ModulePanel
     private const string HttpMessage = "The AI provider returned an error. Try again later.";
     private const string BadOutputMessage = "The AI provider returned an unusable response. Try again.";
     private const string GenericFailureMessage = "Quiz generation failed. Try again.";
+    private const string SaveFailedMessage = "The quiz could not be saved. Please try again.";
     private const string OfflinePointer = "You can still take any quizzes already saved on this computer.";
     private const string NoTopicsTitle = "Create a topic first.";
     private const string GoToTopicsButton = "Go to topics";
@@ -74,11 +76,16 @@ public sealed class GenerateQuizForm : ModulePanel
     private readonly Panel _banner = null!;
     private readonly Label _bannerDetail = null!;
     private readonly Panel _emptyTopics = null!;
+    private readonly Label _topicLabel = null!;
+    private readonly Label _difficultyLabel = null!;
+    private readonly Label _countLabel = null!;
+    private readonly Panel _actionCard = null!;
     private readonly System.Windows.Forms.Timer _elapsedTimer = new() { Interval = 1000 };
 
     private List<Topic> _topicsCache = new();
-    private bool _busy; // the in-flight generation flag (also the re-entrancy guard)
-    private bool _cancelled; // the user cancelled; the late result is discarded
+    private bool _busy; // a generation is in flight (also the re-entrancy guard)
+    private bool _cancelPending; // the user cancelled; the late result is discarded, never saved
+    private int _generationId; // increments per start — the continuation's id must match or it is discarded
     private DateTimeOffset _startedAt;
     private int _savedDraftQuizId; // the last saved draft (the "Review now" hand-off)
 
@@ -108,15 +115,15 @@ public sealed class GenerateQuizForm : ModulePanel
         {
             Name = "GenerateOptionsCard",
             Location = new Point(0, 0),
-            Size = new Size(cardWidth, UITheme.Scaled(this, 260)),
+            Size = new Size(cardWidth, 0), // the layout method sets the height (banner aware)
         };
 
         // The typed-failure banner (§5.11): WarningTint, 8px radius, 12px
-        // padding; hidden until a generation fails.
+        // padding; laid out INLINE at the top of the options card (the option
+        // rows reflow beneath it — never an overlay).
         _banner = new Panel
         {
             Name = "GenerateFailureBanner",
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16)),
             Size = new Size(cardWidth - UITheme.Scaled(this, UITheme.Spacing32), UITheme.Scaled(this, 110)),
             BackColor = UITheme.WarningTint,
             Visible = false,
@@ -188,7 +195,7 @@ public sealed class GenerateQuizForm : ModulePanel
         _banner.Controls.Add(browseQuizzes);
 
         // The option rows.
-        var topicLabel = new Label
+        _topicLabel = new Label
         {
             Name = "GenerateTopicLabel",
             Text = "Topic",
@@ -196,18 +203,16 @@ public sealed class GenerateQuizForm : ModulePanel
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Surface,
             AutoSize = false,
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16)),
             Size = new Size(UITheme.Scaled(this, 200), UITheme.Scaled(this, 18)),
         };
         _topicFilter = new ThemedComboBox
         {
             Name = "GenerateTopicPicker",
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16) + UITheme.Scaled(this, 22)),
             Size = new Size(UITheme.Scaled(this, 300), UITheme.Scaled(this, 32)),
             DropDownStyle = ComboBoxStyle.DropDownList,
         };
 
-        var difficultyLabel = new Label
+        _difficultyLabel = new Label
         {
             Name = "GenerateDifficultyLabel",
             Text = "Difficulty",
@@ -215,20 +220,18 @@ public sealed class GenerateQuizForm : ModulePanel
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Surface,
             AutoSize = false,
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, 88)),
             Size = new Size(UITheme.Scaled(this, 200), UITheme.Scaled(this, 18)),
         };
         _difficulty = new SegmentedControl
         {
             Name = "GenerateDifficultyPicker",
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, 88) + UITheme.Scaled(this, 22)),
             Size = new Size(UITheme.Scaled(this, 300), UITheme.Scaled(this, 32)),
-            LabeledBy = difficultyLabel, // §4.9: the visible label is the accessible name's source
+            LabeledBy = _difficultyLabel, // §4.9: the visible label is the accessible name's source
         };
         _difficulty.Items = new[] { Difficulty.Easy.ToString(), Difficulty.Medium.ToString(), Difficulty.Hard.ToString() };
         _difficulty.SelectedIndex = 0;
 
-        var countLabel = new Label
+        _countLabel = new Label
         {
             Name = "GenerateCountLabel",
             Text = "Questions",
@@ -236,13 +239,11 @@ public sealed class GenerateQuizForm : ModulePanel
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Surface,
             AutoSize = false,
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, 160)),
             Size = new Size(UITheme.Scaled(this, 200), UITheme.Scaled(this, 18)),
         };
         _count = new ThemedComboBox
         {
             Name = "GenerateCountPicker",
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, 160) + UITheme.Scaled(this, 22)),
             Size = new Size(UITheme.Scaled(this, 120), UITheme.Scaled(this, 32)),
             DropDownStyle = ComboBoxStyle.DropDownList,
         };
@@ -253,10 +254,9 @@ public sealed class GenerateQuizForm : ModulePanel
         _count.SelectedIndex = 0;
 
         // The action card.
-        var actionCard = new CardPanel
+        _actionCard = new CardPanel
         {
             Name = "GenerateActionCard",
-            Location = new Point(0, _optionsCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16)),
             Size = new Size(cardWidth, UITheme.Scaled(this, 120)),
         };
         _generate = new FlatButton
@@ -308,7 +308,6 @@ public sealed class GenerateQuizForm : ModulePanel
         _busyBlock = new Panel
         {
             Name = "GenerateBusyBlock",
-            Location = new Point(0, _optionsCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16)),
             Size = new Size(cardWidth, UITheme.Scaled(this, 120)),
             BackColor = UITheme.Surface,
             Visible = false,
@@ -316,9 +315,7 @@ public sealed class GenerateQuizForm : ModulePanel
         _busyTrack = new ProgressTrack
         {
             Name = "GenerateBusyTrack",
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16)),
             Size = new Size(cardWidth - UITheme.Scaled(this, UITheme.Spacing32), UITheme.Scaled(this, 8)),
-            Marquee = true,
         };
         _busyStatus = new Label
         {
@@ -395,11 +392,11 @@ public sealed class GenerateQuizForm : ModulePanel
         _emptyTopics.Controls.Add(emptyCard);
 
         _optionsCard.Controls.Add(_banner);
-        _optionsCard.Controls.Add(topicLabel);
+        _optionsCard.Controls.Add(_topicLabel);
         _optionsCard.Controls.Add(_topicFilter);
-        _optionsCard.Controls.Add(difficultyLabel);
+        _optionsCard.Controls.Add(_difficultyLabel);
         _optionsCard.Controls.Add(_difficulty);
-        _optionsCard.Controls.Add(countLabel);
+        _optionsCard.Controls.Add(_countLabel);
         _optionsCard.Controls.Add(_count);
 
         // The elapsed-seconds counter ticks on the UI timer (§5.11 busy state).
@@ -413,10 +410,70 @@ public sealed class GenerateQuizForm : ModulePanel
         };
         _elapsedTimer.Tag = this;
 
+        // The card re-flows whenever the banner appears or the width changes.
+        _optionsCard.Resize += static (sender, e) =>
+        {
+            if (sender is CardPanel card && card.FindAncestor<GenerateQuizForm>() is { } form)
+            {
+                form.LayoutGenerateLayout();
+            }
+        };
+
         Controls.Add(_busyBlock);
-        Controls.Add(actionCard);
+        Controls.Add(_actionCard);
         Controls.Add(_optionsCard);
         Controls.Add(_emptyTopics);
+        LayoutGenerateLayout();
+    }
+
+    /// <summary>Stops the elapsed timer when the control is disposed (L1).</summary>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _elapsedTimer.Stop();
+            _elapsedTimer.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    /// <summary>
+    /// Lays out the options card and the blocks below it: the failure banner
+    /// is INLINE at the card's top (the option rows reflow beneath it), and
+    /// the action/busy cards follow the card's bottom edge.
+    /// </summary>
+    private void LayoutGenerateLayout()
+    {
+        int inset = UITheme.Scaled(this, UITheme.Spacing16);
+        int y = inset;
+
+        if (_banner.Visible)
+        {
+            _banner.Location = new Point(inset, y);
+            y += _banner.Height + UITheme.Scaled(this, UITheme.Spacing12);
+        }
+
+        _topicLabel.Location = new Point(inset, y);
+        y += UITheme.Scaled(this, 18) + UITheme.Scaled(this, UITheme.Spacing4);
+        _topicFilter.Location = new Point(inset, y);
+        y += UITheme.Scaled(this, 32) + UITheme.Scaled(this, UITheme.Spacing16);
+
+        _difficultyLabel.Location = new Point(inset, y);
+        y += UITheme.Scaled(this, 18) + UITheme.Scaled(this, UITheme.Spacing4);
+        _difficulty.Location = new Point(inset, y);
+        y += UITheme.Scaled(this, 32) + UITheme.Scaled(this, UITheme.Spacing16);
+
+        _countLabel.Location = new Point(inset, y);
+        y += UITheme.Scaled(this, 18) + UITheme.Scaled(this, UITheme.Spacing4);
+        _count.Location = new Point(inset, y);
+
+        int contentBottom = Math.Max(_count.Bottom, _banner.Visible ? _banner.Bottom : 0);
+        _optionsCard.Height = contentBottom + inset;
+
+        int blockTop = _optionsCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16);
+        _actionCard.Location = new Point(0, blockTop);
+        _busyBlock.Location = new Point(0, blockTop);
     }
 
     /// <inheritdoc />
@@ -477,7 +534,9 @@ public sealed class GenerateQuizForm : ModulePanel
         int questionCount = 5 + Math.Max(_count.SelectedIndex, 0); // combo index 0..15 → 5..20
 
         _busy = true;
-        _cancelled = false;
+        _cancelPending = false;
+        _generationId++;
+        int generationId = _generationId; // this request's token (the H2 fix: a superseded completion is discarded)
         _startedAt = DateTimeOffset.UtcNow;
         _savedDraftQuizId = 0;
 
@@ -485,6 +544,7 @@ public sealed class GenerateQuizForm : ModulePanel
         HideBanner();
         _busyStatus.Text = GeneratingStatus;
         _busyBlock.Visible = true;
+        _busyTrack.Marquee = true; // armed per run (M1: never left over from a previous run)
         _busyBlock.BringToFront();
         _elapsedTimer.Start();
         this.FindAncestor<MainForm>()?.SetSidebarEnabled(enabled: false);
@@ -494,25 +554,35 @@ public sealed class GenerateQuizForm : ModulePanel
         // off the UI thread so the marquee animates (the binding R-5 #3 rule).
         Task.Run(() => _generation.GenerateQuiz(topic, difficulty, questionCount))
             .ContinueWith(
-                task => HandleOutcome(topic, task.Result),
+                task => HandleOutcome(topic, task.Result, generationId),
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.FromCurrentSynchronizationContext());
     }
 
-    /// <summary>The UI-thread continuation: save, or show the typed failure banner.</summary>
-    private void HandleOutcome(Topic topic, QuizGenerationOutcome outcome)
+    /// <summary>
+    /// The UI-thread continuation: save, or show the typed failure banner. A
+    /// completion whose token no longer matches (cancelled or superseded by a
+    /// newer request) is discarded — never saved, never touching the state of
+    /// the generation that is now current.
+    /// </summary>
+    private void HandleOutcome(Topic topic, QuizGenerationOutcome outcome, int generationId)
     {
-        _elapsedTimer.Stop();
-
-        if (_cancelled)
+        if (generationId != _generationId)
         {
-            // The §5.11 cancellation rule: the late result is discarded, the
-            // strip notes it, and nothing is saved.
-            EndBusy(readyOnly: true);
-            ReportStatus(CancelledLateMessage, success: false);
+            // The §5.11 cancellation rule: the late result is discarded and
+            // nothing is saved. The strip notes it once, when the user is
+            // back on the ready form and no newer run owns the busy state.
+            if (_cancelPending && !_busy)
+            {
+                _cancelPending = false;
+                ReportStatus(CancelledLateMessage, success: false);
+            }
+
             return;
         }
+
+        _elapsedTimer.Stop();
 
         if (!outcome.IsSuccess || outcome.QuizDraft is null)
         {
@@ -539,11 +609,14 @@ public sealed class GenerateQuizForm : ModulePanel
         }
         catch (Exception)
         {
-            // A persistence failure is not a generation decision: it travels
-            // to the §4.11 unexpected dialog (Program), with the busy state
-            // cleanly ended first.
+            // A persistence failure is an unsuccessful operation, not an
+            // unexpected crash: it ends the busy state cleanly and reports
+            // through the strip (§4.11 — feedback is an inline strip line).
+            // Throwing inside the continuation would hand the exception to
+            // the unobserved-task machinery, where nobody would see it.
             EndBusy(readyOnly: true);
-            throw;
+            ReportStatus(SaveFailedMessage, success: false);
+            return;
         }
 
         EndBusy(readyOnly: false);
@@ -553,8 +626,8 @@ public sealed class GenerateQuizForm : ModulePanel
 
     /// <summary>
     /// The §5.11 Cancel: the form returns to its ready state immediately; the
-    /// in-flight call cannot be aborted through the P5 client, so the late
-    /// result is discarded (nothing is saved).
+    /// in-flight call cannot be aborted through the P5 client, so its token
+    /// is invalidated — the late result is discarded (nothing is saved).
     /// </summary>
     private void CancelGeneration()
     {
@@ -563,7 +636,8 @@ public sealed class GenerateQuizForm : ModulePanel
             return;
         }
 
-        _cancelled = true;
+        _cancelPending = true;
+        _generationId++; // invalidate the in-flight request's completion
         EndBusy(readyOnly: true);
     }
 
@@ -593,28 +667,33 @@ public sealed class GenerateQuizForm : ModulePanel
         _reviewNow.Enabled = enabled;
     }
 
-    /// <summary>Shows the typed-failure banner with the plain-language detail (§5.11).</summary>
+    /// <summary>Shows the typed-failure banner with the plain-language detail (§5.11); the card re-flows inline.</summary>
     private void ShowBanner(IReadOnlyList<string> reasons)
     {
         _bannerDetail.Text = DescribeFailure(reasons);
         _banner.Visible = true;
+        LayoutGenerateLayout();
         _banner.BringToFront();
     }
 
-    /// <summary>Hides the banner ("Try again").</summary>
+    /// <summary>Hides the banner ("Try again"); the card re-flows back.</summary>
     private void HideBanner()
     {
         _banner.Visible = false;
+        LayoutGenerateLayout();
     }
 
     /// <summary>
     /// Maps the typed reason strings to the §5.11 plain-language lines — never
     /// a raw reason, never a provider detail that could leak configuration.
+    /// The chain-level class (contract 7.6 — a fresh clone has no config file)
+    /// maps to the no-provider message, not to a retry hint.
     /// </summary>
     private static string DescribeFailure(IReadOnlyList<string> reasons)
     {
         string first = reasons.Count > 0 ? reasons[0] : string.Empty;
-        string detail = first.Contains(":not-configured", StringComparison.Ordinal) ? NoProviderMessage
+        string detail = first.Contains("empty-provider-list", StringComparison.Ordinal) ? NoProviderMessage
+            : first.Contains(":not-configured", StringComparison.Ordinal) ? NoProviderMessage
             : first.Contains(":auth-failed", StringComparison.Ordinal) ? AuthMessage
             : first.Contains(":quota", StringComparison.Ordinal) ? QuotaMessage
             : first.Contains(":timeout", StringComparison.Ordinal) ? NetworkMessage
