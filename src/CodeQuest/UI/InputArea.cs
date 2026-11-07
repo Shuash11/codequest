@@ -24,6 +24,8 @@ public sealed class InputArea : Panel
 {
     private readonly TextBox _box = new();
     private readonly Label _errorLine = new();
+    private readonly string? _fallbackAccessibleName;
+    private Control? _labeledBy;
     private bool _borderError;
 
     /// <summary>
@@ -38,6 +40,7 @@ public sealed class InputArea : Panel
         SetStyle(ControlStyles.ResizeRedraw, true);
 
         BackColor = UITheme.Surface;
+        _fallbackAccessibleName = accessibleName;
 
         _box.Multiline = true;
         _box.AcceptsReturn = true;
@@ -75,6 +78,22 @@ public sealed class InputArea : Panel
     {
         get => _box.PlaceholderText;
         set => _box.PlaceholderText = value;
+    }
+
+    /// <summary>
+    /// The visible label whose text names this field (§4.4's association rule,
+    /// F2): the label is the source of the input's accessible name, not a
+    /// string retyped beside it. Setting it replaces the fallback name.
+    /// </summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public Control? LabeledBy
+    {
+        get => _labeledBy;
+        set
+        {
+            _labeledBy = value;
+            _box.AccessibleName = value?.Text ?? _fallbackAccessibleName;
+        }
     }
 
     /// <summary>True when the field carries the recipe's error border.</summary>

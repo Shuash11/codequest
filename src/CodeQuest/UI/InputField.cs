@@ -27,6 +27,8 @@ public sealed class InputField : Panel
 {
     private readonly TextBox _box = new();
     private readonly Label _errorLine = new();
+    private readonly string? _fallbackAccessibleName;
+    private Control? _labeledBy;
     private bool _borderError;
 
     /// <summary>
@@ -44,6 +46,7 @@ public sealed class InputField : Panel
 
         BackColor = UITheme.Surface;
         ReserveErrorLine = reserveErrorLine;
+        _fallbackAccessibleName = accessibleName;
 
         _box.AutoSize = false;
         _box.BorderStyle = BorderStyle.None;
@@ -62,6 +65,22 @@ public sealed class InputField : Panel
         Controls.Add(_errorLine);
 
         LayoutField();
+    }
+
+    /// <summary>
+    /// The visible label whose text names this field (§4.4's association rule,
+    /// F2): the label is the source of the input's accessible name, not a
+    /// string retyped beside it. Setting it replaces the fallback name.
+    /// </summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public Control? LabeledBy
+    {
+        get => _labeledBy;
+        set
+        {
+            _labeledBy = value;
+            _box.AccessibleName = value?.Text ?? _fallbackAccessibleName;
+        }
     }
 
     /// <summary>The entered text.</summary>

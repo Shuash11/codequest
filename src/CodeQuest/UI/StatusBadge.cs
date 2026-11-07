@@ -19,7 +19,12 @@ namespace CodeQuest.UI;
 
 /// <summary>
 /// The status badge of recipe 4.10: one painter for the Draft/Approved chip,
-/// reused by the quiz grid and the drill-in headers.
+/// reused by the quiz grid and the drill-in headers. Accessibility contract
+/// (F2, §4.10): role StaticText, name = the badge's text ("Draft" / "Approved"
+/// — the recipe always paints the text, so the name equals the visible label
+/// by construction); non-interactive, so no focusable or toggle state. The
+/// grid's painted badges carry the same contract through
+/// <see cref="GridBadgeCell"/>.
 /// </summary>
 public static class StatusBadgePainter
 {
@@ -85,6 +90,7 @@ public sealed class StatusBadge : Control
         SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
         SetStyle(ControlStyles.ResizeRedraw, true);
         BackColor = UITheme.Surface; // the headers the badge sits on are Surface cards
+        TabStop = false; // a badge is non-interactive (§4.10)
     }
 
     /// <summary>The quiz status this badge shows.</summary>
@@ -111,5 +117,25 @@ public sealed class StatusBadge : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         StatusBadgePainter.Draw(e.Graphics, ClientRectangle, this, _status);
+    }
+
+    /// <summary>The accessible object of recipe 4.10's accessibility contract (F2).</summary>
+    protected override AccessibleObject CreateAccessibilityInstance() => new StatusBadgeAccessibleObject(this);
+
+    /// <summary>StaticText role, badge-text name, non-interactive state (§4.10).</summary>
+    private sealed class StatusBadgeAccessibleObject : Control.ControlAccessibleObject
+    {
+        private readonly StatusBadge _owner;
+
+        public StatusBadgeAccessibleObject(StatusBadge owner) : base(owner)
+        {
+            _owner = owner;
+        }
+
+        public override AccessibleRole Role => AccessibleRole.StaticText;
+
+        public override string? Name => _owner.Status.ToString();
+
+        public override AccessibleStates State => AccessibleStates.ReadOnly; // no focusable, no toggle (§4.10)
     }
 }

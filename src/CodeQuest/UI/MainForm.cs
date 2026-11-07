@@ -23,9 +23,13 @@
 //          with the real management screens — the other placeholders stay
 //          until P9/P10/P12/P13.
 // Status strip (§4.11, §5 anatomy): module panels report success and failure
-//          lines through <see cref="ShowStatus"/> — success lines in
-//          SuccessText auto-clear after ~4 seconds, failure/blocked lines in
-//          DangerText stay until the next feedback.
+//          lines through <see cref="ShowStatus"/> — the INTERIM §2.6/§4.11
+//          rule (F3, until the R-D3 theme re-issue) renders ALL verdict lines
+//          in TextPrimary on Background, so the strip is AA-compliant now;
+//          the semantic text tokens keep their on-Surface uses. Success lines
+//          auto-clear after ~4 seconds, failure/blocked lines stay until the
+//          next feedback. Switching modules clears the strip (F12) so stale
+//          feedback never describes another module.
 // =============================================================================
 
 using CodeQuest.Data;
@@ -246,7 +250,7 @@ public sealed class MainForm : Form
             Name = "StatusStripLabel",
             Text = string.Empty,
             Font = UITheme.Body,
-            ForeColor = UITheme.SuccessText,
+            ForeColor = UITheme.TextPrimary, // the interim §2.6/§4.11 verdict token (F3)
             BackColor = UITheme.Background,
             AutoSize = true,
             Location = new Point(inset, statusTop),
@@ -366,6 +370,8 @@ public sealed class MainForm : Form
     /// is visible — the active item always matches the visible panel (§4.3).
     /// The panels persist, so the switch is lossless (§5.2); a real module
     /// screen reloads its data on show so the rows are always current.
+    /// The strip clears on every switch (F12): stale feedback must never
+    /// describe another module than the one now on screen.
     /// </summary>
     private void ShowModule(string key)
     {
@@ -373,6 +379,9 @@ public sealed class MainForm : Form
         {
             return;
         }
+
+        _statusStrip.Text = string.Empty;
+        _statusClearTimer.Stop();
 
         foreach ((string moduleKey, NavItemButton item) in _navItems)
         {
@@ -395,14 +404,17 @@ public sealed class MainForm : Form
 
     /// <summary>
     /// Shows the content-header status strip line (§5 screen anatomy, §4.11 —
-    /// feedback is an inline strip line, never a dialog). Success lines show
-    /// in SuccessText and auto-clear after ~4 seconds; failure/blocked lines
-    /// show in DangerText and stay until the next feedback.
+    /// feedback is an inline strip line, never a dialog). INTERIM strip token
+    /// (F3, §2.6/§4.11): verdict lines — success AND failure/blocked alike —
+    /// render in TextPrimary on Background until the R-D3 theme re-issue
+    /// replaces this mapping; the wording carries the meaning in the interim.
+    /// Success lines auto-clear after ~4 seconds; failure/blocked lines stay
+    /// until the next feedback.
     /// </summary>
     internal void ShowStatus(string message, bool success = true)
     {
+        _statusStrip.ForeColor = UITheme.TextPrimary; // the interim §2.6/§4.11 verdict token
         _statusStrip.Text = message;
-        _statusStrip.ForeColor = success ? UITheme.SuccessText : UITheme.DangerText;
 
         _statusClearTimer.Stop();
         if (success)

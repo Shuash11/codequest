@@ -1,30 +1,41 @@
 // =============================================================================
-// CodeQuest — Phase P8: Topic & Quiz Management
+// CodeQuest — Phase P8: Topic & Quiz Management (P8.1 fix round)
 // The question editor of the design of record (spec 5.5): one quiz's
 // questions and their choices, opened as a drill-in from the quiz management
-// screen (§5.4's Questions row action).
+// screen (§5.4's "Edit questions" row action).
+// Surface (F5, §5 preamble/§4.11/§5.5): the editor is a PANEL STATE of the
+//          quiz-management module — never a window, never a modal. No window
+//          chrome, no duplicated title: the drill-in's in-content header
+//          (leading "Back" secondary returning to the quiz list WITH its
+//          search/filter state intact) is the only title. The shell is
+//          unchanged while it is open — the sidebar stays enabled, "Quiz
+//          management" stays the active nav item — and the module's feedback
+//          still reports to the shell's status strip (§5.2) through
+//          <see cref="StatusRequested"/>.
 // Look at: the layout — the header "Questions — {quiz title}" with the quiz's
-//          status badge (recipe 4.10) and a status strip of its own (the §5
-//          anatomy, §4.11 — "Question saved." / "Question deleted." live
-//          here, never in a dialog); the toolbar's "Add question" primary;
+//          status badge (recipe 4.10); the toolbar's "Add question" primary;
 //          the questions list card — each row is the position number
 //          ("1", Caption TextSecondary), the question text (one line), the
 //          kind tag ("Multiple choice" / "True–false"), and the trailing
 //          up/down reorder chevrons (recipe 4.1 quiet glyph actions) plus
-//          Edit and Delete.
+//          Edit and Delete. The list card and the form card swap (list ↔
+//          form state, §5.5) — the form never becomes a second window.
 // Reordering (R-2 #8): up is disabled on the first row and down on the last;
 //          a move swaps the two rows' positions by sending the WHOLE new
 //          order through <see cref="IQuestionRepository.Reorder"/> — the data
 //          layer's transactional renumbering (lift + set in one transaction),
 //          never ad-hoc position updates. Positions are never typed, so they
 //          cannot collide; the renumbered list is the reorder's feedback.
-// Question form: Question text (multi-line §4.4), Type (§4.9 segmented:
-//          Multiple choice / True–false), the choice rows — four for multiple
-//          choice, the fixed two for true–false — each a recipe-4.7 checkbox
-//          (the correct marker; the editor enforces exactly one) + a text
-//          input, and "Explanation (optional)" (multi-line §4.4). The
-//          explanation ALWAYS reaches the model — an empty string when the
-//          field is blank (R-2 #6: the column is NOT NULL).
+// Question form (<see cref="QuestionFormPanel"/>): a state of the drill-in —
+//          the list card swaps for the form card. Question text (multi-line
+//          §4.4), Type (§4.9 segmented: Multiple choice / True–false), the
+//          choice rows — four for multiple choice, the fixed two for
+//          true–false — each a recipe-4.7 checkbox with its VISIBLE label
+//          "Mark choice n as the correct answer" (§5.5; the label toggles
+//          the box on click and is the source of §4.7's accessible name)
+//          + a text input, and "Explanation (optional)" (multi-line §4.4).
+//          The explanation ALWAYS reaches the model — an empty string when
+//          the field is blank (R-2 #6: the column is NOT NULL).
 // R-2 #3 at write time: <see cref="QuestionFormValidator"/> rejects zero or
 //          multiple correct choices (the exact spec message) BEFORE the
 //          repository call; the checkbox group itself can never hold two
@@ -43,10 +54,10 @@ using System.Windows.Forms;
 namespace CodeQuest.UI;
 
 /// <summary>
-/// The question editor (spec 5.5): the question list of one quiz plus the
-/// add/edit/delete/reorder flows.
+/// The question editor (spec 5.5) as the shell-hosted drill-in panel: the
+/// question list of one quiz plus the add/edit/delete/reorder flows.
 /// </summary>
-public sealed class QuestionEditForm : Form
+public sealed class QuestionEditForm : UserControl
 {
     // The design of record's exact copy (§5.5 feedback) plus the two-branch
     // delete message in the §5.3/§5.4 blocked-branch pattern.
@@ -69,20 +80,22 @@ public sealed class QuestionEditForm : Form
     private readonly IQuestionRepository _questions;
     private readonly IChoiceRepository _choices;
     private readonly ISubmittedAnswerRepository _answers;
-    private readonly int _quizId;
+    private readonly FlatButton _back;
+    private readonly Label _header;
     private readonly StatusBadge _statusBadge;
     private readonly FlatButton _addQuestion;
-    private readonly Label _statusStrip;
     private readonly ListCardGrid _list;
-    private Quiz _quiz = null!; // assigned in LoadQuiz (called from the constructor)
+    private readonly QuestionFormPanel _form;
+    private Quiz _quiz = null!; // assigned by Open → LoadQuiz
+    private int _quizId;
+    private Question? _editingQuestion; // null while the form state adds a new question
 
-    /// <summary>Creates the editor for one quiz. The quiz header is read here.</summary>
+    /// <summary>Creates the drill-in panel for the repositories it reads and writes.</summary>
     public QuestionEditForm(
         IQuizRepository quizzes,
         IQuestionRepository questions,
         IChoiceRepository choices,
-        ISubmittedAnswerRepository answers,
-        int quizId)
+        ISubmittedAnswerRepository answers)
     {
         ArgumentNullException.ThrowIfNull(quizzes);
         ArgumentNullException.ThrowIfNull(questions);
@@ -92,59 +105,66 @@ public sealed class QuestionEditForm : Form
         _questions = questions;
         _choices = choices;
         _answers = answers;
-        _quizId = quizId;
 
-        Text = "Questions";
-        StartPosition = FormStartPosition.CenterParent;
         BackColor = UITheme.Background;
-        ClientSize = new Size(UITheme.Scaled(this, 760), UITheme.Scaled(this, 560));
-        MinimumSize = new Size(UITheme.Scaled(this, 640), UITheme.Scaled(this, 480));
+        Dock = DockStyle.Fill;
+        Visible = false;
 
-        int inset = UITheme.Scaled(this, UITheme.Spacing24);
-        int headerHeight = UITheme.Scaled(this, 30);
-        int statusTop = inset + headerHeight + UITheme.Scaled(this, UITheme.Spacing8);
-        int statusHeight = UITheme.Scaled(this, 20);
-        int toolbarTop = statusTop + statusHeight + UITheme.Scaled(this, UITheme.Spacing8);
-        int listTop = toolbarTop + UITheme.Scaled(this, 32) + UITheme.Scaled(this, UITheme.Spacing16);
+        int headerHeight = UITheme.Scaled(this, 32);
+        int listTop = (headerHeight + UITheme.Scaled(this, UITheme.Spacing16)) * 2; // header row, toolbar row
+
+        _back = new FlatButton
+        {
+            Name = "QuestionEditorBack",
+            Text = "Back",
+            Variant = UITheme.FlatButtonVariant.Secondary,
+            Location = new Point(0, 0),
+            Size = new Size(
+                TextRenderer.MeasureText("Back", UITheme.Body).Width + UITheme.Scaled(this, UITheme.Spacing16) * 2,
+                headerHeight),
+        };
+        _back.Click += static (sender, e) =>
+        {
+            if (sender is FlatButton button && button.FindAncestor<QuestionEditForm>() is { } form)
+            {
+                form.BackRequested?.Invoke(form, EventArgs.Empty);
+            }
+        };
+
+        _header = new Label
+        {
+            Name = "QuestionEditHeader",
+            Font = UITheme.Title,
+            ForeColor = UITheme.TextPrimary,
+            BackColor = UITheme.Background,
+            AutoSize = true,
+        };
 
         _statusBadge = new StatusBadge
         {
             Name = "QuestionEditStatusBadge",
-            Location = new Point(0, 0), // placed in LayoutHeader once the quiz is known
-            Anchor = AnchorStyles.Top | AnchorStyles.Left,
-        };
-
-        _statusStrip = new Label
-        {
-            Name = "QuestionEditStatus",
-            Text = string.Empty,
-            Font = UITheme.Body,
-            ForeColor = UITheme.SuccessText,
-            BackColor = UITheme.Background,
-            AutoSize = true,
-            Location = new Point(inset, statusTop),
         };
 
         _addQuestion = new FlatButton
         {
             Name = "AddQuestionButton",
             Text = "Add question",
-            Size = new Size(UITheme.Scaled(this, 120), UITheme.Scaled(this, 32)),
+            Size = new Size(UITheme.Scaled(this, 120), headerHeight),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
         };
         _addQuestion.Click += static (sender, e) =>
         {
-            if (sender is FlatButton button && button.Parent is QuestionEditForm form)
+            if (sender is FlatButton button && button.FindAncestor<QuestionEditForm>() is { } form)
             {
-                form.AddQuestion();
+                form.OpenQuestionForm(questionToEdit: null);
             }
         };
 
         _list = new ListCardGrid
         {
             Name = "QuestionListCard",
-            Location = new Point(inset, listTop),
-            Size = new Size(ClientSize.Width - inset * 2, ClientSize.Height - listTop - inset),
+            Location = new Point(0, listTop),
+            Size = new Size(Width, Height - listTop),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
         };
         _list.Grid.Name = "QuestionsGrid";
@@ -170,10 +190,31 @@ public sealed class QuestionEditForm : Form
             }
         };
 
+        // The form state occupies the list card's spot: the list card swaps
+        // for the form card (§5.5) — never a second window.
+        _form = new QuestionFormPanel
+        {
+            Name = "QuestionFormPanel",
+            Location = _list.Location,
+            Size = _list.Size,
+            Anchor = _list.Anchor,
+            Visible = false,
+        };
+        _form.Saved += HandleFormSaved;
+        _form.Cancelled += static (sender, e) =>
+        {
+            if (sender is QuestionFormPanel panel && panel.FindAncestor<QuestionEditForm>() is { } form)
+            {
+                form.ShowList();
+            }
+        };
+
+        Controls.Add(_back);
         Controls.Add(_statusBadge);
-        Controls.Add(_statusStrip);
+        Controls.Add(_header);
         Controls.Add(_addQuestion);
         Controls.Add(_list);
+        Controls.Add(_form);
 
         Resize += static (sender, e) =>
         {
@@ -182,12 +223,25 @@ public sealed class QuestionEditForm : Form
                 form.LayoutHeader();
             }
         };
-
-        LoadQuiz();
     }
 
-    /// <summary>True when any question was added, edited, deleted or reordered — the caller refreshes.</summary>
+    /// <summary>True when any question was added, edited, deleted or reordered — the host refreshes on Back.</summary>
     public bool ChangesSaved { get; private set; }
+
+    /// <summary>Raised when "Back" returns to the quiz list (§5.5's leading affordance).</summary>
+    public event EventHandler? BackRequested;
+
+    /// <summary>The feedback this drill-in asks the shell to show in the module's status strip (§5.2).</summary>
+    public event EventHandler<StatusEventArgs>? StatusRequested;
+
+    /// <summary>Opens the editor for one quiz: reads it fresh and binds the list state.</summary>
+    public void Open(int quizId)
+    {
+        _quizId = quizId;
+        ChangesSaved = false;
+        ShowList();
+        LoadQuiz();
+    }
 
     /// <summary>Reads the quiz fresh from the database and binds the list.</summary>
     private void LoadQuiz()
@@ -195,7 +249,7 @@ public sealed class QuestionEditForm : Form
         _quiz = _quizzes.GetById(_quizId)
             ?? throw new Data.EntityNotFoundException($"There is no quiz with the id {_quizId}.");
 
-        Text = "Questions — " + _quiz.Title;
+        _header.Text = "Questions — " + _quiz.Title;
         _statusBadge.Status = _quiz.Status;
         _statusBadge.ResizeToContent();
         LayoutHeader();
@@ -203,33 +257,24 @@ public sealed class QuestionEditForm : Form
         BindList();
     }
 
-    /// <summary>Places the header: "Questions — {quiz title}" + the status badge + the toolbar button.</summary>
+    /// <summary>Places the header: "Back" leading, then "Questions — {quiz title}" + the status badge.</summary>
     private void LayoutHeader()
     {
-        int inset = UITheme.Scaled(this, UITheme.Spacing24);
+        int titleGap = UITheme.Scaled(this, UITheme.Spacing12);
 
-        _addQuestion.Location = new Point(ClientSize.Width - inset - _addQuestion.Width, inset);
-
-        Label headerLabel = (Label)(Controls.Find("QuestionEditHeader", searchAllChildren: false).FirstOrDefault()
-            ?? new Label
-            {
-                Name = "QuestionEditHeader",
-                Font = UITheme.Title,
-                ForeColor = UITheme.TextPrimary,
-                BackColor = UITheme.Background,
-                AutoSize = true,
-            });
-
-        headerLabel.Text = "Questions — " + _quiz.Title;
-        headerLabel.Location = new Point(inset, inset);
-        if (!Controls.Contains(headerLabel))
-        {
-            Controls.Add(headerLabel);
-        }
-
+        _header.Location = new Point(_back.Right + titleGap, (_back.Height - _header.Height) / 2);
         _statusBadge.Location = new Point(
-            Math.Min(headerLabel.Right + UITheme.Scaled(this, UITheme.Spacing8), _addQuestion.Left - _statusBadge.Width - UITheme.Scaled(this, UITheme.Spacing8)),
-            inset + (headerLabel.Height - _statusBadge.Height) / 2);
+            Math.Min(_header.Right + UITheme.Scaled(this, UITheme.Spacing8), Width - _statusBadge.Width - UITheme.Scaled(this, UITheme.Spacing8)),
+            _header.Location.Y + (_header.Height - _statusBadge.Height) / 2);
+
+        int toolbarRow = _back.Bottom + UITheme.Scaled(this, UITheme.Spacing16);
+        _addQuestion.Location = new Point(Width - _addQuestion.Width, toolbarRow);
+
+        // The toolbar row sits between the header and the list card; the list
+        // card's top follows the toolbar (both rows share the header height).
+        int listTop = toolbarRow + _addQuestion.Height + UITheme.Scaled(this, UITheme.Spacing16);
+        _list.SetBounds(_list.Left, listTop, _list.Width, Height - listTop);
+        _form.SetBounds(_form.Left, listTop, _form.Width, Height - listTop);
     }
 
     /// <summary>Binds the question rows in display order (the renumbering is the reorder feedback).</summary>
@@ -267,6 +312,39 @@ public sealed class QuestionEditForm : Form
         }
     }
 
+    /// <summary>The list state of the drill-in: list card visible, form card hidden (§5.5).</summary>
+    private void ShowList()
+    {
+        _form.Visible = false;
+        _list.Visible = true;
+        _addQuestion.Visible = true;
+    }
+
+    /// <summary>The form state of the drill-in: the list card swaps for the form card (§5.5).</summary>
+    private void ShowForm()
+    {
+        _list.Visible = false;
+        _addQuestion.Visible = false;
+        _form.Visible = true;
+        _form.BringToFront();
+    }
+
+    /// <summary>Opens the blank form state (add) or the prefilled one (edit).</summary>
+    private void OpenQuestionForm(Question? questionToEdit)
+    {
+        _editingQuestion = questionToEdit;
+        if (questionToEdit is null)
+        {
+            _form.OpenForAdd();
+        }
+        else
+        {
+            _form.OpenForEdit(questionToEdit);
+        }
+
+        ShowForm();
+    }
+
     /// <summary>Routes a row action click: reorder, edit or delete.</summary>
     private void HandleRowAction(GridActionEventArgs e)
     {
@@ -285,7 +363,7 @@ public sealed class QuestionEditForm : Form
                 MoveQuestion(e.RowIndex, e.RowIndex + 1);
                 break;
             case EditAction:
-                EditQuestion(question);
+                OpenQuestionForm(question);
                 break;
             case DeleteAction:
                 DeleteQuestion(question);
@@ -315,68 +393,54 @@ public sealed class QuestionEditForm : Form
         BindList();
     }
 
-    /// <summary>Opens the blank question form and stores the new question on Save.</summary>
-    private void AddQuestion()
+    /// <summary>
+    /// The form state's Save: the add path inserts the built question (in one
+    /// transaction, P4), the edit path rewrites it in place. A typed failure
+    /// keeps the form open with the strip line; success returns to the list
+    /// with the strip line (§5.5).
+    /// </summary>
+    private void HandleFormSaved(object? sender, EventArgs e)
     {
-        using var dialog = new QuestionFormDialog("Add question");
-        if (dialog.ShowDialog(this) != DialogResult.OK)
-        {
-            return;
-        }
-
-        int nextPosition = _quiz.Questions.Count == 0 ? 1 : _quiz.Questions.Max(question => question.Position) + 1;
-        Question question = BuildQuestion(dialog, _quizId, nextPosition);
-
         try
         {
-            _questions.Add(question); // question + choices in one transaction (P4)
+            if (_editingQuestion is null)
+            {
+                SaveNewQuestion();
+            }
+            else
+            {
+                ApplyQuestionEdit(_editingQuestion, _form);
+            }
         }
         catch (DuplicateEntityException)
         {
-            ShowStatus(QuestionFormValidator.DuplicateChoiceMessage, success: false);
-            return;
-        }
-
-        ChangesSaved = true;
-        _quiz = _quizzes.GetById(_quizId)!;
-        BindList();
-        ShowStatus(SavedMessage, success: true);
-    }
-
-    /// <summary>Opens the prefilled question form and saves the changes on Save.</summary>
-    private void EditQuestion(Question question)
-    {
-        using var dialog = new QuestionFormDialog("Edit question");
-        dialog.LoadQuestion(question);
-
-        if (dialog.ShowDialog(this) != DialogResult.OK)
-        {
-            return;
-        }
-
-        try
-        {
-            ApplyQuestionEdit(question, dialog);
-        }
-        catch (DuplicateEntityException)
-        {
-            // A transient UNIQUE collision of the in-place choice rewrite or a
-            // raced edit — the spec's exact duplicate message, never raw.
-            ShowStatus(QuestionFormValidator.DuplicateChoiceMessage, success: false);
+            // A transient UNIQUE collision of the in-place choice rewrite or
+            // the insert — the spec's exact duplicate message, never raw.
+            Report(QuestionFormValidator.DuplicateChoiceMessage, success: false);
             return;
         }
         catch (ReferentialIntegrityException)
         {
             // The structural part of the edit (removing a choice an answer
             // still points at) is protected by the schema.
-            ShowStatus(QuestionHasAnswersMessage, success: false);
+            Report(QuestionHasAnswersMessage, success: false);
             return;
         }
 
         ChangesSaved = true;
         _quiz = _quizzes.GetById(_quizId)!;
         BindList();
-        ShowStatus(SavedMessage, success: true);
+        ShowList();
+        Report(SavedMessage, success: true);
+    }
+
+    /// <summary>Builds and stores the new question from the form state.</summary>
+    private void SaveNewQuestion()
+    {
+        int nextPosition = _quiz.Questions.Count == 0 ? 1 : _quiz.Questions.Max(question => question.Position) + 1;
+        Question question = BuildQuestion(_form, _quizId, nextPosition);
+
+        _questions.Add(question); // question + choices in one transaction (P4)
     }
 
     /// <summary>
@@ -384,11 +448,11 @@ public sealed class QuestionEditForm : Form
     /// the kept options, add the new ones, delete the surplus LAST so the
     /// schema-protected delete is the only risky step), then the question row.
     /// </summary>
-    private void ApplyQuestionEdit(Question question, QuestionFormDialog dialog)
+    private void ApplyQuestionEdit(Question question, QuestionFormPanel form)
     {
         List<Choice> existing = question.Choices.OrderBy(choice => choice.Position).ToList();
-        IReadOnlyList<string> texts = dialog.ChoiceTexts;
-        int correctIndex = dialog.CorrectIndex;
+        IReadOnlyList<string> texts = form.ChoiceTexts;
+        int correctIndex = form.CorrectIndex;
 
         for (int i = 0; i < texts.Count; i++)
         {
@@ -421,8 +485,8 @@ public sealed class QuestionEditForm : Form
             _choices.Delete(existing[i].ChoiceId);
         }
 
-        question.QuestionText = dialog.QuestionText;
-        question.Explanation = dialog.Explanation; // always a string (R-2 #6)
+        question.QuestionText = form.QuestionText;
+        question.Explanation = form.Explanation; // always a string (R-2 #6)
         _questions.Update(question);
     }
 
@@ -432,7 +496,7 @@ public sealed class QuestionEditForm : Form
         if (_answers.GetByQuestion(question.QuestionId).Count > 0)
         {
             // Blocked: no dialog, the strip explains the block.
-            ShowStatus(QuestionHasAnswersMessage, success: false);
+            Report(QuestionHasAnswersMessage, success: false);
             return;
         }
 
@@ -446,36 +510,36 @@ public sealed class QuestionEditForm : Form
             if (_questions.Delete(question.QuestionId))
             {
                 // The choices go with the question (choices.question_id ON DELETE CASCADE).
-                ShowStatus(DeletedMessage, success: true);
+                Report(DeletedMessage, success: true);
                 ChangesSaved = true;
             }
         }
         catch (ReferentialIntegrityException)
         {
-            ShowStatus(QuestionHasAnswersMessage, success: false);
+            Report(QuestionHasAnswersMessage, success: false);
         }
 
         _quiz = _quizzes.GetById(_quizId)!;
         BindList();
     }
 
-    /// <summary>Builds the concrete question kind from the dialog's values.</summary>
-    private static Question BuildQuestion(QuestionFormDialog dialog, int quizId, int position)
+    /// <summary>Builds the concrete question kind from the form's values.</summary>
+    private static Question BuildQuestion(QuestionFormPanel form, int quizId, int position)
     {
-        Question question = dialog.IsTrueFalse ? new TrueFalseQuestion() : new MultipleChoiceQuestion();
+        Question question = form.IsTrueFalse ? new TrueFalseQuestion() : new MultipleChoiceQuestion();
         question.QuizId = quizId; // the insert stores the question in this quiz
-        question.QuestionText = dialog.QuestionText;
-        question.Explanation = dialog.Explanation; // always a string (R-2 #6)
+        question.QuestionText = form.QuestionText;
+        question.Explanation = form.Explanation; // always a string (R-2 #6)
         question.Position = position;
         question.CreatedAt = DateTimeOffset.UtcNow;
 
-        for (int i = 0; i < dialog.ChoiceTexts.Count; i++)
+        for (int i = 0; i < form.ChoiceTexts.Count; i++)
         {
             question.AddChoice(new Choice
             {
                 QuestionId = 0, // stamped together with the question row
-                ChoiceText = dialog.ChoiceTexts[i],
-                IsCorrect = i == dialog.CorrectIndex,
+                ChoiceText = form.ChoiceTexts[i],
+                IsCorrect = i == form.CorrectIndex,
                 Position = i + 1,
             });
         }
@@ -483,48 +547,49 @@ public sealed class QuestionEditForm : Form
         return question;
     }
 
-    /// <summary>Shows the editor's own status strip line (§5 anatomy).</summary>
-    private void ShowStatus(string message, bool success)
-    {
-        _statusStrip.Text = message;
-        _statusStrip.ForeColor = success ? UITheme.SuccessText : UITheme.DangerText;
-    }
+    /// <summary>Reports one feedback line to the module's status strip (§5.2, §5.5 feedback).</summary>
+    private void Report(string message, bool success)
+        => StatusRequested?.Invoke(this, new StatusEventArgs(message, success));
 }
 
 /// <summary>
-/// The question modal card of spec 5.5: Question text (multi-line), Type
-/// (segmented), the choice rows (recipe-4.7 checkbox + recipe-4.4 input —
-/// four for multiple choice, the fixed two for true–false) and "Explanation
-/// (optional)". Validation runs through <see cref="QuestionFormValidator"/>
-/// before the dialog closes; the inline error lines carry the failures.
+/// The question form as a STATE of the drill-in panel (§5.5): the list card
+/// swaps for this form card — never a modal, never a window. Question text
+/// (multi-line §4.4), Type (segmented), the choice rows (recipe-4.7 checkbox
+/// with its §5.5 visible label "Mark choice n as the correct answer" +
+/// recipe-4.4 input) and "Explanation (optional)". Validation runs through
+/// <see cref="QuestionFormValidator"/> before <see cref="Saved"/> fires; the
+/// inline error lines carry the failures.
 /// </summary>
-public sealed class QuestionFormDialog : Form
+public sealed class QuestionFormPanel : Panel
 {
     private const int ContentInset = UITheme.Spacing24;
     private const int FieldGap = UITheme.Spacing12;
     private const int ButtonGap = UITheme.Spacing8;
     private const int ChoiceRowCount = 4;
+    private const int ErrorSlot = 16; // F13: the 8px-scale error slot (§2.3), replacing the off-scale 18px
 
+    private static readonly string CorrectMarkLabelFormat = "Mark choice {0} as the correct answer";
+
+    private readonly CardPanel _card;
     private readonly InputArea _questionText;
     private readonly SegmentedControl _type;
     private readonly MarkedCheckBox[] _correctMarks;
+    private readonly Label[] _correctMarkLabels;
     private readonly InputField[] _choiceFields;
     private readonly InputArea _explanation;
     private readonly Label _blockError;
     private readonly FlatButton _save;
     private readonly FlatButton _cancel;
+    private readonly int _markLabelWidth;
     private int _correctIndex = -1;
     private bool _suppressCorrectTracking; // guards the checkbox bookkeeping
 
-    /// <summary>Creates the question form. <paramref name="title"/> is "Add question" or "Edit question".</summary>
-    public QuestionFormDialog(string title)
+    /// <summary>Creates the form card.</summary>
+    public QuestionFormPanel()
     {
-        Text = title;
-        FormBorderStyle = FormBorderStyle.None;
-        StartPosition = FormStartPosition.CenterParent;
-        ShowInTaskbar = false;
-        BackColor = UITheme.Surface;
-        KeyPreview = true;
+        BackColor = UITheme.Background; // the drill-in area behind the card
+        AutoScroll = true; // small windows scroll the tall form card (platform chrome, §4.6)
 
         _questionText = new InputArea(accessibleName: "Question text")
         {
@@ -542,37 +607,52 @@ public sealed class QuestionFormDialog : Form
         _type = new SegmentedControl
         {
             Name = "QuestionTypeSelector",
-            AccessibleName = "Question type",
         };
         _type.Items = new[] { "Multiple choice", "True–false" };
         _type.SelectionChanged += static (sender, e) =>
         {
-            if (sender is SegmentedControl segmented && segmented.Parent is QuestionFormDialog dialog)
+            if (sender is SegmentedControl segmented && segmented.FindAncestor<QuestionFormPanel>() is { } panel)
             {
-                dialog.HandleTypeChanged();
+                panel.HandleTypeChanged();
             }
         };
 
         _correctMarks = new MarkedCheckBox[ChoiceRowCount];
+        _correctMarkLabels = new Label[ChoiceRowCount];
         _choiceFields = new InputField[ChoiceRowCount];
+        _markLabelWidth = TextRenderer.MeasureText(
+            string.Format(CorrectMarkLabelFormat, ChoiceRowCount), UITheme.Body).Width;
 
         for (int i = 0; i < ChoiceRowCount; i++)
         {
             int index = i;
 
+            // The §5.5 visible label: click-to-toggle, and the SOURCE of the
+            // checkbox's accessible name (§4.7's association rule).
+            var markLabel = new Label
+            {
+                Name = "ChoiceMarkLabel" + (i + 1),
+                Text = string.Format(CorrectMarkLabelFormat, i + 1),
+                Font = UITheme.Body,
+                ForeColor = UITheme.TextPrimary,
+                BackColor = UITheme.Surface,
+                AutoSize = false,
+            };
+
             var mark = new MarkedCheckBox
             {
                 Name = "ChoiceCorrectCheck" + (i + 1),
-                AccessibleName = $"Mark choice {i + 1} as the correct answer",
             };
+            mark.LabeledBy = markLabel;
             mark.CheckedChanged += (sender, e) =>
             {
-                if (sender is MarkedCheckBox checkBox && checkBox.Parent is QuestionFormDialog dialog)
+                if (sender is MarkedCheckBox checkBox && checkBox.FindAncestor<QuestionFormPanel>() is { } panel)
                 {
-                    dialog.HandleCorrectChanged(index, checkBox.IsChecked);
+                    panel.HandleCorrectChanged(index, checkBox.IsChecked);
                 }
             };
             _correctMarks[i] = mark;
+            _correctMarkLabels[i] = markLabel;
 
             var field = new InputField(accessibleName: $"Choice {i + 1}")
             {
@@ -608,9 +688,9 @@ public sealed class QuestionFormDialog : Form
         _save = new FlatButton { Name = "SaveQuestionButton", Text = "Save", Variant = UITheme.FlatButtonVariant.Primary };
         _save.Click += static (sender, e) =>
         {
-            if (sender is FlatButton button && button.Parent is QuestionFormDialog dialog)
+            if (sender is FlatButton button && button.FindAncestor<QuestionFormPanel>() is { } panel)
             {
-                dialog.HandleSave();
+                panel.HandleSave();
             }
         };
 
@@ -619,26 +699,64 @@ public sealed class QuestionFormDialog : Form
             Name = "CancelQuestionButton",
             Text = "Cancel",
             Variant = UITheme.FlatButtonVariant.Secondary,
-            DialogResult = DialogResult.Cancel,
+        };
+        _cancel.Click += static (sender, e) =>
+        {
+            if (sender is FlatButton button && button.FindAncestor<QuestionFormPanel>() is { } panel)
+            {
+                panel.Cancelled?.Invoke(panel, EventArgs.Empty);
+            }
         };
 
-        Controls.Add(_questionText);
-        Controls.Add(_type);
+        _card = new CardPanel
+        {
+            Name = "QuestionFormCard",
+            Location = new Point(0, 0),
+        };
+
+        // Card content, in tab order: title, Question, Type, the choice rows
+        // (mark → label → input per row), the block error, Explanation, buttons.
+        _card.Controls.Add(_questionText);
+        _card.Controls.Add(_type);
         for (int i = 0; i < ChoiceRowCount; i++)
         {
-            Controls.Add(_correctMarks[i]);
-            Controls.Add(_choiceFields[i]);
-        }
-        Controls.Add(_blockError);
-        Controls.Add(_explanation);
-        Controls.Add(_save);
-        Controls.Add(_cancel);
+            _card.Controls.Add(_correctMarks[i]);
+            _card.Controls.Add(_correctMarkLabels[i]);
+            _card.Controls.Add(_choiceFields[i]);
 
-        AcceptButton = _save;
-        CancelButton = _cancel;
+            int row = i;
+            _correctMarkLabels[i].Click += (sender, e) =>
+            {
+                if (sender is Label label && label.FindAncestor<QuestionFormPanel>() is { } panel)
+                {
+                    panel._correctMarks[row].IsChecked = !panel._correctMarks[row].IsChecked;
+                }
+            };
+
+        }
+        _card.Controls.Add(_blockError);
+        _card.Controls.Add(_explanation);
+        _card.Controls.Add(_save);
+        _card.Controls.Add(_cancel);
+
+        // The §4.4 label associations (F2): the visible labels are the source
+        // of their inputs' accessible names.
+        _type.LabeledBy = EnsureLabel("QuestionTypeLabel", "Type");
+        _questionText.LabeledBy = EnsureLabel("QuestionTextLabel", "Question");
+        _explanation.LabeledBy = EnsureLabel("QuestionExplanationLabel", "Explanation (optional)");
+        _ = EnsureLabel("QuestionDialogTitle", "Add question"); // set per state in OpenForAdd/OpenForEdit
+        _ = EnsureLabel("QuestionChoicesLabel", "Choices");
+
+        Controls.Add(_card);
 
         LayoutForm();
     }
+
+    /// <summary>Raised on Save when the form's values validate (the host performs the write).</summary>
+    public event EventHandler? Saved;
+
+    /// <summary>Raised on Cancel — the host returns to the list without saving (§5.5).</summary>
+    public event EventHandler? Cancelled;
 
     /// <summary>The entered (trimmed) question text.</summary>
     public string QuestionText => _questionText.Text.Trim();
@@ -668,8 +786,43 @@ public sealed class QuestionFormDialog : Form
     /// <summary>The marked correct row, or -1 when none is marked.</summary>
     public int CorrectIndex => _correctIndex;
 
+    /// <summary>Opens the blank form for a new question ("Add question").</summary>
+    public void OpenForAdd()
+    {
+        EnsureLabel("QuestionDialogTitle", "Add question").Text = "Add question";
+        ResetFields();
+        LayoutForm();
+    }
+
+    /// <summary>Opens the form prefilled from an existing question ("Edit question").</summary>
+    public void OpenForEdit(Question question)
+    {
+        EnsureLabel("QuestionDialogTitle", "Edit question").Text = "Edit question";
+        ResetFields();
+        LoadQuestion(question);
+        LayoutForm();
+    }
+
+    /// <summary>Clears every field to the add-question state.</summary>
+    private void ResetFields()
+    {
+        _questionText.Text = string.Empty;
+        _explanation.Text = string.Empty;
+        _type.SelectedIndex = 0;
+        _correctIndex = -1;
+        _suppressCorrectTracking = true;
+        for (int i = 0; i < ChoiceRowCount; i++)
+        {
+            _choiceFields[i].Text = string.Empty;
+            _correctMarks[i].IsChecked = false;
+        }
+        _suppressCorrectTracking = false;
+        ClearChoiceErrors();
+        ApplyTypeState();
+    }
+
     /// <summary>Prefills the form from an existing question (edit).</summary>
-    public void LoadQuestion(Question question)
+    private void LoadQuestion(Question question)
     {
         _questionText.Text = question.QuestionText;
         _explanation.Text = question.Explanation;
@@ -689,10 +842,9 @@ public sealed class QuestionFormDialog : Form
         _suppressCorrectTracking = false;
 
         ApplyTypeState();
-        LayoutForm();
     }
 
-    /// <summary>Save runs the pure validation; an issue keeps the dialog open, inline.</summary>
+    /// <summary>Save runs the pure validation; an issue keeps the form open, inline.</summary>
     private void HandleSave()
     {
         ClearChoiceErrors();
@@ -700,7 +852,7 @@ public sealed class QuestionFormDialog : Form
         QuestionFormIssue? issue = QuestionFormValidator.Validate(QuestionText, ChoiceTexts, CorrectIndex);
         if (issue is null)
         {
-            DialogResult = DialogResult.OK;
+            Saved?.Invoke(this, EventArgs.Empty);
             return;
         }
 
@@ -770,6 +922,8 @@ public sealed class QuestionFormDialog : Form
             _choiceFields[3].Visible = false;
             _correctMarks[2].Visible = false;
             _correctMarks[3].Visible = false;
+            _correctMarkLabels[2].Visible = false;
+            _correctMarkLabels[3].Visible = false;
 
             if (_correctIndex is not 0 and not 1)
             {
@@ -784,6 +938,8 @@ public sealed class QuestionFormDialog : Form
             _choiceFields[3].Visible = true;
             _correctMarks[2].Visible = true;
             _correctMarks[3].Visible = true;
+            _correctMarkLabels[2].Visible = true;
+            _correctMarkLabels[3].Visible = true;
         }
     }
 
@@ -798,33 +954,6 @@ public sealed class QuestionFormDialog : Form
         _blockError.Visible = false;
     }
 
-    /// <summary>Rounds the card like the §4.11 dialog shape.</summary>
-    protected override void OnLoad(EventArgs e)
-    {
-        base.OnLoad(e);
-        UpdateRegion();
-    }
-
-    protected override void OnResize(EventArgs eventargs)
-    {
-        base.OnResize(eventargs);
-        UpdateRegion();
-    }
-
-    /// <summary>Clips the dialog to the recipe's rounded card shape.</summary>
-    private void UpdateRegion()
-    {
-        if (Width <= 0 || Height <= 0)
-        {
-            return;
-        }
-
-        using var path = UITheme.RoundedPath(new Rectangle(0, 0, Width, Height), UITheme.RadiusCard);
-        Region? oldRegion = Region;
-        Region = new Region(path);
-        oldRegion?.Dispose();
-    }
-
     /// <summary>Places every field of the card (the layout follows the type and the error state).</summary>
     private void LayoutForm()
     {
@@ -837,53 +966,61 @@ public sealed class QuestionFormDialog : Form
         int comboSlot = UITheme.Scaled(this, 32);
         int width = UITheme.Scaled(this, 600);
         int inset = UITheme.Scaled(this, ContentInset);
-        int contentWidth = width - inset * 2;
+        int markSize = UITheme.Scaled(this, 16);
+        int markGap = UITheme.Scaled(this, UITheme.Spacing8);
+        int markLabelWidth = TextRenderer.MeasureText(
+            string.Format(CorrectMarkLabelFormat, ChoiceRowCount), UITheme.Body).Width;
+        int errorSlot = UITheme.Scaled(this, ErrorSlot); // F13: the 8px-scale step
 
         int saveWidth = TextRenderer.MeasureText(_save.Text, UITheme.Body).Width + UITheme.Scaled(this, UITheme.Spacing16) * 2;
         int cancelWidth = TextRenderer.MeasureText(_cancel.Text, UITheme.Body).Width + UITheme.Scaled(this, UITheme.Spacing16) * 2;
 
-        var titleLabel = EnsureLabel("QuestionDialogTitle", Text);
+        var titleLabel = EnsureLabel("QuestionDialogTitle", "Add question");
         titleLabel.Location = new Point(inset, inset);
-        titleLabel.Size = new Size(contentWidth, titleHeight);
+        titleLabel.Size = new Size(width - inset * 2, titleHeight);
 
         int questionLabelTop = inset + titleHeight + UITheme.Scaled(this, UITheme.Spacing16);
         var questionLabel = EnsureLabel("QuestionTextLabel", "Question");
         questionLabel.Location = new Point(inset, questionLabelTop);
-        questionLabel.Size = new Size(contentWidth, labelHeight);
+        questionLabel.Size = new Size(width - inset * 2, labelHeight);
 
         _questionText.Location = new Point(inset, questionLabelTop + labelHeight + UITheme.Scaled(this, UITheme.Spacing4));
-        _questionText.Size = new Size(contentWidth, questionAreaHeight);
+        _questionText.Size = new Size(width - inset * 2, questionAreaHeight);
 
         int typeLabelTop = _questionText.Bottom + FieldGap;
         var typeLabel = EnsureLabel("QuestionTypeLabel", "Type");
         typeLabel.Location = new Point(inset, typeLabelTop);
-        typeLabel.Size = new Size(contentWidth, labelHeight);
+        typeLabel.Size = new Size(width - inset * 2, labelHeight);
 
         _type.Location = new Point(inset, typeLabelTop + labelHeight + UITheme.Scaled(this, UITheme.Spacing4));
-        _type.Size = new Size(contentWidth, comboSlot);
+        _type.Size = new Size(width - inset * 2, comboSlot);
 
         int choicesLabelTop = _type.Bottom + FieldGap;
         var choicesLabel = EnsureLabel("QuestionChoicesLabel", "Choices");
         choicesLabel.Location = new Point(inset, choicesLabelTop);
-        choicesLabel.Size = new Size(contentWidth, labelHeight);
+        choicesLabel.Size = new Size(width - inset * 2, labelHeight);
 
         int rowTop = choicesLabelTop + labelHeight + UITheme.Scaled(this, UITheme.Spacing4);
-        int markSize = UITheme.Scaled(this, 16);
-        int errorSlot = UITheme.Scaled(this, 18);
         for (int i = 0; i < ChoiceRowCount; i++)
         {
             bool visible = !IsTrueFalse || i < 2;
             _correctMarks[i].Visible = visible;
+            _correctMarkLabels[i].Visible = visible;
             _choiceFields[i].Visible = visible;
             if (!visible)
             {
                 continue;
             }
 
+            // The §5.5 choice row: mark · "Mark choice n as the correct
+            // answer" (click toggles the mark) · the choice text input.
             _correctMarks[i].Location = new Point(inset, rowTop + (choiceRowHeight - markSize) / 2);
             _correctMarks[i].Size = new Size(markSize, markSize);
-            _choiceFields[i].Location = new Point(inset + markSize + UITheme.Scaled(this, UITheme.Spacing8), rowTop);
-            _choiceFields[i].Size = new Size(contentWidth - markSize - UITheme.Scaled(this, UITheme.Spacing8), choiceRowHeight);
+            _correctMarkLabels[i].Location = new Point(inset + markSize + markGap, rowTop + (choiceRowHeight - labelHeight) / 2);
+            _correctMarkLabels[i].Size = new Size(markLabelWidth, labelHeight);
+            int fieldLeft = inset + markSize + markGap + markLabelWidth + markGap;
+            _choiceFields[i].Location = new Point(fieldLeft, rowTop);
+            _choiceFields[i].Size = new Size(width - inset - fieldLeft, choiceRowHeight);
             rowTop += choiceRowHeight + UITheme.Scaled(this, UITheme.Spacing8);
 
             // A shown inline error claims its slot below the failing row (§4.4).
@@ -904,10 +1041,10 @@ public sealed class QuestionFormDialog : Form
         int explanationLabelTop = rowTop + UITheme.Scaled(this, UITheme.Spacing8);
         var explanationLabel = EnsureLabel("QuestionExplanationLabel", "Explanation (optional)");
         explanationLabel.Location = new Point(inset, explanationLabelTop);
-        explanationLabel.Size = new Size(contentWidth, labelHeight);
+        explanationLabel.Size = new Size(width - inset * 2, labelHeight);
 
         _explanation.Location = new Point(inset, explanationLabelTop + labelHeight + UITheme.Scaled(this, UITheme.Spacing4));
-        _explanation.Size = new Size(contentWidth, explanationAreaHeight);
+        _explanation.Size = new Size(width - inset * 2, explanationAreaHeight);
 
         int buttonsTop = _explanation.Bottom + UITheme.Scaled(this, UITheme.Spacing24);
         _save.Size = new Size(saveWidth, buttonHeight);
@@ -916,13 +1053,13 @@ public sealed class QuestionFormDialog : Form
         _cancel.Location = new Point(width - inset - saveWidth - ButtonGap - cancelWidth, buttonsTop);
 
         int height = buttonsTop + buttonHeight + inset + errorSlot; // headroom for the next error slot
-        ClientSize = new Size(width, height);
+        _card.Size = new Size(width, height);
     }
 
     /// <summary>Finds or creates one of the card's static labels.</summary>
     private Label EnsureLabel(string name, string text)
     {
-        Control? existing = Controls.Find(name, searchAllChildren: false).FirstOrDefault();
+        Control? existing = _card.Controls.Find(name, searchAllChildren: false).FirstOrDefault();
         if (existing is Label label)
         {
             return label;
@@ -937,7 +1074,7 @@ public sealed class QuestionFormDialog : Form
             BackColor = UITheme.Surface,
             AutoSize = false,
         };
-        Controls.Add(created);
+        _card.Controls.Add(created);
         return created;
     }
 }

@@ -8,6 +8,11 @@
 //          question editor — a question has exactly one correct choice; the
 //          checkbox just marks it and the editor enforces the rule (§4.7, R-2
 //          #3). The control keeps Space/Enter toggling for the keyboard.
+//          Accessibility contract (F2, §4.7): CreateAccessibleInstance exposes
+//          its own accessible object — role CheckBox, name = the paired
+//          visible label's text (§4.4's association rule; §5.5's wording
+//          "Mark choice n as the correct answer"), checked/unchecked mapped
+//          to the toggle state so marking and unmarking is announced.
 // =============================================================================
 
 using System.Windows.Forms;
@@ -23,6 +28,7 @@ public sealed class MarkedCheckBox : Control
     private const string CheckGlyph = "\uE73E";
 
     private bool _checked;
+    private Control? _labeledBy;
 
     /// <summary>Creates the checkbox at the recipe's 16px size.</summary>
     public MarkedCheckBox()
@@ -38,6 +44,19 @@ public sealed class MarkedCheckBox : Control
         // A 16px box is smaller than the §2.6 target size, so the accessible
         // role/name must say what the mark means (screen readers, UX F1 rule).
         AccessibleRole = System.Windows.Forms.AccessibleRole.CheckButton;
+    }
+
+    /// <summary>
+    /// The visible label the accessible name comes from (§4.4's association
+    /// rule: the Label paired with the box is the source of the name — §5.5's
+    /// "Mark choice n as the correct answer" wording — never a retyped
+    /// string, never a longer invented description).
+    /// </summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public Control? LabeledBy
+    {
+        get => _labeledBy;
+        set => _labeledBy = value;
     }
 
     /// <summary>Whether the box is marked.</summary>
@@ -143,5 +162,48 @@ public sealed class MarkedCheckBox : Control
             using var outlinePen = new System.Drawing.Pen(UITheme.Accent);
             e.Graphics.DrawPath(outlinePen, outlinePath);
         }
+    }
+
+    /// <summary>The accessible object of recipe 4.7's accessibility contract (F2).</summary>
+    protected override AccessibleObject CreateAccessibilityInstance() => new MarkedCheckBoxAccessibleObject(this);
+
+    /// <summary>CheckBox role, visible-label name, toggle state (§4.7).</summary>
+    private sealed class MarkedCheckBoxAccessibleObject : Control.ControlAccessibleObject
+    {
+        private readonly MarkedCheckBox _owner;
+
+        public MarkedCheckBoxAccessibleObject(MarkedCheckBox owner) : base(owner)
+        {
+            _owner = owner;
+        }
+
+        public override AccessibleRole Role => AccessibleRole.CheckButton;
+
+        public override string? Name => _owner._labeledBy?.Text ?? base.Name;
+
+        public override string? DefaultAction => "Toggle";
+
+        public override AccessibleStates State
+        {
+            get
+            {
+                AccessibleStates state = AccessibleStates.Focusable;
+                if (_owner.Focused)
+                {
+                    state |= AccessibleStates.Focused;
+                }
+
+                // Checked/unchecked maps to the UIA toggle state (§4.7), so
+                // marking and unmarking a choice is announced as it happens.
+                if (_owner.IsChecked)
+                {
+                    state |= AccessibleStates.Checked;
+                }
+
+                return state;
+            }
+        }
+
+        public override void DoDefaultAction() => _owner.IsChecked = !_owner.IsChecked;
     }
 }

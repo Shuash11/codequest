@@ -76,7 +76,7 @@ public sealed class TopicManageForm : ModulePanel
 
         int toolbarHeight = UITheme.Scaled(this, 32);
 
-        _search = new InputField(accessibleName: "Search topics")
+        _search = new InputField(accessibleName: "Search topics…") // §4.4: name from the visible placeholder
         {
             Name = "TopicsSearchField",
             PlaceholderText = "Search topics…",
@@ -85,7 +85,7 @@ public sealed class TopicManageForm : ModulePanel
         };
         _search.TextChanged += static (sender, e) =>
         {
-            if (sender is InputField field && field.Parent is TopicManageForm form)
+            if (sender is InputField field && field.FindAncestor<TopicManageForm>() is { } form)
             {
                 form.ApplyFilter();
             }
@@ -408,6 +408,7 @@ public sealed class TopicFormDialog : Form
             Name = "TopicNameField",
             PlaceholderText = "Topic name",
         };
+        _name.LabeledBy = nameLabel; // §4.4: the visible label is the name's source (F2)
         _name.TextChanged += static (sender, e) =>
         {
             if (sender is InputField field)

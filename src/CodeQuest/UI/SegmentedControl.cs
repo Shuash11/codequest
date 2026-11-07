@@ -6,11 +6,16 @@
 //          label (the iOS segmented style), unselected segments are
 //          transparent with a Body label, hover on unselected paints the
 //          recipe's quiet step (UITheme.SegmentHover, §4.9). The group is ONE
-//          Tab stop; arrow keys move the selection within it (§2.6) and the
-//          selected segment carries the standard 1px accent outline inset 1px
-//          when the control is keyboard-focused. Disabled: labels TextTertiary,
-//          the selected segment keeps its Surface fill so the stored value
-//          stays legible, no hover response.
+//          Tab stop; arrow keys move the selection within it (§2.6) when the
+//          control is keyboard-focused, and the focused segment carries the
+//          §4.1/§4.3 ring. Disabled: labels
+//          TextTertiary, the selected segment keeps its Surface fill so the
+//          stored value stays legible, no hover response.
+//          Accessibility contract (F2, §4.9): CreateAccessibleInstance exposes
+//          role Group with name = the group's visible label (§4.4's
+//          association — the label control is the name's source); each
+//          segment is a child accessible object with role RadioButton, name =
+//          its visible text and the Selected state on the active one.
 // Users:   the difficulty picker of the quiz form, the status filter of the
 //          quiz management screen (All / Draft / Approved) and the question
 //          type picker of the question form (spec 5.4, 5.5) — never free text,
@@ -30,6 +35,7 @@ public sealed class SegmentedControl : Control
     private string[] _items = Array.Empty<string>();
     private int _selectedIndex;
     private int _hoveredSegment = -1;
+    private Control? _labeledBy;
 
     /// <summary>Creates the control at the recipe's 32px height.</summary>
     public SegmentedControl()
@@ -86,6 +92,18 @@ public sealed class SegmentedControl : Control
             Invalidate();
             OnSelectionChanged(EventArgs.Empty);
         }
+    }
+
+    /// <summary>
+    /// The visible label the group's accessible name comes from (§4.4's
+    /// association rule: the label is the source of the name, not a string
+    /// retyped beside the control — recipe 4.9's "Difficulty"/"Type"/"Status").
+    /// </summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public Control? LabeledBy
+    {
+        get => _labeledBy;
+        set => _labeledBy = value;
     }
 
     /// <summary>Raised after the selection changes (mouse click or arrow keys).</summary>
@@ -244,5 +262,74 @@ public sealed class SegmentedControl : Control
 
         int segment = location.X * _items.Length / Width;
         return segment >= _items.Length ? _items.Length - 1 : segment;
+    }
+
+    /// <summary>
+    /// The group's accessible name: the visible label's text (§4.4's
+    /// association), falling back to an explicitly set AccessibleName.
+    /// </summary>
+    private string GroupAccessibleName => _labeledBy?.Text ?? AccessibleName ?? string.Empty;
+
+    /// <summary>The on-screen bounds of one segment, in screen coordinates.</summary>
+    private Rectangle SegmentBounds(int index)
+    {
+        int width = _items.Length == 0 ? 0 : Width / _items.Length;
+        int x = index * width;
+        if (index == _items.Length - 1)
+        {
+            width = Width - x; // the last segment takes the rounding remainder
+        }
+
+        return new Rectangle(x, 0, width, Height);
+    }
+
+    /// <summary>The accessible object of recipe 4.9's accessibility contract (F2).</summary>
+    protected override AccessibleObject CreateAccessibilityInstance() => new SegmentGroupAccessibleObject(this);
+
+    /// <summary>Group role, visible-label name, segments as RadioButton children (§4.9).</summary>
+    private sealed class SegmentGroupAccessibleObject : Control.ControlAccessibleObject
+    {
+        private readonly SegmentedControl _owner;
+
+        public SegmentGroupAccessibleObject(SegmentedControl owner) : base(owner)
+        {
+            _owner = owner;
+        }
+
+        public override AccessibleRole Role => AccessibleRole.Grouping; // the UIA Group role (§4.9)
+
+        public override string? Name => _owner.GroupAccessibleName;
+
+        public override int GetChildCount() => _owner.Items.Count;
+
+        public override AccessibleObject? GetChild(int index)
+            => index >= 0 && index < _owner.Items.Count ? new SegmentAccessibleObject(_owner, index) : null;
+    }
+
+    /// <summary>
+    /// One segment as a child accessible object (§4.9): role RadioButton,
+    /// name = the segment's visible text, Selected state on the active one.
+    /// </summary>
+    private sealed class SegmentAccessibleObject : AccessibleObject
+    {
+        private readonly SegmentedControl _owner;
+        private readonly int _index;
+
+        public SegmentAccessibleObject(SegmentedControl owner, int index)
+        {
+            _owner = owner;
+            _index = index;
+        }
+
+        public override AccessibleRole Role => AccessibleRole.RadioButton;
+
+        public override string? Name => _owner.Items[_index];
+
+        public override AccessibleStates State
+            => _owner.SelectedIndex == _index ? AccessibleStates.Selected : AccessibleStates.None;
+
+        public override AccessibleObject? Parent => _owner.AccessibilityObject;
+
+        public override Rectangle Bounds => _owner.RectangleToScreen(_owner.SegmentBounds(_index));
     }
 }

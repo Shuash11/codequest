@@ -3,13 +3,17 @@
 // The quiz management screen of the design of record (spec 5.4), hosted as
 // the shell's "Quiz management" module panel (§5.2).
 // Look at: the layout — toolbar: search ("Search quizzes…"), the topic filter
-//          combo ("All topics" + one per topic), the status segmented control
-//          (All / Draft / Approved, recipe 4.9) and the trailing "New quiz"
-//          primary button; the grid card carries Title · Topic · Difficulty ·
-//          Questions · Status (the Draft/Approved badge of recipe 4.10
-//          inline) · Created, with trailing actions (Questions, Edit, Delete).
-//          The search narrows by title and the filters by topic and status,
-//          live while the user types or switches (QuizListFilter).
+//          combo ("All topics" + one per topic), the visible "Status" group
+//          label (Caption, TextPrimary, §5.4's §4.9 naming ripple) behind the
+//          status segmented control (All / Draft / Approved, recipe 4.9) and
+//          the trailing "New quiz" primary button; the grid card carries
+//          Title · Topic · Difficulty · Questions · Status (the Draft/Approved
+//          badge of recipe 4.10 inline) · Created, with the P8 trailing
+//          action set in §5.4's column order (Edit · Edit questions ·
+//          Delete). The Title column — the
+//          record identifier — carries a readable minimum width (F4). The
+//          search narrows by title and the filters by topic and status, live
+//          while the user types or switches (QuizListFilter).
 // Quiz form: modal card — Title (§4.4), Topic (§4.5 combo of existing
 //          topics), Difficulty (§4.9 segmented, Easy/Medium/Hard).
 // Delete flow (the CORRECTED two-branch flow of spec 5.4): only an unblocked
@@ -25,6 +29,11 @@
 //          visible here); the Approve affordance itself belongs to §5.12
 //          (P13) — a zero-question quiz cannot be approved THERE, this
 //          screen only shows the state.
+// Question editor (F5, §5.5): the editor is a drill-in PANEL STATE of this
+//          module — never a modal window. Opening it hides the toolbar and
+//          list; its leading "Back" returns here with the search/filter
+//          state intact (§5.2's panel persistence), refreshing the grid when
+//          question data changed.
 // R-2 obligations carried here: #5 (duplicate title per topic → the spec's
 //          exact message, pre-checked inline AND caught as
 //          DuplicateEntityException — never raw), F8 (empty-title guard
@@ -58,9 +67,10 @@ public sealed class QuizManageForm : ModulePanel
     private const string NoMatchTitle = "No quizzes match your search.";
     private const string AllTopicsLabel = "All topics";
 
-    private const string QuestionsAction = "Questions";
+    private const string QuestionsAction = "Edit questions"; // F6: verb-appropriate action copy (§5.4)
     private const string EditAction = "Edit";
     private const string DeleteAction = "Delete";
+    private const string StatusGroupLabel = "Status"; // the §5.4 visible group label behind the status filter
 
     private readonly IQuizRepository _quizzes;
     private readonly ITopicRepository _topics;
@@ -70,9 +80,11 @@ public sealed class QuizManageForm : ModulePanel
     private readonly ISubmittedAnswerRepository _answers;
     private readonly InputField _search;
     private readonly ThemedComboBox _topicFilter;
+    private readonly Label _statusLabel;
     private readonly SegmentedControl _statusFilter;
     private readonly FlatButton _newQuiz;
     private readonly ListCardGrid _list;
+    private QuestionEditForm? _questionEditor; // the §5.5 drill-in state, created on first open (F5)
 
     private readonly List<int?> _topicFilterIds = new(); // parallel to the combo items; null = all topics
     private Dictionary<int, string> _topicNames = new();
@@ -107,7 +119,7 @@ public sealed class QuizManageForm : ModulePanel
         int toolbarHeight = UITheme.Scaled(this, 32);
         int gap = UITheme.Scaled(this, UITheme.Spacing8);
 
-        _search = new InputField(accessibleName: "Search quizzes")
+        _search = new InputField(accessibleName: "Search quizzes…") // §4.4: name from the visible placeholder
         {
             Name = "QuizSearchField",
             PlaceholderText = "Search quizzes…",
@@ -116,7 +128,7 @@ public sealed class QuizManageForm : ModulePanel
         };
         _search.TextChanged += static (sender, e) =>
         {
-            if (sender is InputField field && field.Parent is QuizManageForm form)
+            if (sender is InputField field && field.FindAncestor<QuizManageForm>() is { } form)
             {
                 form.ApplyFilter();
             }
@@ -131,24 +143,38 @@ public sealed class QuizManageForm : ModulePanel
         };
         _topicFilter.SelectedIndexChanged += static (sender, e) =>
         {
-            if (sender is ThemedComboBox combo && combo.Parent is QuizManageForm form)
+            if (sender is ThemedComboBox combo && combo.FindAncestor<QuizManageForm>() is { } form)
             {
                 form.ApplyFilter();
             }
         };
 
+        // §5.4 (F2 ripple): the visible "Status" group label (Caption,
+        // TextPrimary, 8px gap) sits behind the segmented filter and is the
+        // source of its accessible name (§4.4's association, §4.9's naming).
+        _statusLabel = new Label
+        {
+            Name = "QuizStatusLabel",
+            Text = StatusGroupLabel,
+            Font = UITheme.Caption,
+            ForeColor = UITheme.TextPrimary,
+            BackColor = UITheme.Background,
+            AutoSize = true,
+            Location = new Point(_topicFilter.Right + gap, (toolbarHeight - UITheme.Scaled(this, 15)) / 2),
+        };
+
         _statusFilter = new SegmentedControl
         {
             Name = "QuizStatusFilter",
-            AccessibleName = "Status filter",
-            Location = new Point(_topicFilter.Right + gap, 0),
+            Location = new Point(_statusLabel.Right + gap, 0),
             Size = new Size(UITheme.Scaled(this, 228), toolbarHeight),
             Anchor = AnchorStyles.Top | AnchorStyles.Left,
         };
+        _statusFilter.LabeledBy = _statusLabel;
         _statusFilter.Items = new[] { "All", "Draft", "Approved" };
         _statusFilter.SelectionChanged += static (sender, e) =>
         {
-            if (sender is SegmentedControl segment && segment.Parent is QuizManageForm form)
+            if (sender is SegmentedControl segment && segment.FindAncestor<QuizManageForm>() is { } form)
             {
                 form.ApplyFilter();
             }
@@ -179,14 +205,14 @@ public sealed class QuizManageForm : ModulePanel
         };
         _list.Grid.Name = "QuizGrid";
         _list.Grid.AccessibleName = "Quizzes";
-        _list.Grid.AddTextColumn("QuizTitle", "Title", 34f, extraLeftInset: UITheme.Scaled(this, UITheme.Spacing8));
+        _list.Grid.AddTextColumn("QuizTitle", "Title", 34f, extraLeftInset: UITheme.Scaled(this, UITheme.Spacing8), minimumWidth: 160); // F4: the record identifier keeps a readable floor
         _list.Grid.AddTextColumn("QuizTopic", "Topic", 16f, minimumWidth: 82);
         _list.Grid.AddTextColumn("QuizDifficulty", "Difficulty", 12f, minimumWidth: 74);
         _list.Grid.AddTextColumn("QuizQuestionCount", "Questions", 11f, minimumWidth: 74);
         _list.Grid.AddBadgeColumn("QuizStatus", "Status", 96);
         _list.Grid.AddTextColumn("QuizCreated", "Created", 15f, minimumWidth: 108);
-        _list.Grid.AddActionColumn(QuestionsAction, QuestionsAction, GridActionKind.Secondary);
         _list.Grid.AddActionColumn(EditAction, EditAction, GridActionKind.Secondary);
+        _list.Grid.AddActionColumn(QuestionsAction, QuestionsAction, GridActionKind.Secondary);
         _list.Grid.AddActionColumn(DeleteAction, DeleteAction, GridActionKind.Destructive);
         _list.Grid.ActionClicked += static (sender, e) =>
         {
@@ -205,6 +231,7 @@ public sealed class QuizManageForm : ModulePanel
 
         Controls.Add(_search);
         Controls.Add(_topicFilter);
+        Controls.Add(_statusLabel);
         Controls.Add(_statusFilter);
         Controls.Add(_newQuiz);
         Controls.Add(_list);
@@ -284,8 +311,8 @@ public sealed class QuizManageForm : ModulePanel
                 questionCount.ToString(),
                 quiz.Status.ToString(), // the badge column paints this as a §4.10 chip
                 UiFormat.FormatDate(quiz.CreatedAt),
-                QuestionsAction,
                 EditAction,
+                QuestionsAction,
                 DeleteAction);
             _list.Grid.Rows[index].Tag = quiz;
         }
@@ -343,16 +370,63 @@ public sealed class QuizManageForm : ModulePanel
         }
     }
 
-    /// <summary>Opens the question editor of spec 5.5 for one quiz.</summary>
+    /// <summary>
+    /// Opens the question editor of spec 5.5 as the drill-in state of this
+    /// module (F5): the toolbar and list hide, the editor panel fills the
+    /// module area, the shell stays unchanged (§5 preamble — the sidebar and
+    /// header never move). The search and filters keep their state while
+    /// hidden; "Back" restores the list view exactly as the user left it.
+    /// </summary>
     private void OpenQuestionEditor(Quiz quiz)
     {
-        using var editor = new QuestionEditForm(_quizzes, _questions, _choices, _answers, quiz.QuizId);
-        editor.ShowDialog(FindForm());
-
-        if (editor.ChangesSaved)
+        if (_questionEditor is null)
         {
-            RefreshData(); // question counts may have changed
+            _questionEditor = new QuestionEditForm(_quizzes, _questions, _choices, _answers)
+            {
+                Name = "QuestionEditorPanel",
+                Dock = DockStyle.Fill,
+                Visible = false,
+            };
+            _questionEditor.BackRequested += HandleEditorBack;
+            _questionEditor.StatusRequested += static (sender, e) =>
+            {
+                if (sender is QuestionEditForm editor && editor.FindAncestor<QuizManageForm>() is { } form)
+                {
+                    form.ReportStatus(e.Message, e.Success);
+                }
+            };
+            Controls.Add(_questionEditor);
         }
+
+        ShowListView(visible: false);
+        _questionEditor.Open(quiz.QuizId);
+        _questionEditor.Visible = true;
+        _questionEditor.BringToFront();
+    }
+
+    /// <summary>The editor's "Back": returns to the quiz list with search/filter state intact (§5.5).</summary>
+    private void HandleEditorBack(object? sender, EventArgs e)
+    {
+        bool dataChanged = _questionEditor!.ChangesSaved;
+
+        _questionEditor.Visible = false;
+        ShowListView(visible: true);
+
+        if (dataChanged)
+        {
+            RefreshData(); // the Questions column may have changed
+        }
+    }
+
+    /// <summary>Shows or hides this module's list state (toolbar + grid) while the editor is open.</summary>
+    private void ShowListView(bool visible)
+    {
+        _search.Visible = visible;
+        _topicFilter.Visible = visible;
+        _statusLabel.Visible = visible;
+        _statusFilter.Visible = visible;
+        _newQuiz.Visible = visible;
+        _list.Visible = visible;
     }
 
     /// <summary>Opens the "New quiz" modal card and stores the quiz on Save.</summary>
@@ -510,8 +584,14 @@ public sealed class QuizFormDialog : Form
 
     private static readonly string[] Difficulties = { "Easy", "Medium", "Hard" };
 
+    // The design of record's exact copy (§5.4): the no-topic message attaches
+    // to the TOPIC picker — the field actually in error (F10, WCAG 3.3.1) —
+    // never to the Title field.
+    private const string NoTopicMessage = "Create a topic first.";
+
     private readonly InputField _title;
     private readonly ThemedComboBox _topic;
+    private readonly Label _topicError;
     private readonly SegmentedControl _difficulty;
     private readonly FlatButton _save;
     private readonly FlatButton _cancel;
@@ -553,6 +633,7 @@ public QuizFormDialog(string title, IReadOnlyList<Topic> topics)
             Name = "QuizTitleField",
             PlaceholderText = "Quiz title",
         };
+        _title.LabeledBy = titleFieldLabel; // §4.4: the visible label is the name's source (F2)
         _title.TextChanged += static (sender, e) =>
         {
             if (sender is InputField field)
@@ -576,6 +657,13 @@ public QuizFormDialog(string title, IReadOnlyList<Topic> topics)
             Name = "QuizTopicCombo",
             AccessibleName = "Topic",
         };
+        _topic.SelectedIndexChanged += static (sender, e) =>
+        {
+            if (sender is ThemedComboBox combo && combo.FindAncestor<QuizFormDialog>() is { } dialog)
+            {
+                dialog._topicError.Visible = false; // the error persists until the value validates (§4.4)
+            }
+        };
         foreach (Topic topic in topics)
         {
             _topic.Items.Add(topic.Name);
@@ -585,6 +673,18 @@ public QuizFormDialog(string title, IReadOnlyList<Topic> topics)
         {
             _topic.SelectedIndex = 0; // a fresh quiz defaults to the first topic
         }
+
+        // The topic picker's inline error line (F10): directly below the
+        // combo, the §4.4 error recipe's Caption DangerText.
+        _topicError = new Label
+        {
+            Name = "QuizTopicError",
+            Font = UITheme.Caption,
+            ForeColor = UITheme.DangerText,
+            BackColor = UITheme.Surface,
+            AutoSize = true,
+            Visible = false,
+        };
 
         var difficultyLabel = new Label
         {
@@ -599,8 +699,8 @@ public QuizFormDialog(string title, IReadOnlyList<Topic> topics)
         _difficulty = new SegmentedControl
         {
             Name = "QuizDifficultySelector",
-            AccessibleName = "Difficulty",
         };
+        _difficulty.LabeledBy = difficultyLabel; // §4.4: the visible label is the name's source (§4.9)
         _difficulty.Items = Difficulties;
 
         _save = new FlatButton { Name = "SaveQuizButton", Text = "Save", Variant = UITheme.FlatButtonVariant.Primary };
@@ -625,6 +725,7 @@ public QuizFormDialog(string title, IReadOnlyList<Topic> topics)
         Controls.Add(_title);
         Controls.Add(topicLabel);
         Controls.Add(_topic);
+        Controls.Add(_topicError);
         Controls.Add(difficultyLabel);
         Controls.Add(_difficulty);
         Controls.Add(_save);
@@ -680,9 +781,21 @@ public QuizFormDialog(string title, IReadOnlyList<Topic> topics)
         };
     }
 
-    /// <summary>Save runs the caller's validation; an error keeps the dialog open, inline.</summary>
+    /// <summary>
+    /// Save runs the caller's validation; an error keeps the dialog open,
+    /// inline. The no-topic case attaches the error to the TOPIC picker (F10,
+    /// WCAG 3.3.1 — the field actually in error), not to the Title field.
+    /// </summary>
     private void HandleSave()
     {
+        if (QuizTopicId <= 0)
+        {
+            ShowTopicError(NoTopicMessage);
+            return;
+        }
+
+        _topicError.Visible = false;
+
         string? error = ValidateInput?.Invoke(_title.Text, QuizTopicId);
 
         if (error is not null)
@@ -692,6 +805,13 @@ public QuizFormDialog(string title, IReadOnlyList<Topic> topics)
         }
 
         DialogResult = DialogResult.OK;
+    }
+
+    /// <summary>Shows the topic picker's inline error line (the §4.4 recipe, on the combo's slot).</summary>
+    private void ShowTopicError(string message)
+    {
+        _topicError.Text = message;
+        _topicError.Visible = true;
     }
 
     /// <summary>Rounds the card like the §4.11 dialog shape.</summary>
@@ -729,6 +849,8 @@ public QuizFormDialog(string title, IReadOnlyList<Topic> topics)
         int buttonHeight = UITheme.Scaled(this, 32);
         int fieldHeight = UITheme.Scaled(this, 52); // the 32px field + the reserved error slot
         int comboSlot = UITheme.Scaled(this, 32);
+        int topicErrorSlot = UITheme.Scaled(this, 16) + UITheme.Scaled(this, UITheme.Spacing4); // the F10 line's reserved slot
+        int topicSlot = comboSlot + topicErrorSlot;
         int width = UITheme.Scaled(this, 460);
         int inset = UITheme.Scaled(this, ContentInset);
         int contentWidth = width - inset * 2;
@@ -741,7 +863,7 @@ public QuizFormDialog(string title, IReadOnlyList<Topic> topics)
         int titleFieldTop = fieldLabelTop + labelHeight + UITheme.Scaled(this, UITheme.Spacing4);
         int topicTop = titleFieldTop + fieldHeight + FieldGap;
         int topicFieldTop = topicTop + labelHeight + UITheme.Scaled(this, UITheme.Spacing4);
-        int difficultyTop = topicFieldTop + comboSlot + FieldGap;
+        int difficultyTop = topicFieldTop + topicSlot + FieldGap;
         int difficultyFieldTop = difficultyTop + labelHeight + UITheme.Scaled(this, UITheme.Spacing4);
         int buttonsTop = difficultyFieldTop + comboSlot + UITheme.Scaled(this, UITheme.Spacing24);
         int height = buttonsTop + buttonHeight + inset;
@@ -760,6 +882,8 @@ public QuizFormDialog(string title, IReadOnlyList<Topic> topics)
 
         _topic.Location = new Point(inset, topicFieldTop);
         _topic.Width = contentWidth; // the combo's height follows its font (native flat chrome)
+
+        _topicError.Location = new Point(inset, _topic.Bottom + UITheme.Scaled(this, UITheme.Spacing4));
 
         difficultyLabel.Location = new Point(inset, difficultyTop);
         difficultyLabel.Size = new Size(contentWidth, labelHeight);
