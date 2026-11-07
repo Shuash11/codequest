@@ -30,46 +30,56 @@ The palette, type scale, spacing, radii, and separators below are the tokens P7 
 
 ### 2.1 Color tokens
 
-The palette is iOS-clean: **light neutral surfaces, one accent, three semantic colors.** Values are pinned from the current Apple Human Interface Guidelines color specifications (fetched 2026-11-04; see §3 for citation). The HIG notes its documented values are "for your reference during the app design process" — this design pins them as fixed tokens precisely because WinForms has no dynamic system-color machinery; `UITheme.cs` constants are the single source. Dark mode is out of scope: the app ships one light appearance (deliberate scope note — a half-done dark mode would break the consistency rubric line it is meant to earn).
+> **D3 re-issue (2026-11-08, owner directive "grey and modern theme").** The blue
+> accent is replaced by a grey accent, and the four contrast findings from the
+> P8 accessibility review are fixed at the token level (F3: SuccessText /
+> DangerText now ≥ 4.75:1 on their tints; F7: TextSecondary headers now
+> 4.66:1 on Background; F8: badge text 4.75:1; F9: BorderControl now 3.25:1,
+> above the 3:1 non-text floor). The tables below carry the re-issued values;
+> `UITheme.cs` is updated to match — the single code revision point the token
+> discipline buys. The interim all-`TextPrimary` strip rule from P8.1 is
+> discarded: the verdict tokens are semantic again and AA-compliant.
 
-**Surfaces and neutrals** (values from the HIG iOS gray ramp, light mode):
+The palette is **light neutral surfaces, one grey accent, three semantic colors.** The original values were pinned from the Apple Human Interface Guidelines (fetched 2026-11-04; see §3 for citation); the D3 re-issue keeps the structure and re-pins the values (the grey ramp and the AA-corrected semantic text variants). WinForms has no dynamic system-color machinery; `UITheme.cs` constants are the single source. Dark mode is out of scope: the app ships one light appearance (deliberate scope note — a half-done dark mode would break the consistency rubric line it is meant to earn).
 
-| Token | Hex | Source value | Used for |
-|---|---|---|---|
-| `Background` | `#F2F2F7` | systemGray6 (R-242 G-242 B-247) | Window background, sidebar background — the grouped-background "primary" role |
-| `Surface` | `#FFFFFF` | systemBackground (white) | Cards, list containers, input fields — the grouped-background "secondary" role |
-| `Fill` | `#E5E5EA` | systemGray5 (R-229 G-229 B-234) | Selected/hover row fill, pressed chips, quiet control fills |
-| `BorderControl` | `#C7C7CC` | systemGray3 (R-199 G-199 B-204) | Text-input and combo borders |
-| `SeparatorHairline` | `#E5E5EA` | systemGray5 | 1px row separators (see §2.5) |
+**Surfaces and neutrals** (the D3 grey ramp, light mode):
 
-**Text** (the HIG label hierarchy, flattened to three opaque desktop tokens):
+| Token | Hex | Used for |
+|---|---|---|
+| `Background` | `#F5F5F7` | Window background, sidebar background — the grouped-background "primary" role |
+| `Surface` | `#FFFFFF` | Cards, list containers, input fields — the grouped-background "secondary" role |
+| `Fill` | `#E9E9EE` | Selected/hover row fill, pressed chips, quiet control fills |
+| `BorderControl` | `#8E8E93` | Text-input and combo borders; unchecked control borders (F9: 3.25:1) |
+| `SeparatorHairline` | `#D8D8DC` | 1px row separators (see §2.5) |
+
+**Text** (three opaque desktop tokens; the first two meet AA on Surface and Background):
 
 | Token | Hex | Role |
 |---|---|---|
-| `TextPrimary` | `#000000` | Primary content — iOS label is black in light mode |
-| `TextSecondary` | `#8E8E93` | systemGray — metadata: dates, sub-labels, quiet column headers |
-| `TextTertiary` | `#AEAEB2` | systemGray2 — placeholder text, disabled text, decorative hints |
+| `TextPrimary` | `#1D1D1F` | Primary content |
+| `TextSecondary` | `#6E6E73` | Metadata: dates, sub-labels, quiet column headers (F7: 5.07:1 on Surface) |
+| `TextTertiary` | `#98989D` | Placeholder text, disabled text, decorative hints (AA-exempt roles) |
 | `TextOnAccent` | `#FFFFFF` | Text/icons on filled accent or filled danger buttons |
 
-**Accent — exactly one:**
+**Accent — exactly one, and grey (D3):**
 
-| Token | Hex | Source | Used for |
+| Token | Hex | Used for |
+|---|---|---|
+| `Accent` | `#3A3A3C` | Primary action fill, sidebar active state, focused input border, links (white label 9.1:1) |
+| `AccentHover` | `#2C2C2E` | Pointer hover on filled accent buttons — no hover on touch iOS, so desktop needs this added |
+| `AccentPressed` | `#232326` | Button while held |
+| `AccentDisabled` | `#C7C7CC` | Disabled filled buttons; paired with `TextOnAccent` at reduced expectation, see state tables in §4 |
+| `AccentTint` | `#E0E0E5` | Selected sidebar item background, selected DataGridView row, focused control borders |
+
+**Semantic colors** (text variants re-pinned to meet AA on their tints and on white — F3/F8):
+
+| Token | Hex (fill) | Hex (text) | Used for |
 |---|---|---|---|
-| `Accent` | `#0088FF` | HIG system Blue, light mode (R-0 G-136 B-255, June 2025 refresh — the same family as the long-standing iOS blue #007AFF) | Primary action fill, sidebar active state, focused input border, links |
-| `AccentHover` | `#0080F0` | Designer-derived (~6% darken of Accent) | Pointer hover on filled accent buttons — no hover on touch iOS, so desktop needs this added |
-| `AccentPressed` | `#006BC7` | Designer-derived (~15% darken) | Button while held |
-| `AccentDisabled` | `#B8DAFF` | Designer-derived (tint toward white) | Disabled filled buttons; paired with `TextOnAccent` at reduced expectation, see state tables in §4 |
-| `AccentTint` | `#E8F3FF` | Designer-derived (~10% tint of Accent on white) | Selected sidebar item background, selected DataGridView row, focused control borders |
+| `Success` | `#2E9E48` | `#157A38` | Approved badge fill, correct-answer marks, success feedback text (text 4.75:1 on tint, 5.5:1 on white) |
+| `Danger` | `#C62B25` | `#B3241F` | Destructive buttons, error text, incorrect marks (text 5.6:1 on tint, 6.6:1 on white; white label on the fill 5.5:1) |
+| `Warning` | `#A97400` | `#8A5A00` | Draft-phase generation banner border, needs-practice emphasis (text 5.4:1 on tint) |
 
-**Semantic colors** (base fills from the HIG system-color table; text uses the HIG *increased-contrast* variants of the same colors — those exist in the source table precisely for legibility on light backgrounds):
-
-| Token | Hex (fill) | Hex (text) | Source | Used for |
-|---|---|---|---|---|
-| `Success` | `#34C759` | `#008932` | Green light / accessible green light (R-0 G-137 B-50) | Approved badge fill, correct-answer marks, success feedback text |
-| `Danger` | `#FF383C` | `#E9152D` | Red light (R-255 G-56 B-60) / accessible red light (R-233 G-21 B-45) | Destructive buttons, error text, incorrect marks |
-| `Warning` | `#FF8D28` | `#C55300` | Orange light (R-255 G-141 B-40) / accessible orange light (R-197 G-83 B-0) | Draft-phase generation banner, needs-practice emphasis |
-
-Tints for banner/badge backgrounds are designer-derived mixes of the above on white: `SuccessTint` `#DFF5E7`, `DangerTint` `#FDE8E9`, `WarningTint` `#FFF3E0`.
+Tints for banner/badge backgrounds are designer-derived mixes on white: `SuccessTint` `#DFF5E7`, `DangerTint` `#FDE8E9`, `WarningTint` `#FFF3E0`.
 
 **Color has a job.** Every token above signals state or action; none is decoration (HIG: "use color consistently… to help communicate information like status or interactivity"). Accent appears only where a thing is the primary action or the current selection — never on two competing buttons at once, never on passive text. State is never color alone: Draft/Approved badges always carry a text label (§4.10), correct/incorrect always carry a mark plus text (§5.9) — HIG inclusive-color guidance.
 

@@ -23,9 +23,7 @@
 //          I2 the Take-quiz and History screens (spec 5.6-5.9) — the Reports
 //          and P13 placeholders stay until their phases.
 // Status strip (§4.11, §5 anatomy): module panels report success and failure
-//          lines through <see cref="ShowStatus"/> — the INTERIM §2.6/§4.11
-//          rule (F3, until the R-D3 theme re-issue) renders ALL verdict lines
-//          in TextPrimary on Background, so the strip is AA-compliant now;
+//          lines through <see cref="ShowStatus"/> — the SEMANTIC verdict tokens (F3 final, D3 re-issue): SuccessText for success, DangerText for failure/blocked - both AA on Background
 //          the semantic text tokens keep their on-Surface uses. Success lines
 //          auto-clear after ~4 seconds, failure/blocked lines stay until the
 //          next feedback. Switching modules clears the strip (F12) so stale
@@ -272,12 +270,12 @@ public sealed class MainForm : Form
             Location = new Point(inset, headerTop),
         };
 
-        _statusStrip = new Label
+        _statusStrip = new LiveStatusLabel
         {
             Name = "StatusStripLabel",
             Text = string.Empty,
             Font = UITheme.Body,
-            ForeColor = UITheme.TextPrimary, // the interim §2.6/§4.11 verdict token (F3)
+            ForeColor = UITheme.SuccessText, // the semantic verdict token (F3 final: AA on Background since D3)
             BackColor = UITheme.Background,
             AutoSize = true,
             Location = new Point(inset, statusTop),
@@ -484,16 +482,15 @@ public sealed class MainForm : Form
 
     /// <summary>
     /// Shows the content-header status strip line (§5 screen anatomy, §4.11 —
-    /// feedback is an inline strip line, never a dialog). INTERIM strip token
-    /// (F3, §2.6/§4.11): verdict lines — success AND failure/blocked alike —
-    /// render in TextPrimary on Background until the R-D3 theme re-issue
-    /// replaces this mapping; the wording carries the meaning in the interim.
+    /// feedback is an inline strip line, never a dialog). Semantic strip
+    /// tokens (F3 final, D3 re-issue): SuccessText on success, DangerText on
+    /// failure/blocked — both AA on Background since the re-issue.
     /// Success lines auto-clear after ~4 seconds; failure/blocked lines stay
     /// until the next feedback.
     /// </summary>
     internal void ShowStatus(string message, bool success = true)
     {
-        _statusStrip.ForeColor = UITheme.TextPrimary; // the interim §2.6/§4.11 verdict token
+        _statusStrip.ForeColor = success ? UITheme.SuccessText : UITheme.DangerText; // semantic verdict tokens (F3 final: both AA on Background)
         _statusStrip.Text = message;
 
         _statusClearTimer.Stop();

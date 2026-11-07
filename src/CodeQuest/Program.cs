@@ -85,10 +85,13 @@ internal static class Program
 
     /// <summary>
     /// A UI-thread exception: the §4.11 unexpected dialog. "Try again" returns
-    /// to the running app; "Close" ends it.
+    /// to the running app; "Close" ends it. The exception is appended to the
+    /// local error log first (type + message + time — never key material, per
+    /// the I5 logging obligation), so a crash after a demo still leaves a clue.
     /// </summary>
     private static void OnThreadException(object? sender, ThreadExceptionEventArgs e)
     {
+        AppendErrorLog(e.Exception);
         if (!DialogForm.ShowUnexpectedError())
         {
             Application.Exit();
@@ -98,9 +101,15 @@ internal static class Program
     /// <summary>
     /// A non-UI-thread exception: the process is ending regardless, so the
     /// dialog's job is the friendly message (no stack trace) before the exit.
+    /// The exception lands in the local error log the same way.
     /// </summary>
     private static void OnDomainUnhandledException(object? sender, UnhandledExceptionEventArgs e)
     {
+        if (e.ExceptionObject is Exception exception)
+        {
+            AppendErrorLog(exception);
+        }
+
         try
         {
             _ = DialogForm.ShowUnexpectedError();
@@ -113,5 +122,30 @@ internal static class Program
         }
 
         Environment.Exit(1);
+    }
+
+    /// <summary>
+    /// Appends one exception line to %LOCALAPPDATA%\CodeQuest\error.log — the
+    /// I5 logging hook (file-based, no key material: the key travels only in
+    /// request headers, never in exception messages). A logging failure is
+    /// swallowed: logging must never turn a handled failure into a crash.
+    /// </summary>
+    private static void AppendErrorLog(Exception exception)
+    {
+        try
+        {
+            string directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "CodeQuest");
+            Directory.CreateDirectory(directory);
+            File.AppendAllText(
+                Path.Combine(directory, "error.log"),
+                $"{DateTimeOffset.UtcNow:yyyy-MM-dd'T'HH:mm:ss'Z'}\t{exception.GetType().Name}\t{exception.Message}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Logging is best-effort by design (I5): a full disk or a locked
+            // file must not replace the original failure with a new one.
+        }
     }
 }
