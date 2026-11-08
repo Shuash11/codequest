@@ -32,9 +32,10 @@ UninstallDisplayIcon={app}\CodeQuest.exe
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional icons:"
 
 [Files]
-Source: "publish\CodeQuest.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "publish\codequest.db"; DestDir: "{app}"; Flags: onlyifdoesntexist ignoreversion
-Source: "publish\config\*"; DestDir: "{app}\config"; Flags: onlyifdoesntexist ignoreversion recursesubdirs
+; paths are relative to THIS script's folder (installer\) — the publish output is its sibling
+Source: "..\publish\CodeQuest.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\publish\codequest.db"; DestDir: "{app}"; Flags: onlyifdoesntexist ignoreversion
+Source: "..\publish\config\*"; DestDir: "{app}\config"; Flags: onlyifdoesntexist ignoreversion recursesubdirs
 
 [Icons]
 Name: "{autoprograms}\CodeQuest"; Filename: "{app}\CodeQuest.exe"
