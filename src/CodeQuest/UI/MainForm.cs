@@ -208,7 +208,7 @@ public sealed class MainForm : Form
             Location = new Point(inset, accountTop),
             BackColor = UITheme.Background,
         };
-        avatar.Paint += static (sender, e) =>
+        avatar.Paint += (sender, e) =>
         {
             if (sender is Panel panel)
             {
