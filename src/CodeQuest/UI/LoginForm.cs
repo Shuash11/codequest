@@ -59,7 +59,6 @@ public sealed class LoginForm : Form
 
         // Vertical block: logo chip + 12 + title + 4 + subtitle + 24 + card, centered.
         int chipSize = UITheme.Scaled(this, 44);
-        int chipX = (ClientSize.Width - chipSize) / 2;
         int titleHeight = UITheme.Scaled(this, 32);
         int subtitleHeight = UITheme.Scaled(this, 18);
         int cardHeight = UITheme.Scaled(this, 138);
