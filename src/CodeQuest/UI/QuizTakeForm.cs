@@ -1,27 +1,16 @@
 // =============================================================================
-// CodeQuest — Quiz Taking & Auto Scoring (P9): the home module of spec 5.6 and
-// the result summary of spec 5.7.
-// The panel has three states, hosted inside the shell like every module (§5.2):
-//   1. List (§5.6 moment 1): every quiz — Approved rows selectable with a
-//      trailing "Start" action, Draft rows rendered disabled (TextTertiary,
-//      "Pending review" in the Questions column, Draft badge, no start) —
-//      proposal line 23 enforced at the UI. When nothing is approved, the
-//      screen shows the spec's drafts-only empty state instead of dead rows.
-//   2. Run (§5.6 moment 2): quiz title + "Question N of M" + the determinate
-//      8px progress track (answered ÷ total), the question card with one
-//      ChoiceRowButton per option, Previous / Next("Submit") footer. The
-//      stored selection survives Next/Previous. Leaving mid-quiz via any nav
-//      item raises the §4.11 confirm dialog; Leave discards cleanly — no
-//      attempt row is written (documented P9 behavior).
-//   3. Result (§5.7): the hero card (score "8 / 10", percentage, topic —
-//      difficulty context) and the per-question verdict list; "View answers"
-//      opens the §5.9 review drill-in for this attempt, "Retake" restarts the
-//      run, "Done" returns to the list with "Result saved." in the strip.
-// Persistence rules (R-2 #1): the attempt row stores ONLY the correct count;
-// the display denominator is the quiz's own question count, computed live.
-// The one write is AttemptRepository.AddWithAnswers — one transaction, guarded
-// by the data layer (R-2 #3); the submit button is disabled for its duration,
-// so double submission cannot create a second attempt.
+// CodeQuest — The fun quiz UI: TAKE QUIZ (home, run, result).
+// HOME — quiz CARDS, not a table: every quiz renders as a colorful card with
+//   a difficulty color band and a PLAY pill; drafts show as locked cards.
+// RUN — Kahoot-style: four big colored ANSWER TILES (▲ ● ◆ ■), tap = the
+//   answer reveals INSTANTLY (correct = green wash, wrong = red wash + the
+//   key tile glows green), the question locks (one honest shot), then Next.
+//   The old "table of quiet grey rows" is gone.
+// RESULT — a huge score, a verdict message ("Excellent work!" / "Nice run!" /
+//   "Keep practicing!"), and colorful per-question verdict cards.
+// The data rules are unchanged (R-2 #1): one atomic AddWithAnswers write, the
+// stored score is the correct count, the display denominator is the quiz's
+// own question count, and the double-submit guard stays.
 // =============================================================================
 
 using CodeQuest.Data.Repositories;
@@ -33,18 +22,21 @@ using System.Windows.Forms;
 namespace CodeQuest.UI;
 
 /// <summary>
-/// The quiz-taking module (spec 5.6/5.7): list, run, and result in one
-/// shell-hosted panel.
+/// The quiz-taking module (the fun-UI redesign): quiz cards, the tile run,
+/// and the result screen in one shell-hosted panel.
 /// </summary>
 public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 {
-    private const string StartAction = "Start";
+    private static readonly Color[] TileColors =
+        { UITheme.TileRed, UITheme.TileBlue, UITheme.TileAmber, UITheme.TileGreen };
+
     private const string EmptyTitle = "No quizzes yet.";
-    private const string DraftsOnlyTitle = "Quizzes appear here once they're approved.";
     private const string ResultSavedMessage = "Result saved.";
     private const string LeaveTitle = "Leave this quiz?";
     private const string LeaveMessage = "Your answers so far will be discarded.";
     private const string LeaveConfirmText = "Leave";
+    private const string FeedbackCorrect = "Correct!";
+    private const string FeedbackWrong = "Incorrect \u2014 the green tile was the answer.";
 
     private readonly QuizRepository _quizzes;
     private readonly QuestionRepository _questions;
@@ -54,44 +46,44 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private readonly IScoringService _scoring;
     private readonly UserAccount _user;
 
-    // The run view and the result view assign their controls in builder
-    // methods (readonly fields are constructor-only in C#, so these are not
-    // readonly — each is assigned exactly once, in the constructor's build).
-    private ListCardGrid _list;
-    private Panel _runView;
-    private Label _runTitle = null!;
-    private Label _runProgressLabel = null!;
-    private ProgressTrack _runProgress = null!;
-    private Label _questionText = null!;
-    private Panel _choiceStack = null!;
-    private FlatButton _previousButton = null!;
-    private FlatButton _nextButton = null!;
-    private Panel _resultView;
-    private Label _resultScore = null!;
-    private Label _resultPercent = null!;
-    private Label _resultContext = null!;
-    private Panel _resultListCard = null!;
-    private Panel _resultActions = null!;
-    private FlatButton _viewAnswersButton = null!;
-    private FlatButton _retakeButton = null!;
-    private FlatButton _doneButton = null!;
+    private readonly FlowLayoutPanel _cardFlow = null!;
+    private readonly Panel _emptyView = null!;
+    private readonly Panel _runView = null!;
+    private readonly Label _runTitle = null!;
+    private readonly Label _runProgressLabel = null!;
+    private readonly ProgressTrack _runProgress = null!;
+    private readonly Label _questionText = null!;
+    private readonly Label _feedback = null!;
+    private readonly Panel _choiceStack = null!;
+    private readonly FlatButton _previousButton = null!;
+    private readonly FlatButton _nextButton = null!;
+    private readonly Panel _resultView = null!;
+    private readonly Label _resultScore = null!;
+    private readonly Label _resultPercent = null!;
+    private readonly Label _resultMessage = null!;
+    private readonly Panel _resultListCard = null!;
+    private readonly Panel _resultActions = null!;
+    private readonly FlatButton _viewAnswersButton = null!;
+    private readonly FlatButton _retakeButton = null!;
+    private readonly FlatButton _doneButton = null!;
     private AttemptReviewForm? _reviewPanel; // the §5.9 drill-in state, created on first open
 
     private Dictionary<int, string> _topicNames = new();
 
-    // The run state (moment 2): the quiz being taken, the picked choice per
-    // question index, the current question, and the submit re-entrancy guard.
+    // The run state: the quiz being taken, the picked choice per question,
+    // which questions are revealed (locked), and the submit guard.
     private Quiz? _runQuiz;
     private int?[] _selections = Array.Empty<int?>();
+    private bool[] _revealed = Array.Empty<bool>();
     private int _runIndex;
     private bool _submitting;
-    private List<ChoiceRowButton> _choiceRows = new();
+    private List<AnswerTile> _tiles = new();
 
-    // The result state (§5.7): what the last completed attempt produced.
+    // The result state: what the last completed attempt produced.
     private int _resultAttemptId;
     private Quiz? _resultQuiz;
     private int _resultCorrect;
-    private bool _awaitingSavedAnnouncement; // a completed attempt awaits its "Result saved." strip on the list
+    private bool _awaitingSavedAnnouncement;
 
     /// <summary>Creates the quiz-taking module over the data layer.</summary>
     public QuizTakeForm(
@@ -121,13 +113,60 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         Dock = DockStyle.Fill;
         BackColor = UITheme.Background;
 
-        _list = BuildListView();
+        _cardFlow = new FlowLayoutPanel
+        {
+            Name = "TakeQuizCardFlow",
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            BackColor = UITheme.Background,
+        };
+
+        _emptyView = new Panel
+        {
+            Name = "TakeQuizEmptyView",
+            Dock = DockStyle.Fill,
+            Visible = false,
+            BackColor = UITheme.Background,
+        };
+        var emptyCard = new CardPanel
+        {
+            Name = "TakeQuizEmptyCard",
+            Size = new Size(UITheme.Scaled(this, 480), UITheme.Scaled(this, 130)),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left,
+        };
+        var emptyTitle = new Label
+        {
+            Name = "TakeQuizEmptyTitle",
+            Text = EmptyTitle,
+            Font = UITheme.BodySemibold,
+            ForeColor = UITheme.TextPrimary,
+            BackColor = UITheme.Surface,
+            AutoSize = false,
+            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16)),
+            Size = new Size(UITheme.Scaled(this, 448), UITheme.Scaled(this, 22)),
+        };
+        var emptyCaption = new Label
+        {
+            Name = "TakeQuizEmptyCaption",
+            Text = "Generate a quiz and approve it \u2014 it will show up here.",
+            Font = UITheme.Caption,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.Surface,
+            AutoSize = false,
+            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16) + UITheme.Scaled(this, 26)),
+            Size = new Size(UITheme.Scaled(this, 448), UITheme.Scaled(this, 18)),
+        };
+        emptyCard.Controls.Add(emptyTitle);
+        emptyCard.Controls.Add(emptyCaption);
+        _emptyView.Controls.Add(emptyCard);
+
         _runView = BuildRunView();
         _resultView = BuildResultView();
 
-        Controls.Add(_list);
+        Controls.Add(_cardFlow);
         Controls.Add(_runView);
         Controls.Add(_resultView);
+        Controls.Add(_emptyView);
 
         // The run view resizes with the module host (Dock = Fill), so its
         // internal layouts recompute on every resize.
@@ -140,7 +179,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             }
         };
 
-        ShowList(announceCompletion: false);
+        RefreshData();
     }
 
     /// <inheritdoc />
@@ -153,7 +192,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
         _topicNames = names;
 
-        LoadListRows();
+        LoadQuizCards();
     }
 
     /// <summary>
@@ -178,115 +217,47 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     }
 
     // -------------------------------------------------------------------------
-    // State 1 — the quiz list (§5.6 moment 1)
+    // Home — quiz cards (the fun-UI redesign: no tables)
     // -------------------------------------------------------------------------
 
-    /// <summary>Builds the list card of moment 1 (no toolbar — the take list has no filters).</summary>
-    private ListCardGrid BuildListView()
-    {
-        var list = new ListCardGrid
-        {
-            Name = "TakeQuizListCard",
-            Dock = DockStyle.Fill,
-        };
-        list.Grid.Name = "TakeQuizGrid";
-        list.Grid.AccessibleName = "Quizzes";
-        list.Grid.AddTextColumn("TakeTitle", "Title", 34f, extraLeftInset: UITheme.Scaled(this, UITheme.Spacing8), minimumWidth: 160);
-        list.Grid.AddTextColumn("TakeTopic", "Topic", 16f, minimumWidth: 82);
-        list.Grid.AddTextColumn("TakeDifficulty", "Difficulty", 12f, minimumWidth: 74);
-        list.Grid.AddTextColumn("TakeQuestions", "Questions", 11f, minimumWidth: 110);
-        list.Grid.AddBadgeColumn("TakeStatus", "Status", 96);
-        list.Grid.AddActionColumn(StartAction, StartAction, GridActionKind.Secondary);
-        list.Grid.IsActionEnabled = (rowIndex, actionName) =>
-        {
-            if (actionName != StartAction || rowIndex < 0 || rowIndex >= list.Grid.Rows.Count)
-            {
-                return false;
-            }
-
-            return list.Grid.Rows[rowIndex].Tag is Quiz quiz && quiz.Status == QuizStatus.Approved;
-        };
-        list.Grid.ActionClicked += static (sender, e) =>
-        {
-            if (sender is IosListGrid grid && grid.FindAncestor<QuizTakeForm>() is { } form)
-            {
-                form.HandleStart(e.RowIndex);
-            }
-        };
-
-        return list;
-    }
-
-    /// <summary>Fills the list card from the database (§5.6 moment 1 states).</summary>
-    private void LoadListRows()
+    /// <summary>Rebuilds the quiz card grid from the database.</summary>
+    private void LoadQuizCards()
     {
         IReadOnlyList<Quiz> quizzes = _quizzes.GetAll();
-        bool anyApproved = quizzes.Any(quiz => quiz.Status == QuizStatus.Approved);
 
-        _list.Grid.SuspendLayout();
-        _list.Grid.Rows.Clear();
+        _cardFlow.SuspendLayout();
+        _cardFlow.Controls.Clear();
 
-        if (anyApproved)
+        foreach (Quiz quiz in quizzes)
         {
-            foreach (Quiz quiz in quizzes)
+            string topicName = _topicNames.TryGetValue(quiz.TopicId, out string? name) ? name : string.Empty;
+            int questionCount = _questions.GetByQuiz(quiz.QuizId).Count;
+
+            var card = new QuizCard(quiz, topicName, questionCount)
             {
-                string topicName = _topicNames.TryGetValue(quiz.TopicId, out string? name) ? name : string.Empty;
-                bool approved = quiz.Status == QuizStatus.Approved;
-                int questionCount = _questions.GetByQuiz(quiz.QuizId).Count;
-
-                int index = _list.Grid.Rows.Add(
-                    quiz.Title,
-                    topicName,
-                    quiz.Difficulty.ToString(),
-                    approved ? questionCount.ToString() : "Pending review", // §5.6: the Draft caption rides the disabled row
-                    quiz.Status.ToString(), // the badge column paints this as a §4.10 chip
-                    approved ? StartAction : string.Empty);
-                _list.Grid.Rows[index].Tag = quiz;
-
-                if (!approved)
+                Margin = new Padding(0, 0, UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16)),
+            };
+            card.PlayClicked += static (sender, quizId) =>
+            {
+                if (sender is QuizCard card2 && card2.FindAncestor<QuizTakeForm>() is { } form)
                 {
-                    // §5.6: Draft rows render in TextTertiary and are not startable.
-                    _list.Grid.Rows[index].DefaultCellStyle.ForeColor = UITheme.TextTertiary;
+                    form.StartQuiz(quizId);
                 }
-            }
+            };
+            _cardFlow.Controls.Add(card);
         }
 
-        _list.Grid.ResumeLayout();
+        _cardFlow.ResumeLayout();
 
-        // The states of §5.6 moment 1: empty (nothing at all) and drafts-only
-        // (content exists but nothing is takeable yet).
-        if (quizzes.Count == 0)
-        {
-            _list.ShowEmptyState(EmptyTitle, string.Empty);
-        }
-        else if (!anyApproved)
-        {
-            _list.ShowEmptyState(DraftsOnlyTitle, string.Empty);
-        }
-        else
-        {
-            _list.HideEmptyState();
-        }
-    }
-
-    /// <summary>Starts the run for the quiz of the pressed row (§5.6 moment 2).</summary>
-    private void HandleStart(int rowIndex)
-    {
-        if (_submitting || rowIndex < 0 || rowIndex >= _list.Grid.Rows.Count)
-        {
-            return;
-        }
-
-        if (_list.Grid.Rows[rowIndex].Tag is not Quiz listQuiz || listQuiz.Status != QuizStatus.Approved)
-        {
-            return; // a Draft row can never be started (the action is disabled anyway)
-        }
-
-        StartQuiz(listQuiz.QuizId);
+        // The §5.6 empty state: no quizzes at all. Drafts render as locked
+        // cards — the cards themselves explain the pending review.
+        bool empty = quizzes.Count == 0;
+        _emptyView.Visible = empty;
+        _cardFlow.Visible = !empty;
     }
 
     // -------------------------------------------------------------------------
-    // State 2 — the run (§5.6 moment 2)
+    // Run — the Kahoot-style tile flow (§5.6 moment 2, fun-UI redesign)
     // -------------------------------------------------------------------------
 
     /// <summary>Builds the run view's controls once; each run fills them per question.</summary>
@@ -304,7 +275,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         {
             Name = "RunFooter",
             Dock = DockStyle.Bottom,
-            Height = UITheme.Scaled(this, 32),
+            Height = UITheme.Scaled(this, 40),
             BackColor = UITheme.Background,
         };
         _previousButton = new FlatButton
@@ -312,8 +283,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             Name = "PreviousButton",
             Text = "Previous",
             Variant = UITheme.FlatButtonVariant.Secondary,
-            Location = new Point(0, 0),
-            Size = new Size(UITheme.Scaled(this, 110), UITheme.Scaled(this, 32)),
+            Location = new Point(0, UITheme.Scaled(this, 4)),
+            Size = new Size(UITheme.Scaled(this, 120), UITheme.Scaled(this, 32)),
         };
         _previousButton.Click += static (sender, e) =>
         {
@@ -326,8 +297,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         {
             Name = "NextButton",
             Text = "Next",
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing12), 0),
-            Size = new Size(UITheme.Scaled(this, 110), UITheme.Scaled(this, 32)),
+            Location = new Point(UITheme.Scaled(this, UITheme.Spacing12), UITheme.Scaled(this, 4)),
+            Size = new Size(UITheme.Scaled(this, 120), UITheme.Scaled(this, 32)),
         };
         _nextButton.Click += static (sender, e) =>
         {
@@ -376,14 +347,23 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             BackColor = UITheme.Surface,
             AutoSize = false,
         };
-        _choiceStack = new Panel { Name = "RunChoiceStack", BackColor = UITheme.Surface, AutoScroll = true };
+        _feedback = new Label
+        {
+            Name = "RunFeedback",
+            Font = UITheme.BodySemibold,
+            ForeColor = UITheme.SuccessText,
+            BackColor = UITheme.Surface,
+            AutoSize = false,
+            Visible = false,
+        };
+        _choiceStack = new Panel { Name = "RunChoiceStack", BackColor = UITheme.Surface };
         card.Controls.Add(_questionText);
+        card.Controls.Add(_feedback);
         card.Controls.Add(_choiceStack);
 
         // Dock layout processes the LAST control first: the footer claims the
         // bottom strip, the header the top, the progress track the next top
-        // strip, and the question card fills the rest between them (§3.3: the
-        // footer is part of the content flow, not the window bottom).
+        // strip, and the question card fills the rest between them.
         run.Controls.Add(card);
         run.Controls.Add(_runProgress);
         run.Controls.Add(header);
@@ -406,12 +386,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _runProgressLabel.Size = new Size(header.Width, UITheme.Scaled(this, 18));
     }
 
-    /// <summary>
-    /// Lays out the question card's text and choice rows (§5.6 moment 2). The
-    /// choice stack is sized to the card's remaining space and the rows are
-    /// positioned relative to it — an unsized container would clip the rows
-    /// to the Panel's default 200×100 bounds.
-    /// </summary>
+    /// <summary>Lays out the question card's text, feedback, and answer tiles.</summary>
     private void LayoutQuestionCard()
     {
         if (_questionText.Parent is not CardPanel card)
@@ -425,34 +400,42 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             _questionText.Text.Length == 0 ? " " : _questionText.Text,
             _questionText.Font,
             new Size(contentWidth, int.MaxValue),
-            TextFormatFlags.WordBreak) // multi-line questions wrap — measure wrapped (M2)
+            TextFormatFlags.WordBreak)
             .Height;
 
         _questionText.Location = new Point(inset, inset);
         _questionText.Size = new Size(contentWidth, textHeight);
 
-        int stackTop = inset + textHeight + UITheme.Scaled(this, UITheme.Spacing12);
-        _choiceStack.Location = new Point(inset, stackTop);
-        _choiceStack.Size = new Size(contentWidth, Math.Max(card.Height - stackTop - inset, 1));
+        int top = inset + textHeight + UITheme.Scaled(this, UITheme.Spacing12);
 
-        int top = 0;
-        int rowHeight = UITheme.Scaled(this, 36);
-        int rowGap = UITheme.Scaled(this, UITheme.Spacing8);
-        foreach (ChoiceRowButton row in _choiceRows)
+        if (_feedback.Visible)
         {
-            row.Location = new Point(0, top); // stack-relative — the stack clips at the card's content edge
-            row.Size = new Size(_choiceStack.Width, rowHeight);
-            top += rowHeight + rowGap;
+            _feedback.Location = new Point(inset, top);
+            _feedback.Size = new Size(contentWidth, UITheme.Scaled(this, 22));
+            top += UITheme.Scaled(this, 22) + UITheme.Scaled(this, UITheme.Spacing8);
+        }
+
+        _choiceStack.Location = new Point(inset, top);
+        _choiceStack.Size = new Size(contentWidth, Math.Max(card.Height - top - inset, 1));
+
+        int top2 = 0;
+        int tileHeight = UITheme.Scaled(this, 54);
+        int tileGap = UITheme.Scaled(this, UITheme.Spacing8);
+        foreach (AnswerTile tile in _tiles)
+        {
+            tile.Location = new Point(0, top2); // stack-relative — the stack clips at the card's content edge
+            tile.Size = new Size(_choiceStack.Width, tileHeight);
+            top2 += tileHeight + tileGap;
         }
     }
 
-    /// <summary>Loads the quiz and enters the run (used by Start and Retake).</summary>
+    /// <summary>Loads the quiz and enters the run (used by PLAY and Retake).</summary>
     private void StartQuiz(int quizId)
     {
         Quiz? quiz = _quizzes.GetById(quizId);
         if (quiz is null || quiz.Status != QuizStatus.Approved)
         {
-            return; // unreachable from the UI (only Approved rows start); a defensive guard
+            return; // unreachable from the UI (only Approved cards play); a defensive guard
         }
 
         if (quiz.Questions.Count == 0)
@@ -463,6 +446,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
         _runQuiz = quiz;
         _selections = new int?[quiz.Questions.Count];
+        _revealed = new bool[quiz.Questions.Count];
         _runIndex = 0;
 
         _runTitle.Text = quiz.Title;
@@ -475,12 +459,13 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     {
         _runQuiz = null;
         _selections = Array.Empty<int?>();
+        _revealed = Array.Empty<bool>();
         _runIndex = 0;
-        _choiceRows = new List<ChoiceRowButton>();
+        _tiles = new List<AnswerTile>();
         ShowList(announceCompletion: false);
     }
 
-    /// <summary>Renders the current question: header, progress, text, choices, buttons.</summary>
+    /// <summary>Renders the current question: header, progress, text, tiles, buttons.</summary>
     private void RenderQuestion()
     {
         if (_runQuiz is null)
@@ -493,35 +478,50 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _runProgressLabel.Text = $"Question {_runIndex + 1} of {_runQuiz.Questions.Count}";
         UpdateRunProgress();
         _questionText.Text = question.QuestionText;
+        _feedback.Visible = false;
 
         _choiceStack.SuspendLayout();
-        foreach (ChoiceRowButton existing in _choiceRows)
+        foreach (AnswerTile existing in _tiles)
         {
             existing.Dispose();
         }
         _choiceStack.Controls.Clear();
-        _choiceRows = new List<ChoiceRowButton>();
+        _tiles = new List<AnswerTile>();
 
-        foreach (Choice choice in question.Choices.OrderBy(item => item.Position))
+        Choice? key = question.GetCorrectChoice();
+        Choice? picked = _selections[_runIndex] is { } pickedId
+            ? question.Choices.FirstOrDefault(choice => choice.ChoiceId == pickedId)
+            : null;
+
+        var ordered = question.Choices.OrderBy(item => item.Position).ToList();
+        for (int i = 0; i < ordered.Count; i++)
         {
-            var row = new ChoiceRowButton
+            Choice choice = ordered[i];
+            bool revealed = _revealed[_runIndex];
+            var tile = new AnswerTile(i, choice.ChoiceText, TileColors[i % TileColors.Length])
             {
-                Name = $"ChoiceRow{choice.ChoiceId}",
-                ChoiceText = choice.ChoiceText,
-                IsSelected = _selections[_runIndex] == choice.ChoiceId,
-                Tag = choice.ChoiceId,
+                Name = $"AnswerTile{choice.ChoiceId}",
+                ChoiceId = choice.ChoiceId,
+                IsSelected = picked is not null && picked.ChoiceId == choice.ChoiceId,
+                IsCorrectTile = choice.IsCorrect,
+                IsRevealed = revealed,
             };
-            row.Click += static (sender, e) =>
+            tile.Click += static (sender, e) =>
             {
-                if (sender is ChoiceRowButton choiceRow && choiceRow.FindAncestor<QuizTakeForm>() is { } form)
+                if (sender is AnswerTile tile2 && tile2.FindAncestor<QuizTakeForm>() is { } form)
                 {
-                    form.SelectChoice(choiceRow);
+                    form.HandleTileClick(tile2);
                 }
             };
-            _choiceStack.Controls.Add(row);
-            _choiceRows.Add(row);
+            _choiceStack.Controls.Add(tile);
+            _tiles.Add(tile);
         }
         _choiceStack.ResumeLayout();
+
+        if (revealed && picked is not null)
+        {
+            ShowFeedback(question.IsCorrectChoice(picked));
+        }
 
         LayoutQuestionCard();
 
@@ -529,6 +529,14 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         bool last = _runIndex == _runQuiz.Questions.Count - 1;
         _nextButton.Text = last ? "Submit" : "Next";
         LayoutRunHeader();
+    }
+
+    /// <summary>Shows the instant Correct!/Incorrect! feedback line (the fun moment).</summary>
+    private void ShowFeedback(bool correct)
+    {
+        _feedback.Text = correct ? FeedbackCorrect : FeedbackWrong;
+        _feedback.ForeColor = correct ? UITheme.SuccessText : UITheme.DangerText;
+        _feedback.Visible = true;
     }
 
     /// <summary>Updates the determinate progress from the answered count (§5.6).</summary>
@@ -539,24 +547,38 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             return;
         }
 
-        _runProgress.Value = _selections.Count(selection => selection is not null) / (double)_runQuiz.Questions.Count;
+        _runProgress.Value = _revealed.Count(revealed => revealed) / (double)_runQuiz.Questions.Count;
     }
 
-    /// <summary>Moves the selection to the pressed row (§5.6: one selection, no toggle-off).</summary>
-    private void SelectChoice(ChoiceRowButton row)
+    /// <summary>
+    /// The fun moment: tapping a tile REVEALS the answer immediately — the
+    /// picked tile washes green (correct) or red (wrong) and the key tile
+    /// glows green. The question then locks: one honest shot per question.
+    /// </summary>
+    private void HandleTileClick(AnswerTile tile)
     {
-        if (_runQuiz is null || _submitting || row.Tag is not int choiceId)
+        if (_runQuiz is null || _submitting || _revealed[_runIndex] || tile.Tag is not int choiceId)
         {
             return;
         }
 
         _selections[_runIndex] = choiceId;
-        foreach (ChoiceRowButton other in _choiceRows)
+        _revealed[_runIndex] = true;
+
+        Question question = _runQuiz.Questions[_runIndex];
+        Choice picked = question.Choices.First(choice => choice.ChoiceId == choiceId);
+        bool correct = question.IsCorrectChoice(picked);
+
+        foreach (AnswerTile other in _tiles)
         {
-            other.IsSelected = other == row;
+            other.IsSelected = other == tile;
+            other.IsRevealed = true;
+            other.IsCorrectTile = other.ChoiceId == question.GetCorrectChoice()?.ChoiceId;
         }
 
+        ShowFeedback(correct);
         UpdateRunProgress();
+        LayoutQuestionCard();
     }
 
     /// <summary>Previous/Next navigation; Next on the final question submits (§5.6).</summary>
@@ -598,8 +620,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     /// The one write of the run (§5.6): score the selections, store the attempt
     /// and its answers in one transaction, and show the result (§5.7). The
     /// buttons stay disabled for the write's duration, so a double submission
-    /// cannot create a second attempt; a database failure surfaces through the
-    /// application's §4.11 dialog — it is not a scoring decision.
+    /// cannot create a second attempt; a database failure reports through the
+    /// strip (an unobserved continuation throw would vanish).
     /// </summary>
     private void Submit()
     {
@@ -647,6 +669,12 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             _runQuiz = null; // the run is over — the leave guard no longer applies
             ShowResult();
         }
+        catch (Exception)
+        {
+            EndBusyAfterFailure();
+            ReportStatus("The quiz could not be saved. Please try again.", success: false);
+            return;
+        }
         finally
         {
             _submitting = false;
@@ -655,8 +683,15 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
     }
 
+    /// <summary>Restores the footer after a failed write (the busy path's cleanup).</summary>
+    private void EndBusyAfterFailure()
+    {
+        _previousButton.Enabled = _runIndex > 0;
+        _nextButton.Enabled = true;
+    }
+
     // -------------------------------------------------------------------------
-    // State 3 — the result summary (§5.7)
+    // Result — the fun summary (§5.7)
     // -------------------------------------------------------------------------
 
     /// <summary>Builds the result view's controls once; each attempt fills them.</summary>
@@ -676,16 +711,16 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         {
             Name = "ResultHeroCard",
             Location = new Point(0, 0),
-            Size = new Size(cardWidth, UITheme.Scaled(this, 112)),
+            Size = new Size(cardWidth, UITheme.Scaled(this, 150)),
         };
         _resultScore = new Label
         {
             Name = "ResultScoreLabel",
-            Font = UITheme.Title,
-            ForeColor = UITheme.TextPrimary,
+            Font = UITheme.Display,
+            ForeColor = UITheme.FunPrimary,
             BackColor = UITheme.Surface,
             AutoSize = true,
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16)),
+            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing12)),
         };
         _resultPercent = new Label
         {
@@ -694,6 +729,17 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Surface,
             AutoSize = true,
+        };
+        _resultMessage = new Label
+        {
+            Name = "ResultMessageLabel",
+            Font = UITheme.BodySemibold,
+            ForeColor = UITheme.TextPrimary,
+            BackColor = UITheme.Surface,
+            AutoSize = true,
+            Location = new Point(
+                UITheme.Scaled(this, UITheme.Spacing16),
+                UITheme.Scaled(this, UITheme.Spacing12) + UITheme.Scaled(this, 52)),
         };
         _resultContext = new Label
         {
@@ -704,10 +750,11 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             AutoSize = true,
             Location = new Point(
                 UITheme.Scaled(this, UITheme.Spacing16),
-                UITheme.Scaled(this, UITheme.Spacing16) + UITheme.Scaled(this, 52)),
+                UITheme.Scaled(this, UITheme.Spacing12) + UITheme.Scaled(this, 76)),
         };
         hero.Controls.Add(_resultScore);
         hero.Controls.Add(_resultPercent);
+        hero.Controls.Add(_resultMessage);
         hero.Controls.Add(_resultContext);
         result.Controls.Add(hero);
 
@@ -719,13 +766,12 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         };
         result.Controls.Add(_resultListCard);
 
-        var actions = _resultActions = new Panel
+        _resultActions = new Panel
         {
             Name = "ResultActions",
             Location = new Point(0, _resultListCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16)),
             Size = new Size(cardWidth, UITheme.Scaled(this, 32)),
         };
-        int buttonWidth = UITheme.Scaled(this, 110);
         int buttonHeight = UITheme.Scaled(this, 32);
         _viewAnswersButton = new FlatButton
         {
@@ -747,7 +793,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             Name = "RetakeButton",
             Text = "Retake",
             Location = new Point(UITheme.Scaled(this, 140) + UITheme.Scaled(this, UITheme.Spacing12), 0),
-            Size = new Size(buttonWidth, buttonHeight),
+            Size = new Size(UITheme.Scaled(this, 110), buttonHeight),
         };
         _retakeButton.Click += static (sender, e) =>
         {
@@ -761,8 +807,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             Name = "DoneButton",
             Text = "Done",
             Variant = UITheme.FlatButtonVariant.Secondary,
-            Location = new Point(UITheme.Scaled(this, 140) + buttonWidth + UITheme.Scaled(this, 12) + UITheme.Scaled(this, UITheme.Spacing12), 0),
-            Size = new Size(buttonWidth, buttonHeight),
+            Location = new Point(UITheme.Scaled(this, 250) + UITheme.Scaled(this, UITheme.Spacing24), 0),
+            Size = new Size(UITheme.Scaled(this, 110), buttonHeight),
         };
         _doneButton.Click += static (sender, e) =>
         {
@@ -771,15 +817,15 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
                 form.ShowList(announceCompletion: true);
             }
         };
-        actions.Controls.Add(_viewAnswersButton);
-        actions.Controls.Add(_retakeButton);
-        actions.Controls.Add(_doneButton);
-        result.Controls.Add(actions);
+        _resultActions.Controls.Add(_viewAnswersButton);
+        _resultActions.Controls.Add(_retakeButton);
+        _resultActions.Controls.Add(_doneButton);
+        result.Controls.Add(_resultActions);
 
         return result;
     }
 
-    /// <summary>Fills the result view from the completed attempt (§5.7).</summary>
+    /// <summary>Fills the result view from the completed attempt (§5.7, fun-UI).</summary>
     private void ShowResult()
     {
         if (_resultQuiz is null)
@@ -797,7 +843,19 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _resultPercent.Text = $"{percent:0}%";
         _resultPercent.Location = new Point(
             _resultScore.Right + UITheme.Scaled(this, UITheme.Spacing12),
-            UITheme.Scaled(this, UITheme.Spacing16) + UITheme.Scaled(this, 12));
+            UITheme.Scaled(this, UITheme.Spacing12) + UITheme.Scaled(this, 18));
+        _resultMessage.Text = percent switch
+        {
+            >= 80d => "Excellent work!",
+            >= 50d => "Nice run \u2014 keep going!",
+            _ => "Keep practicing \u2014 you'll get there!",
+        };
+        _resultMessage.ForeColor = percent switch
+        {
+            >= 80d => UITheme.SuccessText,
+            >= 50d => UITheme.LevelMedium,
+            _ => UITheme.DangerText,
+        };
         _resultContext.Text = $"{topicName} \u2014 {_resultQuiz.Difficulty}";
 
         BuildResultRows(_resultQuiz);
@@ -838,7 +896,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             var mark = new Label
             {
                 Name = $"ResultMark{i}",
-                Text = correct ? "\uE73E" : "\uE711", // the check / cross glyph (§5.7: shape + word)
+                Text = correct ? "\u2713" : "\u2717",
                 Font = UITheme.NavGlyph,
                 ForeColor = verdictColor,
                 BackColor = UITheme.Surface,
@@ -854,41 +912,28 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
                 Font = UITheme.Body,
                 ForeColor = verdictColor,
                 BackColor = UITheme.Surface,
-                AutoSize = true,
+                AutoSize = false,
                 Location = new Point(UITheme.Scaled(this, 24), 0),
                 Size = new Size(UITheme.Scaled(this, 90), rowHeight),
                 TextAlign = ContentAlignment.MiddleLeft,
             };
-            var number = new Label
-            {
-                Name = $"ResultQuestionNumber{i}",
-                Text = $"Question {i + 1}",
-                Font = UITheme.Caption,
-                ForeColor = UITheme.TextSecondary,
-                BackColor = UITheme.Surface,
-                AutoSize = false,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Location = new Point(UITheme.Scaled(this, 24) + UITheme.Scaled(this, 90), 0),
-                Size = new Size(UITheme.Scaled(this, 96), rowHeight),
-            };
             var detail = new Label
             {
-                Name = $"ResultQuestionText{i}",
-                Text = question.QuestionText,
+                Name = $"ResultQuestion{i}",
+                Text = $"Question {i + 1}   {question.QuestionText}",
                 Font = UITheme.Body,
                 ForeColor = UITheme.TextPrimary,
                 BackColor = UITheme.Surface,
                 AutoSize = false,
                 AutoEllipsis = true,
                 TextAlign = ContentAlignment.MiddleLeft,
-                Location = new Point(UITheme.Scaled(this, 24) + UITheme.Scaled(this, 90) + UITheme.Scaled(this, 96), 0),
+                Location = new Point(UITheme.Scaled(this, 24) + UITheme.Scaled(this, 90), 0),
                 Size = new Size(
-                    Math.Max(row.Width - UITheme.Scaled(this, 24) - UITheme.Scaled(this, 90) - UITheme.Scaled(this, 96), 1),
+                    Math.Max(row.Width - UITheme.Scaled(this, 24) - UITheme.Scaled(this, 90), 1),
                     rowHeight),
             };
             row.Controls.Add(mark);
             row.Controls.Add(verdict);
-            row.Controls.Add(number);
             row.Controls.Add(detail);
             _resultListCard.Controls.Add(row);
             top += rowHeight;
@@ -966,7 +1011,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Returns to the list (moment 1). After a completed attempt the strip
+    /// Returns to the quiz cards (home). After a completed attempt the strip
     /// carries the spec's "Result saved." line (§5.6 moment 1 feedback).
     /// </summary>
     private void ShowList(bool announceCompletion)
@@ -980,10 +1025,10 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             ReportStatus(ResultSavedMessage, success: true);
         }
 
-        ShowView(_list);
+        ShowView(_cardFlow);
     }
 
-    /// <summary>Shows exactly one of the panel's three states (list, run, result).</summary>
+    /// <summary>Shows exactly one of the panel's states (cards, run, result).</summary>
     private void ShowView(Control view)
     {
         foreach (Control child in Controls)
@@ -998,7 +1043,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     /// <summary>Hides the three states while the review drill-in is open.</summary>
     private void ShowDrillIn(bool visible)
     {
-        _list.Visible = visible;
+        _cardFlow.Visible = visible;
         _runView.Visible = visible;
         _resultView.Visible = visible;
     }

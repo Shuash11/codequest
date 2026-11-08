@@ -1,18 +1,14 @@
 // =============================================================================
-// CodeQuest — Performance Reports (I3): the reports screen of spec 5.10.
-// Layout: filter row — topic filter (§4.5 combo, "All topics"), difficulty
-// filter (§4.5 combo, "All difficulties"); summary card — three inline stat
-// groups (number in Title over a Caption label): Attempts, Quizzes taken,
-// Average score; per-topic table card (§4.6): Topic — Attempts — Average % —
-// Best % — Needs practice (a quiet WarningText flag, word plus color, §2.6);
-// needs-practice list card, header "Topics that need more practice", rows
-// sorted ascending by average (weakest first).
-// States: empty (no attempts) — the summary card, table, and list are all
-// replaced by one friendly empty state: "No quiz attempts yet" + "Take a quiz
-// and your results will appear here." Zeros are never presented as data; a
-// zero-attempt topic row renders "—" in its numeric columns and no flag.
-// The panel reloads from IReportService each time it becomes visible, so
-// finishing a quiz updates it on return. Read-only — no strip messages.
+// CodeQuest — Performance Reports (the fun-UI redesign): the reports screen
+// of spec 5.10, with visual score BARS instead of a data table.
+// Layout: filter row — topic filter, difficulty filter; summary card — three
+// stat groups (Attempts, Quizzes taken, Average score); per-topic BAR rows —
+// the topic name and a horizontal bar whose width and color carry the average
+// (green ≥80, amber 50–79, red <50, no bar for zero attempts — "—" instead of
+// zeros-as-data); needs-practice list card, weakest first.
+// States: empty (no attempts) — everything replaced by one friendly empty
+// state. The panel reloads from IReportService each time it becomes visible.
+// Read-only — no strip messages.
 // =============================================================================
 
 using CodeQuest.Data.Repositories;
@@ -24,8 +20,8 @@ using System.Windows.Forms;
 namespace CodeQuest.UI;
 
 /// <summary>
-/// The reports module (spec 5.10): summary, per-topic table, and the
-/// needs-practice list over the tested report service.
+/// The reports module (the fun-UI redesign): summary stats, score bars, and
+/// the needs-practice list over the tested report service.
 /// </summary>
 public sealed class ReportsForm : ModulePanel
 {
@@ -44,10 +40,12 @@ public sealed class ReportsForm : ModulePanel
     private readonly Label _summaryAttempts = null!;
     private readonly Label _summaryQuizzes = null!;
     private readonly Label _summaryAverage = null!;
-    private readonly ListCardGrid _table = null!;
+    private readonly Panel _barStack = null!;
     private readonly Panel _weakCard = null!;
     private readonly Panel _emptyView = null!;
-    private bool _rebuildingFilters; // guards the SelectedIndexChanged feedback loop while the combos rebuild
+    private bool _rebuildingFilters; // guards the SelectedIndexChanged feedback loop
+
+    private Dictionary<int, string> _topicNames = new();
 
     /// <summary>Creates the reports module over the report service.</summary>
     public ReportsForm(UserAccount user, IReportService reports)
@@ -75,7 +73,7 @@ public sealed class ReportsForm : ModulePanel
         {
             if (sender is ThemedComboBox combo && combo.FindAncestor<ReportsForm>() is { } form)
             {
-                form.ApplyFilter();
+                ApplyFilter();
             }
         };
 
@@ -90,18 +88,18 @@ public sealed class ReportsForm : ModulePanel
         {
             if (sender is ThemedComboBox combo && combo.FindAncestor<ReportsForm>() is { } form)
             {
-                form.ApplyFilter();
+                ApplyFilter();
             }
         };
 
         int cardWidth = UITheme.Scaled(this, 640);
 
-        // The summary card: three stat groups (number in Title, label in Caption).
+        // The summary card: three stat groups (number in Display/Title, label in Caption).
         var summaryCard = new CardPanel
         {
             Name = "ReportsSummaryCard",
             Location = new Point(0, filterHeight + UITheme.Scaled(this, UITheme.Spacing16)),
-            Size = new Size(cardWidth, UITheme.Scaled(this, 96)),
+            Size = new Size(cardWidth, UITheme.Scaled(this, 110)),
         };
         _summaryAttempts = StatLabel("ReportsAttemptsValue", 0);
         _summaryQuizzes = StatLabel("ReportsQuizzesValue", 1);
@@ -113,26 +111,20 @@ public sealed class ReportsForm : ModulePanel
         summaryCard.Controls.Add(StatCaption("ReportsQuizzesCaption", "Quizzes taken", 1));
         summaryCard.Controls.Add(StatCaption("ReportsAverageCaption", "Average score", 2));
 
-        // The per-topic table card (§4.6 list).
-        _table = new ListCardGrid
+        // The per-topic score bars.
+        _barStack = new Panel
         {
-            Name = "ReportsTableCard",
+            Name = "ReportsBarStack",
             Location = new Point(0, summaryCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16)),
-            Size = new Size(cardWidth, UITheme.Scaled(this, 300)),
+            Size = new Size(cardWidth, UITheme.Scaled(this, 100)),
+            BackColor = UITheme.Surface,
         };
-        _table.Grid.Name = "ReportsGrid";
-        _table.Grid.AccessibleName = "Performance by topic";
-        _table.Grid.AddTextColumn("ReportsTopic", "Topic", 30f, extraLeftInset: UITheme.Scaled(this, UITheme.Spacing8), minimumWidth: 120);
-        _table.Grid.AddTextColumn("ReportsTopicAttempts", "Attempts", 12f, minimumWidth: 84);
-        _table.Grid.AddTextColumn("ReportsTopicAverage", "Average %", 14f, minimumWidth: 96);
-        _table.Grid.AddTextColumn("ReportsTopicBest", "Best %", 12f, minimumWidth: 84);
-        _table.Grid.AddTextColumn("ReportsTopicFlag", "Needs practice", 20f, minimumWidth: 120);
 
         // The needs-practice list card.
         _weakCard = new Panel
         {
             Name = "ReportsWeakCard",
-            Location = new Point(0, _table.Bottom + UITheme.Scaled(this, UITheme.Spacing16)),
+            Location = new Point(0, _barStack.Bottom + UITheme.Scaled(this, UITheme.Spacing16)),
             Size = new Size(cardWidth, UITheme.Scaled(this, 120)),
             BackColor = UITheme.Surface,
         };
@@ -180,7 +172,7 @@ public sealed class ReportsForm : ModulePanel
         // The report elements are flow-positioned (the panel scrolls when the
         // window is short); the empty view fills the whole module.
         Controls.Add(_weakCard);
-        Controls.Add(_table);
+        Controls.Add(_barStack);
         Controls.Add(summaryCard);
         Controls.Add(_topicFilter);
         Controls.Add(_difficultyFilter);
@@ -298,29 +290,119 @@ public sealed class ReportsForm : ModulePanel
         _summaryQuizzes.Text = report.Overall.QuizzesTaken.ToString();
         _summaryAverage.Text = $"{report.Overall.AveragePercent:0}%";
 
-        // The per-topic table, narrowed by the topic filter (a pure view filter).
-        _table.Grid.SuspendLayout();
-        _table.Grid.Rows.Clear();
-        foreach (TopicReport row in report.Topics)
-        {
-            if (topicFilterName is not null && !string.Equals(row.TopicName, topicFilterName, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            int index = _table.Grid.Rows.Add(
-                row.TopicName,
-                row.Attempts == 0 ? "\u2014" : row.Attempts.ToString(), // zero-attempt rows render "—", never zeros-as-data
-                row.Attempts == 0 ? "\u2014" : $"{row.AveragePercent:0}%",
-                row.Attempts == 0 ? "\u2014" : $"{row.BestPercent:0}%",
-                row.NeedsPractice ? "Needs practice" : "\u2014");
-            DataGridViewRow gridRow = _table.Grid.Rows[index];
-            gridRow.Cells["ReportsTopicFlag"].Style.ForeColor = row.NeedsPractice ? UITheme.WarningText : UITheme.TextTertiary;
-        }
-        _table.Grid.ResumeLayout();
-
-        // The needs-practice list, weakest first (the service's order).
+        BuildScoreBars(report, topicFilterName);
         BuildWeakList(report);
+    }
+
+    /// <summary>The color band of an average (the bar's fill and its caption).</summary>
+    private static Color BandColor(double percent) => percent switch
+    {
+        >= 80d => UITheme.LevelEasy,
+        >= 50d => UITheme.LevelMedium,
+        _ => UITheme.LevelHard,
+    };
+
+    /// <summary>
+    /// Builds the per-topic score bars (the fun-UI redesign of the table): one
+    /// row per topic — name, a horizontal bar whose width and color carry the
+    /// average, and the numbers as caption text (never color alone).
+    /// </summary>
+    private void BuildScoreBars(PracticeReport report, string? topicFilterName)
+    {
+        _barStack.SuspendLayout();
+        foreach (Control existing in _barStack.Controls)
+        {
+            existing.Dispose();
+        }
+        _barStack.Controls.Clear();
+
+        int inset = UITheme.Scaled(this, UITheme.Spacing16);
+        int rowHeight = UITheme.Scaled(this, 64);
+        int barHeight = UITheme.Scaled(this, 14);
+        int top = inset;
+
+        var rows = report.Topics
+            .Where(row => topicFilterName is null || string.Equals(row.TopicName, topicFilterName, StringComparison.Ordinal))
+            .ToList();
+
+        if (rows.Count == 0)
+        {
+            var nothing = new Label
+            {
+                Name = "ReportsBarsEmpty",
+                Text = NoMatchTitle,
+                Font = UITheme.Caption,
+                ForeColor = UITheme.TextSecondary,
+                BackColor = UITheme.Surface,
+                AutoSize = false,
+                Location = new Point(inset, top),
+                Size = new Size(Math.Max(_barStack.Width - inset * 2, 1), UITheme.Scaled(this, 20)),
+            };
+            _barStack.Controls.Add(nothing);
+            top += UITheme.Scaled(this, 20);
+        }
+
+        foreach (TopicReport row in rows)
+        {
+            var name = new Label
+            {
+                Name = "ReportsBarName" + row.TopicId,
+                Text = row.TopicName,
+                Font = UITheme.BodySemibold,
+                ForeColor = row.Attempts == 0 ? UITheme.TextTertiary : UITheme.TextPrimary,
+                BackColor = UITheme.Surface,
+                AutoSize = false,
+                Location = new Point(inset, top),
+                Size = new Size(Math.Max(_barStack.Width - inset * 2, 1), UITheme.Scaled(this, 20)),
+            };
+            _barStack.Controls.Add(name);
+            top += UITheme.Scaled(this, 20);
+
+            // The bar track + fill: the fill width carries the average.
+            int trackWidth = Math.Max(_barStack.Width - inset * 2, 1);
+            var track = new Panel
+            {
+                Name = "ReportsBarTrack" + row.TopicId,
+                Location = new Point(inset, top),
+                Size = new Size(trackWidth, barHeight),
+                BackColor = UITheme.Fill,
+            };
+            if (row.Attempts > 0)
+            {
+                int fillWidth = Math.Max((int)Math.Round(trackWidth * row.AveragePercent / 100d), UITheme.Scaled(this, 6));
+                var fillBar = new Panel
+                {
+                    Name = "ReportsBarFill" + row.TopicId,
+                    Location = new Point(0, 0),
+                    Size = new Size(fillWidth, barHeight),
+                    BackColor = BandColor(row.AveragePercent),
+                };
+                track.Controls.Add(fillBar);
+            }
+            _barStack.Controls.Add(track);
+            top += barHeight + UITheme.Scaled(this, UITheme.Spacing4);
+
+            string numbers = row.Attempts == 0
+                ? "\u2014 no attempts yet"
+                : $"avg {row.AveragePercent:0}%  \u00B7  best {row.BestPercent:0}%  \u00B7  {row.Attempts} attempt{(row.Attempts == 1 ? string.Empty : "s")}"
+                    + (row.NeedsPractice ? "  \u00B7  needs practice" : string.Empty);
+            var numbersLabel = new Label
+            {
+                Name = "ReportsBarNumbers" + row.TopicId,
+                Text = numbers,
+                Font = UITheme.Caption,
+                ForeColor = row.Attempts == 0 ? UITheme.TextTertiary : BandColor(row.AveragePercent),
+                BackColor = UITheme.Surface,
+                AutoSize = false,
+                Location = new Point(inset, top),
+                Size = new Size(Math.Max(_barStack.Width - inset * 2, 1), UITheme.Scaled(this, 16)),
+            };
+            _barStack.Controls.Add(numbersLabel);
+            top += UITheme.Scaled(this, 16) + UITheme.Scaled(this, UITheme.Spacing12);
+        }
+
+        _barStack.ResumeLayout();
+        _barStack.Height = top + inset;
     }
 
     /// <summary>Builds the needs-practice list card's rows (§5.10, ascending by average).</summary>

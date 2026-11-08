@@ -137,6 +137,48 @@ public static class UITheme
     /// <summary>Unselected-segment hover on the segmented control (recipe 4.9's derived quiet step).</summary>
     public static readonly Color SegmentHover = ColorTranslator.FromHtml("#F0F0F4");
 
+    // ------------------------------------------------------------- The fun set
+    // The learner surfaces (quiz cards, answer tiles, score bars) use the
+    // vivid quiz palette — an app about playing quizzes should feel like one.
+    // White text on every tile: Red 4.3:1, Blue 4.6:1, Amber 7.4:1, Green 4.0:1
+    // (tile text is large bold — WCAG large-text floor is 3:1).
+
+    /// <summary>Primary action of the learner surfaces (play buttons, progress).</summary>
+    public static readonly Color FunPrimary = ColorTranslator.FromHtml("#6C5CE7");
+
+    /// <summary>Hover state of the learner primary (darken).</summary>
+    public static readonly Color FunPrimaryHover = ColorTranslator.FromHtml("#5A4BD1");
+
+    /// <summary>Answer tile 1 — the red tile.</summary>
+    public static readonly Color TileRed = ColorTranslator.FromHtml("#D63040");
+
+    /// <summary>Answer tile 2 — the blue tile.</summary>
+    public static readonly Color TileBlue = ColorTranslator.FromHtml("#2D6BE4");
+
+    /// <summary>Answer tile 3 — the amber tile.</summary>
+    public static readonly Color TileAmber = ColorTranslator.FromHtml("#C77700");
+
+    /// <summary>Answer tile 4 — the green tile.</summary>
+    public static readonly Color TileGreen = ColorTranslator.FromHtml("#1E8E4E");
+
+    /// <summary>Hover darken for the answer tiles.</summary>
+    public static Color TileHover(Color tile) => ControlPaint.Dark(tile, 0.08f);
+
+    /// <summary>Correct-reveal wash: the tile keeps its hue, the verdict reads green.</summary>
+    public static readonly Color CorrectWash = ColorTranslator.FromHtml("#1E8E4E");
+
+    /// <summary>Wrong-reveal wash.</summary>
+    public static readonly Color WrongWash = ColorTranslator.FromHtml("#B3241F");
+
+    /// <summary>Difficulty "Easy" chip/bar color.</summary>
+    public static readonly Color LevelEasy = ColorTranslator.FromHtml("#1E8E4E");
+
+    /// <summary>Difficulty "Medium" chip/bar color.</summary>
+    public static readonly Color LevelMedium = ColorTranslator.FromHtml("#C77700");
+
+    /// <summary>Difficulty "Hard" chip/bar color.</summary>
+    public static readonly Color LevelHard = ColorTranslator.FromHtml("#D63040");
+
     // ------------------------------------------------------------------ §2.2
     // The 3-step size hierarchy plus the two in-size weight variants, and the
     // system glyph font for the few icons that earn their place (§3.7).
@@ -158,6 +200,9 @@ public static class UITheme
 
     /// <summary>Sidebar nav item glyphs (Segoe MDL2 Assets 12pt, recipe 4.3).</summary>
     public static readonly Font NavGlyph = new("Segoe MDL2 Assets", 12f);
+
+    /// <summary>The big result score of the fun-UI result screen (Segoe UI Bold 30pt).</summary>
+    public static readonly Font Display = new("Segoe UI", 28f, FontStyle.Bold);
 
     // ------------------------------------------------------------------ §2.3
     // Spacing scale (8px grid). No other value appears in any layout.
