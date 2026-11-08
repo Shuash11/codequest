@@ -8,172 +8,130 @@
 <meta property="og:title" content="CodeQuest — Learn. Get quizzed. Improve.">
 <meta property="og:description" content="Free Windows app: AI-generated programming & cybersecurity quizzes, instant scoring, answer review, and performance reports.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233A3A3C'/%3E%3Ctext x='16' y='22' font-family='Segoe UI' font-size='16' font-weight='700' fill='%23fff' text-anchor='middle'%3ECQ%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236C5CE7'/%3E%3Ctext x='16' y='22' font-family='Segoe UI' font-size='16' font-weight='700' fill='%23fff' text-anchor='middle'%3ECQ%3C/text%3E%3C/svg%3E">
 <style>
   :root{
-    --bg:#F5F5F7; --surface:#FFFFFF; --text:#1D1D1F; --text-2:#6E6E73; --text-3:#98989D;
-    --accent:#3A3A3C; --accent-hover:#2C2C2E; --line:#E9E9EE; --success:#157A38;
-    --radius:16px; --radius-sm:10px;
+    --bg:#0A0A0E; --bg2:#0E0E13; --card:#101016; --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.14);
+    --text:#EDEDEF; --text2:#9B9BA4; --text3:#5F5F68;
+    --accent:#6C5CE7; --accent-glow:rgba(108,92,231,.28);
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{
-    font-family:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+    font-family:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
     background:var(--bg); color:var(--text); line-height:1.6;
     -webkit-font-smoothing:antialiased; overflow-x:hidden;
   }
-  ::selection{background:#d9d9de}
+  ::selection{background:rgba(108,92,231,.4)}
 
-  /* ---------- nav ---------- */
   nav{
     position:fixed; top:0; left:0; right:0; z-index:50;
     display:flex; align-items:center; justify-content:space-between;
     padding:14px clamp(20px,6vw,72px);
-    background:rgba(245,245,247,.72); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
-    border-bottom:1px solid rgba(0,0,0,.05);
+    background:rgba(10,10,14,.75); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--border);
   }
-  .brand{display:flex; align-items:center; gap:10px; font-weight:700; font-size:17px; letter-spacing:-.01em}
-  .brand .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
-  .nav-links{display:flex; gap:26px; font-size:14px; color:var(--text-2)}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:650; font-size:15px; letter-spacing:-.01em}
+  .brand .mark{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:10.5px;font-weight:700}
+  .nav-links{display:flex; gap:24px; font-size:13.5px; color:var(--text2)}
   .nav-links a{color:inherit; text-decoration:none; transition:color .2s}
   .nav-links a:hover{color:var(--text)}
-  .nav-cta{background:var(--accent); color:#fff !important; padding:8px 18px; border-radius:99px; font-weight:600}
-  .nav-cta:hover{background:var(--accent-hover)}
+  .nav-cta{background:#fff; color:#0A0A0E !important; padding:7px 16px; border-radius:8px; font-weight:600; font-size:13.5px}
+  .nav-cta:hover{background:#e8e8ec}
   @media(max-width:720px){.nav-links a:not(.nav-cta){display:none}}
 
-  /* ---------- hero ---------- */
   .hero{
-    max-width:1160px; margin:0 auto; padding:150px clamp(20px,6vw,72px) 40px;
-    display:grid; grid-template-columns:1.05fr .95fr; gap:56px; align-items:center;
+    max-width:1080px; margin:0 auto; padding:140px clamp(20px,6vw,72px) 30px; text-align:center;
   }
-  @media(max-width:920px){.hero{grid-template-columns:1fr; padding-top:120px}}
-  .pill{
-    display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600;
-    color:var(--text-2); background:var(--surface); border:1px solid var(--line);
-    padding:6px 14px; border-radius:99px; margin-bottom:22px;
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:8px; font-size:12px; font-weight:600; letter-spacing:.04em;
+    color:var(--text2); border:1px solid var(--border2); border-radius:99px; padding:5px 13px; margin-bottom:26px;
   }
-  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
   h1{
-    font-size:clamp(38px,5.4vw,60px); line-height:1.06; letter-spacing:-.03em; font-weight:700;
-    margin-bottom:20px;
+    font-size:clamp(34px,4.6vw,54px); line-height:1.08; letter-spacing:-.035em; font-weight:700;
+    margin-bottom:18px;
   }
-  h1 em{font-style:normal; color:var(--text-3)}
-  .hero p.lede{font-size:18px; color:var(--text-2); max-width:520px; margin-bottom:34px}
-  .cta-row{display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+  h1 .dim{color:var(--text3)}
+  .hero .lede{font-size:17px; color:var(--text2); max-width:520px; margin:0 auto 32px}
+  .cta-row{display:flex; gap:12px; justify-content:center; flex-wrap:wrap}
   .btn{
-    display:inline-flex; align-items:center; gap:10px; text-decoration:none; cursor:pointer;
-    font-weight:600; font-size:15.5px; border-radius:99px; padding:15px 30px;
-    transition:transform .18s ease, box-shadow .18s ease, background .18s ease;
+    display:inline-flex; align-items:center; gap:9px; text-decoration:none; cursor:pointer;
+    font-weight:600; font-size:14.5px; border-radius:10px; padding:12px 24px;
+    transition:transform .15s ease, background .15s ease, border-color .15s ease;
   }
-  .btn-primary{background:var(--accent); color:#fff; box-shadow:0 8px 24px rgba(29,29,31,.18)}
-  .btn-primary:hover{background:var(--accent-hover); transform:translateY(-2px); box-shadow:0 12px 30px rgba(29,29,31,.22)}
-  .btn-ghost{color:var(--text); background:var(--surface); border:1px solid var(--line)}
-  .btn-ghost:hover{transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.06)}
-  .meta-line{margin-top:18px; font-size:13px; color:var(--text-3)}
-  .meta-line b{color:var(--text-2); font-weight:600}
+  .btn-white{background:#fff; color:#0A0A0E}
+  .btn-white:hover{background:#e8e8ec; transform:translateY(-1px)}
+  .btn-ghost{color:var(--text); background:transparent; border:1px solid var(--border2)}
+  .btn-ghost:hover{border-color:rgba(255,255,255,.3)}
+  .meta-line{margin-top:16px; font-size:12.5px; color:var(--text3)}
+  .meta-line b{color:var(--text2); font-weight:600}
 
-  /* ---------- app mock ---------- */
-  .mock-wrap{display:flex; justify-content:center}
-  .mock{
-    width:100%; max-width:470px; background:var(--surface); border-radius:22px;
-    box-shadow:0 30px 80px rgba(29,29,31,.14), 0 2px 8px rgba(29,29,31,.05);
-    border:1px solid rgba(0,0,0,.05); overflow:hidden;
-    transform:rotate(1.2deg); transition:transform .5s cubic-bezier(.2,.8,.2,1);
+  .shot-frame{
+    max-width:980px; margin:56px auto 0; padding:0 clamp(20px,6vw,72px);
   }
-  .mock:hover{transform:rotate(0deg) scale(1.015)}
-  .mock-bar{display:flex; gap:6px; padding:13px 16px; border-bottom:1px solid var(--line)}
-  .mock-bar i{width:11px;height:11px;border-radius:50%;background:#E9E9EE;display:block}
-  .mock-bar i:first-child{background:#d9d9de}
-  .mock-body{padding:26px 26px 30px}
-  .mock-kicker{font-size:11px; font-weight:600; color:var(--text-3); letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px}
-  .mock-q{font-size:16.5px; font-weight:600; letter-spacing:-.01em; margin-bottom:6px}
-  .mock-progress{height:6px; border-radius:99px; background:var(--line); margin:14px 0 22px; overflow:hidden}
-  .mock-progress i{display:block; height:100%; width:40%; border-radius:99px; background:var(--accent)}
-  .choice{
-    display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:11px;
-    border:1px solid var(--line); margin-bottom:9px; font-size:14px; color:var(--text);
+  .shot{
+    width:100%; display:block; border-radius:14px;
+    border:1px solid var(--border2);
+    box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 30px 90px rgba(108,92,231,.16), 0 10px 40px rgba(0,0,0,.5);
   }
-  .choice .ring{width:17px;height:17px;border-radius:50%;border:1.5px solid #C7C7CC;flex-shrink:0}
-  .choice.sel{background:#E0E0E5; border-color:transparent}
-  .choice.sel .ring{background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 3.5px #fff}
-  .choice .tag{margin-left:auto; font-size:10.5px; font-weight:700; color:var(--text-2); letter-spacing:.04em; text-transform:uppercase}
-  .mock-foot{display:flex; justify-content:space-between; align-items:center; margin-top:18px}
-  .mock-foot .score{font-size:12px; color:var(--text-2)}
-  .mock-foot .next{background:var(--accent); color:#fff; font-size:13px; font-weight:600; padding:9px 22px; border-radius:99px}
-  .mock-ai{
-    position:absolute; margin:-64px 0 0 42px; background:var(--surface); border-radius:14px;
-    box-shadow:0 16px 40px rgba(29,29,31,.16); padding:12px 16px; font-size:12.5px;
-    display:flex; gap:10px; align-items:center; transform:rotate(-1.6deg);
+  .glow{
+    max-width:820px; height:1px; margin:0 auto; position:relative;
   }
-  .mock-ai .spark{color:#B3241F; font-weight:700}
-  .mock-ai b{display:block; font-size:12.5px}
-  .mock-ai span{color:var(--text-2); font-size:11.5px}
+  .glow::before{content:""; position:absolute; inset:-90px 10% auto 10%; height:180px;
+    background:radial-gradient(ellipse at center, var(--accent-glow), transparent 70%); pointer-events:none}
 
-  /* ---------- sections ---------- */
-  section{max-width:1160px; margin:0 auto; padding:70px clamp(20px,6vw,72px)}
-  .kicker{font-size:12.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text-3); margin-bottom:12px}
-  h2{font-size:clamp(26px,3.2vw,36px); letter-spacing:-.02em; line-height:1.15; margin-bottom:14px}
-  .section-sub{color:var(--text-2); font-size:16.5px; max-width:560px}
+  .shot-row{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; max-width:980px; margin:22px auto 0; padding:0 clamp(20px,6vw,72px)}
+  @media(max-width:860px){.shot-row{grid-template-columns:1fr}}
+  .shot-row .shot{border-radius:10px}
 
-  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:44px}
-  @media(max-width:920px){.grid{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:620px){.grid{grid-template-columns:1fr}}
+  section{max-width:980px; margin:0 auto; padding:72px clamp(20px,6vw,72px)}
+  .kicker{font-size:12px; font-weight:650; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); margin-bottom:12px}
+  h2{font-size:clamp(24px,3vw,32px); letter-spacing:-.025em; line-height:1.18; margin-bottom:12px}
+  .section-sub{color:var(--text2); font-size:15.5px; max-width:540px}
+
+  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:40px}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
   .card{
-    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
-    padding:26px; transition:transform .25s ease, box-shadow .25s ease;
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:22px; transition:border-color .2s ease, background .2s ease;
   }
-  .card:hover{transform:translateY(-4px); box-shadow:0 16px 40px rgba(29,29,31,.08)}
-  .card .icon{
-    width:42px; height:42px; border-radius:11px; background:var(--bg); border:1px solid var(--line);
-    display:grid; place-items:center; margin-bottom:16px;
-  }
-  .card .icon svg{width:20px; height:20px; stroke:var(--text); fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
-  .card h3{font-size:16px; letter-spacing:-.01em; margin-bottom:7px}
-  .card p{font-size:14px; color:var(--text-2)}
+  .card:hover{border-color:var(--border2); background:#12121a}
+  .card h3{font-size:14.5px; letter-spacing:-.01em; margin-bottom:6px}
+  .card p{font-size:13.5px; color:var(--text2)}
+  .card .num{font-size:12px; font-weight:650; color:var(--accent); margin-bottom:12px; display:block}
 
-  /* steps */
-  .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:44px}
-  @media(max-width:920px){.steps{grid-template-columns:1fr}}
-  .step{position:relative; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:28px}
-  .step .num{
-    font-size:13px; font-weight:700; color:var(--text-2); width:34px; height:34px; border-radius:50%;
-    background:var(--bg); border:1px solid var(--line); display:grid; place-items:center; margin-bottom:16px;
-  }
-  .step h3{font-size:16px; margin-bottom:7px}
-  .step p{font-size:14px; color:var(--text-2)}
-  .step code{font-size:12.5px; background:var(--bg); border:1px solid var(--line); padding:2px 7px; border-radius:6px}
-
-  /* tech strip */
-  .chips{display:flex; flex-wrap:wrap; gap:10px; margin-top:30px}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:28px}
   .chip{
-    font-size:13px; font-weight:600; color:var(--text-2); background:var(--surface);
-    border:1px solid var(--line); border-radius:99px; padding:8px 17px;
+    font-size:12.5px; font-weight:550; color:var(--text2); background:var(--card);
+    border:1px solid var(--border); border-radius:7px; padding:6px 13px;
   }
 
-  /* cta band */
   .band{
-    background:var(--accent); border-radius:24px; color:#fff; text-align:center;
-    padding:clamp(44px,6vw,72px) clamp(24px,6vw,72px); margin:30px clamp(20px,6vw,72px);
+    max-width:980px; margin:20px auto 0; padding:0 clamp(20px,6vw,72px);
   }
-  .band h2{color:#fff; margin-bottom:10px}
-  .band p{color:rgba(255,255,255,.72); margin-bottom:30px}
-  .band .btn{background:#fff; color:var(--text)}
-  .band .btn:hover{transform:translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,.25)}
-  .band .fine{font-size:12.5px; color:rgba(255,255,255,.55); margin-top:18px}
+  .band-inner{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:36px 40px; display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap;
+  }
+  .band-inner h2{font-size:20px; margin-bottom:4px}
+  .band-inner p{color:var(--text2); font-size:14px}
+  .band .btn{background:#fff; color:#0A0A0E}
 
   footer{
-    max-width:1160px; margin:0 auto; padding:40px clamp(20px,6vw,72px) 60px;
+    max-width:980px; margin:0 auto; padding:44px clamp(20px,6vw,72px) 60px;
     display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap;
-    color:var(--text-3); font-size:13.5px; border-top:1px solid var(--line);
+    color:var(--text3); font-size:13px; border-top:1px solid var(--border);
   }
-  footer a{color:var(--text-2); text-decoration:none}
+  footer a{color:var(--text2); text-decoration:none}
   footer a:hover{color:var(--text)}
 
-  /* reveal */
-  .reveal{opacity:0; transform:translateY(26px); transition:opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1)}
-  .reveal.in{opacity:1; transform:none}
+  .fade{opacity:0; transform:translateY(16px); transition:opacity .6s ease, transform .6s ease}
+  .fade.in{opacity:1; transform:none}
+
   @media(prefers-reduced-motion:reduce){
-    .reveal{opacity:1; transform:none; transition:none}
+    *{transition:none !important; animation:none !important}
+    .fade{opacity:1; transform:none}
     html{scroll-behavior:auto}
   }
 </style>
@@ -191,78 +149,64 @@
 </nav>
 
 <header class="hero">
-  <div>
-    <span class="pill"><span class="dot"></span> Version 1.0.3 · free · Windows 10 / 11</span>
-    <h1>AI-built quizzes for <em>programming</em> & cybersecurity.</h1>
-    <p class="lede">
-      Pick a topic, a difficulty, and a length — CodeQuest generates the quiz, scores it
-      instantly, explains every answer, and shows you exactly what to practice next.
-    </p>
-    <div class="cta-row">
-      <a class="btn btn-primary" href="https://github.com/Shuash11/codequest/releases/latest/download/CodeQuest-Setup.exe">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download installer for Windows
-      </a>
-      <a class="btn btn-ghost" href="#how">How it works</a>
-    </div>
-    <p class="meta-line"><b>35 MB</b> · no installer — extract & run · works offline · AI key included for evaluation</p>
+  <span class="eyebrow"><span class="dot"></span> v1.0.3 · free · Windows 10 / 11</span>
+  <h1>AI-built quizzes for<br>programming <span class="dim">&</span> cybersecurity.</h1>
+  <p class="lede">
+    Pick a topic, a difficulty, and a length — CodeQuest generates the quiz, scores it
+    instantly, explains every answer, and shows you exactly what to practice next.
+  </p>
+  <div class="cta-row">
+    <a class="btn btn-white" href="https://github.com/Shuash11/codequest/releases/latest/download/CodeQuest-Setup.exe">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download for Windows
+    </a>
+    <a class="btn btn-ghost" href="#how">How it works</a>
   </div>
+  <p class="meta-line"><b>35 MB</b> installer · no admin rights · works offline · AI key included for evaluation</p>
 
-  <div class="mock-wrap">
-    <div style="position:relative">
-      <div class="mock">
-        <div class="mock-bar"><i></i><i></i><i></i></div>
-        <div class="mock-body">
-          <div class="mock-kicker">C# · Question 2 of 5</div>
-          <div class="mock-q">Which C# collection guarantees unique keys and offers fast lookup by key?</div>
-          <div class="mock-progress"><i></i></div>
-          <div class="choice"><span class="ring"></span> List<T></div>
-          <div class="choice sel"><span class="ring"></span> Dictionary<TKey, TValue> <span class="tag">Selected</span></div>
-          <div class="choice"><span class="ring"></span> Queue<T></div>
-          <div class="choice"><span class="ring"></span> Array</div>
-          <div class="mock-foot">
-            <span class="score">Answered 2 of 5</span>
-            <span class="next">Next</span>
-          </div>
-        </div>
-      </div>
-      <div class="mock-ai"><span class="spark">✦</span><span><b>AI-generated quiz</b><span>reviewed & approved</span></span></div>
-    </div>
+  <div class="shot-frame fade">
+    <img class="shot" src="assets/app-takequiz.png" alt="CodeQuest — take a quiz screen" loading="eager">
   </div>
 </header>
 
+<div class="shot-row fade">
+  <img class="shot" src="assets/app-history.png" alt="CodeQuest — attempt history" loading="lazy">
+  <img class="shot" src="assets/app-reports.png" alt="CodeQuest — performance reports" loading="lazy">
+  <img class="shot" src="assets/app-generate.png" alt="CodeQuest — AI quiz generation" loading="lazy">
+</div>
+
 <section id="features">
-  <div class="kicker reveal">Features</div>
-  <h2 class="reveal">Everything a study session needs.</h2>
-  <p class="section-sub reveal">Seven connected modules, one clean desktop app — built with C# and a normalized SQLite database.</p>
+  <span class="kicker">Features</span>
+  <h2>Everything a study session needs.</h2>
+  <p class="section-sub">Seven connected modules, one clean desktop app — built with C# and a normalized SQLite database.</p>
   <div class="grid">
-    <div class="card reveal">
-      <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect x="4" y="12" width="16" height="8" rx="2"/><path d="M2 12h20"/></svg></div>
+    <div class="card fade">
+      <span class="num">01</span>
       <h3>AI quiz generation</h3>
       <p>Pick topic, difficulty and length (5–20 questions). The provider chain authors a fresh quiz in seconds.</p>
     </div>
-    <div class="card reveal">
-      <div class="icon"><svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg></div>
+    <div class="card fade">
+      <span class="num">02</span>
       <h3>Human review gate</h3>
       <p>Generated quizzes land as drafts. Every question, answer and explanation is checked before students see it.</p>
     </div>
-    <div class="card reveal">
-      <div class="icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+    <div class="card fade">
+      <span class="num">03</span>
       <h3>Instant scoring</h3>
       <p>Auto-scored the moment you submit — percentage, per-question verdicts, and the reasoning behind each answer.</p>
     </div>
-    <div class="card reveal">
-      <div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+    <div class="card fade">
+      <span class="num">04</span>
       <h3>Works offline</h3>
       <p>Taking quizzes, scoring, history and reports run entirely on your machine. The network is only for new questions.</p>
     </div>
-    <div class="card reveal">
-      <div class="icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.8L7 14.3"/></svg></div>
+    <div class="card fade">
+      <span class="num">05</span>
       <h3>Performance reports</h3>
       <p>Averages, best runs and a needs-practice list per topic — sorted weakest first, with topic and difficulty filters.</p>
     </div>
-    <div class="card reveal">
-      <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+    <div class="card fade">
+      <span class="num">06</span>
       <h3>Private by design</h3>
       <p>Everything is stored in a local SQLite database on your machine. No telemetry, no accounts, no tracking.</p>
     </div>
@@ -270,52 +214,55 @@
 </section>
 
 <section id="how">
-  <div class="kicker reveal">How it works</div>
-  <h2 class="reveal">Three steps, zero setup.</h2>
-  <p class="section-sub reveal">No installer, no dependencies, no account. The download carries everything — app, database and configuration.</p>
-  <div class="steps">
-    <div class="step reveal">
-      <div class="num">1</div>
-      <h3>Download & extract</h3>
-      <p>Grab the ZIP below and extract it anywhere. Inside: the app, the seeded database, and the ready configuration.</p>
+  <span class="kicker">How it works</span>
+  <h2>Three steps, zero setup.</h2>
+  <p class="section-sub">The download carries everything — app, database and configuration.</p>
+  <div class="grid">
+    <div class="card fade">
+      <span class="num">1</span>
+      <h3>Install</h3>
+      <p>Run the setup once — it installs into your own folder without admin rights and adds the shortcuts.</p>
     </div>
-    <div class="step reveal">
-      <div class="num">2</div>
+    <div class="card fade">
+      <span class="num">2</span>
       <h3>Run <code>CodeQuest.exe</code></h3>
-      <p>Double-click to launch. Sign in with a name — that's the whole login. Your attempts are saved locally from the first session.</p>
+      <p>Sign in with a name — that's the whole login. Your attempts are saved locally from the first session.</p>
     </div>
-    <div class="step reveal">
-      <div class="num">3</div>
-      <h3>Take a quiz, watch the report</h3>
-      <p>Take a seeded quiz, review every answer with explanations, then open <b>Reports</b> to see your weakest topics ranked.</p>
+    <div class="card fade">
+      <span class="num">3</span>
+      <h3>Learn</h3>
+      <p>Take quizzes, review every answer with explanations, then open <b>Reports</b> to see your weakest topics ranked.</p>
     </div>
   </div>
 </section>
 
 <section id="tech">
-  <div class="kicker reveal">Under the hood</div>
-  <h2 class="reveal">Built like a real product, scaled to a course project.</h2>
-  <p class="section-sub reveal">A normalized relational schema, a layered object-oriented design, and a tested provider chain — the same patterns production teams use, sized honestly.</p>
-  <div class="chips reveal">
+  <span class="kicker">Technology</span>
+  <h2>Built like a real product,<br>scaled to a course project.</h2>
+  <p class="section-sub">A normalized relational schema, a layered object-oriented design, and a tested provider chain.</p>
+  <div class="chips">
     <span class="chip">C# · .NET 10</span>
     <span class="chip">Windows Forms</span>
     <span class="chip">SQLite · 3NF schema</span>
     <span class="chip">ADO.NET · parameterized SQL</span>
-    <span class="chip">AI provider chain — NVIDIA + OpenRouter</span>
+    <span class="chip">AI chain — NVIDIA + OpenRouter</span>
     <span class="chip">xUnit test suite</span>
     <span class="chip">CI build & release</span>
     <span class="chip">WCAG-conscious UI tokens</span>
   </div>
 </section>
 
-<div class="band reveal">
-  <h2>Ready to try it?</h2>
-  <p>Run the installer, launch CodeQuest, and take your first AI-generated quiz in under a minute.</p>
-  <a class="btn" href="https://github.com/Shuash11/codequest/releases/latest/download/CodeQuest-Setup.exe">
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-    Download CodeQuest — free
-  </a>
-  <p class="fine">Windows 10 / 11 · 35 MB · the AI evaluation key is included in the package</p>
+<div class="band">
+  <div class="band-inner">
+    <div>
+      <h2>Ready to try it?</h2>
+      <p>Install once, sign in with a name, take your first AI-generated quiz in under a minute.</p>
+    </div>
+    <a class="btn btn-white" href="https://github.com/Shuash11/codequest/releases/latest/download/CodeQuest-Setup.exe">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download — free
+    </a>
+  </div>
 </div>
 
 <footer>
@@ -328,8 +275,11 @@
     entries.forEach((entry) => {
       if (entry.isIntersecting) { entry.target.classList.add('in'); io.unobserve(entry.target); }
     });
-  }, { threshold: 0.12 });
-  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.fade').forEach((el, i) => {
+    el.style.transitionDelay = (i % 3) * 70 + 'ms';
+    io.observe(el);
+  });
 </script>
 </body>
 </html>
