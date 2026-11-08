@@ -188,12 +188,11 @@ public sealed class AnswerTile : Control
     /// <summary>The accessible object: RadioButton semantics on the tile (F2 contract).</summary>
     protected override AccessibleObject CreateAccessibilityInstance() => new AnswerTileAccessibleObject(this);
 
-    /// <summary>RadioButton role, visible-text name, Selected state, invokable (§2.6/F2).</summary>
+    /// <summary>RadioButton role, visible-text name, Selected state (§2.6/F2). The
+    /// legacy default action (DoDefaultAction) triggers the tile for MSAA clients;
+    /// keyboard users activate with Tab + Enter/Space.</summary>
     private sealed class AnswerTileAccessibleObject : Control.ControlAccessibleObject
     {
-        /// <summary>The UIA Invoke pattern id (WinForms does not expose a public constant).</summary>
-        private const int UIAInvokePatternId = 10000;
-
         private readonly AnswerTile _owner;
 
         public AnswerTileAccessibleObject(AnswerTile owner) : base(owner)
@@ -204,10 +203,6 @@ public sealed class AnswerTile : Control
         public override AccessibleRole Role => AccessibleRole.RadioButton;
 
         public override string? Name => _owner.ChoiceText;
-
-        /// <summary>Expose Invoke so assistive tech (and the activation path) can trigger the tile.</summary>
-        public override bool IsPatternSupported(int patternId)
-            => patternId == UIAInvokePatternId || base.IsPatternSupported(patternId);
 
         public override AccessibleStates State
         {
