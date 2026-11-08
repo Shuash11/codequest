@@ -3,11 +3,14 @@
 // Recipe 4.3 of the design of record: the sidebar nav item.
 // Look at: OnPaint — the full-width 40px row with its state table: inactive
 //          (transparent on Background, TextPrimary label, TextSecondary glyph),
-//          hover (Fill), active (AccentTint background, Accent glyph,
-//          BodySemibold label), pressed (#D6EBFF = UITheme.NavItemPressed),
-//          and the 1px accent focus outline inset 1px (§2.6). Glyph and label
-//          sit 8px apart behind 16px horizontal padding; the hit area is the
-//          full row (the control itself).
+//          hover (Fill), active (AccentTint background, AccentText glyph —
+//          the accent as ink on dark, §5.2a; Accent itself measures 2.91:1 on
+//          the tint), BodySemibold label, pressed (NavItemPressed), and the
+//          1px AccentText focus outline inset 1px (§2.6 D4 ring). Disabled
+//          rows (the §5.11 generation lock) render TextTertiary glyph + label
+//          on transparent (§2.6 disabled recipe). Glyph and label sit 8px
+//          apart behind 16px horizontal padding; the hit area is the full
+//          row (the control itself).
 // Inheritance note: this extends WinForms' Button for the same reason as
 //          FlatButton — keyboard activation and the UIAutomation Invoke
 //          pattern stay free; all chrome is painted here.
@@ -40,10 +43,12 @@ public sealed class NavItemButton : Button
 
         Font = UITheme.Body;
         Height = UITheme.Scaled(this, 40);
-        // Inactive rows are "transparent on Background" (recipe 4.3); nav items
-        // only ever sit on the sidebar, whose fill is Background — same paint,
-        // without transparency quirks. The themed default face must be off, or
-        // it shows through the rounded corner cutouts.
+        // Inactive rows are "transparent on Background" (recipe 4.3): at
+        // paint time both the row background and the corner cutouts resolve
+        // the actual container surface via UITheme.ContainerSurface (D4 audit
+        // rule #1 — never assume a fixed token). BackColor stays the
+        // parentless fallback. The themed default face must be off, or it
+        // shows through the rounded corner cutouts.
         BackColor = UITheme.Background;
         UseVisualStyleBackColor = false;
         TabStop = true;
@@ -122,9 +127,13 @@ public sealed class NavItemButton : Button
         int radius = UITheme.Scaled(this, UITheme.RadiusControl);
         System.Drawing.Rectangle bounds = new(0, 0, Width - 1, Height - 1);
 
+        // The row's own surface: what the container paints behind this row
+        // (D4 audit rule #1 — resolved, never assumed).
+        System.Drawing.Color surface = UITheme.ContainerSurface(this);
+
         // Paint the row background ourselves — ButtonBase's own background
         // pass leaves the rounded corner cutouts unpainted (black specks).
-        using (var backgroundBrush = new System.Drawing.SolidBrush(BackColor))
+        using (var backgroundBrush = new System.Drawing.SolidBrush(surface))
         {
             e.Graphics.FillRectangle(backgroundBrush, ClientRectangle);
         }
@@ -133,15 +142,24 @@ public sealed class NavItemButton : Button
         Color glyphColor;
         Color labelColor;
 
-        if (Active)
+        if (!Enabled)
         {
-            glyphColor = UITheme.Accent;
+            // §2.6 disabled recipe: TextTertiary glyph + label on transparent
+            // (the §5.11 generation lock must read as disabled).
+            glyphColor = UITheme.TextTertiary;
+            labelColor = UITheme.TextTertiary;
+        }
+        else if (Active)
+        {
+            // The accent as ink on dark is AccentText (§5.2a): Accent on the
+            // tint measures 2.91:1 — below the 3:1 non-text floor.
+            glyphColor = UITheme.AccentText;
             labelColor = UITheme.TextPrimary;
         }
         else if (SecondaryAction)
         {
             glyphColor = UITheme.TextSecondary;
-            labelColor = UITheme.Accent;
+            labelColor = UITheme.AccentText;
         }
         else
         {
@@ -149,11 +167,12 @@ public sealed class NavItemButton : Button
             labelColor = UITheme.TextPrimary;
         }
 
-        // Recipe 4.3 inactive rows are "transparent fill (on Background)" — the
-        // fill equals the row background, so the fill pass is skipped entirely:
-        // a same-color rounded fill would contribute nothing but antialiased
-        // edge pixels, which read as a faint ghost ring on state changes.
-        if (fillColor != BackColor)
+        // Recipe 4.3 inactive rows are "transparent fill (on the container)" —
+        // the fill equals the resolved row background, so the fill pass is
+        // skipped entirely: a same-color rounded fill would contribute nothing
+        // but antialiased edge pixels, which read as a faint ghost ring on
+        // state changes.
+        if (fillColor != surface)
         {
             using (var fillPath = UITheme.RoundedPath(bounds, radius))
             {
@@ -162,13 +181,15 @@ public sealed class NavItemButton : Button
             }
         }
 
-        if (Focused)
+        if (Focused && Enabled)
         {
-            // Recipe 4.3 focus row: 1px accent outline inset 1px, in addition
-            // to any state (§2.6 — keyboard focus is always visible).
+            // Recipe 4.3 focus row: 1px AccentText outline inset 1px, in
+            // addition to any state (§2.6 D4 ring — AccentText is case 1 on
+            // Background and case 3 over the AccentTint selection; plain
+            // Accent is invisible on the tint).
             bounds.Inflate(-1, -1);
             using var outlinePath = UITheme.RoundedPath(bounds, radius);
-            using var outlinePen = new System.Drawing.Pen(UITheme.Accent);
+            using var outlinePen = new System.Drawing.Pen(UITheme.AccentText);
             e.Graphics.DrawPath(outlinePen, outlinePath);
         }
 

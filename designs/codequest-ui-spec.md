@@ -1,6 +1,6 @@
 # CodeQuest — iOS-Style UI Design Spec (Design of Record)
 
-Status: `active` — Phase P6 deliverable. Created 2026-11-04 by the Designer agent. This is the design of record for every CodeQuest screen (P7–P13, polished in P16). The Frontend agent implements against this spec; P16 polishes against its unslop bar (§6). No code lives in this document. Amended 2026-11-06 (P6.1): five accessibility & surface amendments answering the P8 ux-review findings — §2.6, §4.4, §4.6, §4.7, §4.9, §4.10, §4.11, §5 preamble, §5.4, §5.5, §7.
+Status: `active` — Phase P6 deliverable. Created 2026-11-04 by the Designer agent. This is the design of record for every CodeQuest screen (P7–P13, polished in P16). The Frontend agent implements against this spec; P16 polishes against its unslop bar (§6). No code lives in this document. Amended 2026-11-06 (P6.1): five accessibility & surface amendments answering the P8 ux-review findings — §2.6, §4.4, §4.6, §4.7, §4.9, §4.10, §4.11, §5 preamble, §5.4, §5.5, §7. Amended 2026-11-08 (D4): dark-only theme re-issue + gamification screens, see §2.1 tables and new sections §4.14, §5.2a, §5.13, §5.14, §5.3a, §5.7a.
 
 Sources of truth: `plans/codequest-master-plan.md` (Phase P6, P7–P13, R-2/R-3/R-5, backlog #1/#5/#11), `docs/codequest-proposal.md` (read-only), `docs/oop-final-exam-guidelines.md` (read-only, UI rubric lines 109–114). Stack constraint: C# .NET 10 WinForms, GDI+ only — flat colors, custom-drawn controls, restyled `DataGridView`; no WPF, no external UI frameworks.
 
@@ -54,53 +54,103 @@ The palette, type scale, spacing, radii, and separators below are the tokens P7 
 > P8 accessibility review are fixed at the token level (F3: SuccessText /
 > DangerText now ≥ 4.75:1 on their tints; F7: TextSecondary headers now
 > 4.66:1 on Background; F8: badge text 4.75:1; F9: BorderControl now 3.25:1,
-> above the 3:1 non-text floor). The tables below carry the re-issued values;
+> above the 3:1 non-text floor). The tables below carried the re-issued values;
 > `UITheme.cs` is updated to match — the single code revision point the token
 > discipline buys. The interim all-`TextPrimary` strip rule from P8.1 is
 > discarded: the verdict tokens are semantic again and AA-compliant.
 
-The palette is **light neutral surfaces, one grey accent, three semantic colors.** The original values were pinned from the Apple Human Interface Guidelines (fetched 2026-11-04; see §3 for citation); the D3 re-issue keeps the structure and re-pins the values (the grey ramp and the AA-corrected semantic text variants). WinForms has no dynamic system-color machinery; `UITheme.cs` constants are the single source. Dark mode is out of scope: the app ships one light appearance (deliberate scope note — a half-done dark mode would break the consistency rubric line it is meant to earn).
+> **D4 re-issue (2026-11-08, owner directive: dark-only theme + gamification).**
+> The whole palette becomes **dark neutral surfaces, one indigo accent, three
+> semantic colors** — the D3 light appearance is retired. Token *names and
+> structure* are unchanged; only values re-issue (validated with the WCAG
+> relative-luminance formula in `designs/d4-dark-theme-amendment.md` §1 — floors:
+> 4.5:1 normal text, 3:1 large/bold text and non-text boundaries, EXEMPT for
+> placeholder/disabled roles). The two fun amendments above are re-issued with
+> these tables: their token names and relationships stand; the hex values they
+> pinned are superseded below. New tokens: `SurfaceRaised` (third elevation
+> level), `BorderHairline` (passive-container edges), `AccentText` (the accent
+> as INK — `Accent` itself is a FILL only), `SegmentHover`, and the danger
+> hover/pressed/disabled dark states. Full ratios: §2.1 tables below.
 
-**Surfaces and neutrals** (the D3 grey ramp, light mode):
+The palette is **dark neutral surfaces, one indigo accent, three semantic colors.** WinForms has no dynamic system-color machinery; `UITheme.cs` constants are the single source. Dark-only is an owner directive (the light theme is removed — the earlier "dark mode is out of scope" scope note is superseded). **Elevation rule:** exactly three levels — `Background` → `Surface` → `SurfaceRaised`, each step lighter (1.08/1.09 — deliberately the same subtlety as light's white-on-`#F5F5F7`). A container nests one level per float: window/sidebar → cards → dialogs/dropdowns. Never skip a level (no Raised card on Background, no Surface dialog). **State fills are not elevation** — `Fill`, `FillPressed`, `SegmentHover`, `AccentTint`, and the washes always paint on top of the current level. On dark, neutral fills **lighten** one step per interaction state (hover → pressed); the accent family **darkens** (it is already the brightest element).
 
-| Token | Hex | Used for |
-|---|---|---|
-| `Background` | `#F5F5F7` | Window background, sidebar background — the grouped-background "primary" role |
-| `Surface` | `#FFFFFF` | Cards, list containers, input fields — the grouped-background "secondary" role |
-| `Fill` | `#E9E9EE` | Selected/hover row fill, pressed chips, quiet control fills |
-| `BorderControl` | `#8E8E93` | Text-input and combo borders; unchecked control borders (F9: 3.25:1) |
-| `SeparatorHairline` | `#D8D8DC` | 1px row separators (see §2.5) |
+**Border rule:**
 
-**Text** (three opaque desktop tokens; the first two meet AA on Surface and Background):
+- **`BorderControl`** — the only borders with an AA floor (3:1, met on all three surfaces): 1px borders of *interactive controls* — text inputs, combos, numeric stepper, unchecked checkbox/radio rings.
+- **`BorderHairline`** — 1px edges of *passive containers*: every card (§4.2), the dialog card. Decorative by classification (the container is also identified by elevation and content); chosen ≥1.36:1 against every surface so it is perceivable without weight.
+- **`SeparatorHairline`** — 1px row separators *inside* one container (§2.5) and the sidebar's right edge (§5.2).
+- **None** — buttons (fills do the work), chips/badges, tiles, hover/selected states. The dialog is the one element with both a hairline and a shadow (owner-mandated; §4.11).
 
-| Token | Hex | Role |
-|---|---|---|
-| `TextPrimary` | `#1D1D1F` | Primary content |
-| `TextSecondary` | `#6E6E73` | Metadata: dates, sub-labels, quiet column headers (F7: 5.07:1 on Surface) |
-| `TextTertiary` | `#98989D` | Placeholder text, disabled text, decorative hints (AA-exempt roles) |
-| `TextOnAccent` | `#FFFFFF` | Text/icons on filled accent or filled danger buttons |
+**Surfaces and neutrals** (the D4 dark elevation ramp):
 
-**Accent — exactly one, and grey (D3):**
+| Token | Hex | Used for | Key ratios | Floor |
+|---|---|---|---|---|
+| `Background` | `#101216` | Window, sidebar, content background | — (base) | — |
+| `Surface` | `#171A20` | Cards, list containers, input fields, grids | vs Background 1.08 | — (decorative) |
+| `SurfaceRaised` *(new)* | `#1E222B` | Dialogs, combo dropdown panels — anything floating | vs Surface 1.09, vs Background 1.18 | — |
+| `Fill` | `#232833` | Hover/selected row fill, pressed chips, quiet control fills, progress track, disabled inputs | vs Background 1.27, vs Surface 1.18 | — |
+| `FillPressed` | `#2A303D` | Secondary button pressed, one step above Fill | vs Fill 1.12 | — |
+| `SegmentHover` *(new)* | `#2C3140` | Unselected-segment hover (§4.9) | vs Fill 1.14 | — |
+| `BorderControl` | `#646E82` | Text-input/combo borders, unchecked control rings, stepper | vs Surface **3.40**, vs SurfaceRaised **3.10**, vs Background 3.66 | **3.0 non-text** |
+| `BorderHairline` *(new)* | `#323845` | 1px edges of passive containers: cards, dialog card | vs Surface 1.48, vs SurfaceRaised 1.36, vs Background 1.60 | — (decorative, see border rule) |
+| `SeparatorHairline` | `#2A2F3A` | 1px row separators (§2.5), sidebar right edge | vs Surface 1.30 | — |
 
-| Token | Hex | Used for |
-|---|---|---|
-| `Accent` | `#3A3A3C` | Primary action fill, sidebar active state, focused input border, links (white label 9.1:1) |
-| `AccentHover` | `#2C2C2E` | Pointer hover on filled accent buttons — no hover on touch iOS, so desktop needs this added |
-| `AccentPressed` | `#232326` | Button while held |
-| `AccentDisabled` | `#C7C7CC` | Disabled filled buttons; paired with `TextOnAccent` at reduced expectation, see state tables in §4 |
-| `AccentTint` | `#E0E0E5` | Selected sidebar item background, selected DataGridView row, focused control borders |
+**Text** (the ink ramp; the first two meet AA on every surface):
 
-**Semantic colors** (text variants re-pinned to meet AA on their tints and on white — F3/F8):
+| Token | Hex | Role | On Surface | On Background | On SurfaceRaised | Floor |
+|---|---|---|---|---|---|---|
+| `TextPrimary` | `#E8EAF0` | Primary content | **14.49** | **15.59** | **13.24** | 4.5 |
+| `TextSecondary` | `#9BA3B4` | Metadata, captions, quiet labels | **6.88** | **7.40** | **6.29** | 4.5 |
+| `TextTertiary` | `#6B7385` | Placeholders, disabled text, decorative hints (**AA-exempt roles only** — never anything a user must read) | 3.66 | 3.94 | — | EXEMPT |
+| `TextOnAccent` | `#FFFFFF` | Text/icons on filled accent, filled danger, and the four answer tiles | on `Accent` **4.86**, `AccentHover` **6.25**, `AccentPressed` **8.07**, `Danger` **4.99**, `DangerHover` **6.42**, `DangerPressed` **8.27** | | | 4.5 (button labels are Body 10pt = small text) |
 
-| Token | Hex (fill) | Hex (text) | Used for |
+**Accent — exactly one, and indigo (`Accent` is a FILL; `AccentText` is its ink):**
+
+| Token | Hex | Used for | Key ratios | Floor |
+|---|---|---|---|---|
+| `Accent` | `#6C5CE7` | Primary action fill, progress fills, focus-ring fallback — **fill only** | boundary vs Surface **3.59**, vs SurfaceRaised **3.28**, vs Background **3.86**; as progress fill vs Fill track **3.04** (tightest pass in the system — do not lighten `Fill` without re-checking) | 3.0 non-text |
+| `AccentHover` | `#5A4BD1` | Pointer hover on filled accent (the accent family darkens on dark) | white label **6.25** | 4.5 |
+| `AccentPressed` | `#493BB8` | Button while held | white label **8.07** | 4.5 |
+| `AccentDisabled` | `#262938` | Disabled filled buttons, label `TextTertiary` | label 3.03 (EXEMPT); fill vs Surface 1.21 | EXEMPT |
+| `AccentText` *(new)* | `#A79BF5` | **Everywhere light used `Accent` as ink**: links, secondary-button labels, grid column headers, nav active glyph, chips, the XP line, default focus ring | on Surface **7.18**, Background **7.72**, SurfaceRaised **6.56**, AccentTint **5.83**, Fill **6.08**, NavItemPressed **6.20**, FillPressed **5.45** | 4.5 |
+| `AccentTint` | `#2A2749` | Selected nav item, selected grid row, chips, unlocked achievement tiles | vs Background 1.33, vs Surface 1.23 (selection fills — decorative; selection is also weight + ink, never color alone) | — |
+| `NavItemPressed` | `#262244` | Nav item while held | vs Background 1.25; `AccentText` ink on it **6.20** | — |
+
+**Semantic colors** (fills + dark-wash tints + text variants; tints are banner/badge backgrounds, never text):
+
+| Token | Fill | Text | Tint (wash) | Text ratios | Verdict |
+|---|---|---|---|---|---|
+| Success | `#2FA857` | `#4CC27A` | `#16301F` | text on Surface **7.72**, Background **8.31**, Raised **7.06**, on tint **6.30**; fill as mark vs Surface **5.69** | meets AA everywhere used |
+| Danger | `#CF3530` | `#F07A72` | `#3A1A18` | white on fill **4.99**, on hover `#B32A24` **6.42**, on pressed `#97201B` **8.27**; text on Surface **6.42**, Background **6.90**, Raised **5.86**, on tint **5.77** | `Danger` re-issued (the plan's `#C62B25` measured 2.86 vs SurfaceRaised — a destructive button in a dialog failed the 3:1 boundary floor) |
+| Warning | `#B07C10` | `#E5A83B` | `#38290F` | text on Surface **8.29**, Background **8.92**, on tint **6.70**; fill vs Surface **4.76**, banner border on tint **3.84** | meets AA everywhere used |
+
+**New dark state colors** (derived darken steps consistent with `AccentHover/Pressed`):
+
+| Token | Hex | Used for | Ratio |
 |---|---|---|---|
-| `Success` | `#2E9E48` | `#157A38` | Approved badge fill, correct-answer marks, success feedback text (text 4.75:1 on tint, 5.5:1 on white) |
-| `Danger` | `#C62B25` | `#B3241F` | Destructive buttons, error text, incorrect marks (text 5.6:1 on tint, 6.6:1 on white; white label on the fill 5.5:1) |
-| `Warning` | `#A97400` | `#8A5A00` | Draft-phase generation banner border, needs-practice emphasis (text 5.4:1 on tint) |
+| `DangerHover` | `#B32A24` | Destructive hover | white **6.42** |
+| `DangerPressed` | `#97201B` | Destructive held | white **8.27** |
+| `DangerDisabled` | `#2E2325` | Disabled destructive, label `TextTertiary` | 3.19 (EXEMPT) |
+| `SuccessText`/`DangerText`/`WarningText` on `Background` (status-strip verdict lines, §5 preamble) | — | the strip | **8.31 / 6.90 / 8.92** — the F3 interim all-`TextPrimary` strip rule is definitively discarded; semantic verdict tokens meet AA on the dark strip |
 
-Tints for banner/badge backgrounds are designer-derived mixes on white: `SuccessTint` `#DFF5E7`, `DangerTint` `#FDE8E9`, `WarningTint` `#FFF3E0`.
+**The fun set** (learner surfaces only — tiles, difficulty, washes; D4 re-issue). Tile labels are the choice text in `TextOnAccent` at `BodySemibold` 10pt — **small text by WCAG** (large = ≥14pt bold), so the floor is **4.5:1**, not the 3:1 "large text" reading the light palette assumed:
 
-**Color has a job.** Every token above signals state or action; none is decoration (HIG: "use color consistently… to help communicate information like status or interactivity"). Accent appears only where a thing is the primary action or the current selection — never on two competing buttons at once, never on passive text. State is never color alone: Draft/Approved badges always carry a text label (§4.10), correct/incorrect always carry a mark plus text (§5.9) — HIG inclusive-color guidance.
+| Token | Hex (dark) | White label | vs Surface / Background | Verdict |
+|---|---|---|---|---|
+| `FunPrimary` | = `Accent` | **4.86** | 3.59 / 3.86 | alias kept |
+| `TileRed` | `#D63040` | **4.82** | 3.61 / 3.89 | kept at the light value |
+| `TileBlue` | `#2D6BE4` | **4.84** | 3.60 / 3.87 | kept at the light value |
+| `TileAmber` | `#A65F00` | **4.93** | 3.53 / 4.01 | re-issued (the light `#C77700` measured 3.46 — below the 4.5 small-text floor) |
+| `TileGreen` | `#178146` | **4.92** | 3.54 / 3.81 | re-issued (the light `#1E8E4E` measured 4.17) |
+| `CorrectWash` | `#178146` | **4.92** | 3.54 / 3.81 | = TileGreen, mirroring the light relationship |
+| `WrongWash` | `#B3241F` | **6.59** | 2.65 (decorative) | light value kept |
+| `LevelEasy` | `#4CC27A` | — | bar fill vs Fill track **6.54**; chip text on `SuccessTint` **6.30** | re-issued as the *text-variant* greens/ambers/reds (dual use: difficulty chip text on its wash + score-bar fill on the track) |
+| `LevelMedium` | `#E5A83B` | — | bar fill **7.03**; on `WarningTint` **6.70** | same |
+| `LevelHard` | `#F07A72` | — | bar fill **5.43**; on `DangerTint` **5.77** | same |
+
+**Tile hover on dark** (amends §5.6): fills may not lighten (white labels would drop below 4.5 — TileRed has only ~9% headroom). Hover = **fill blended 15% toward black** (explicit per-tile constants in `UITheme`, replacing the light-theme darken helper): Red `#B62936`, Blue `#265BC2`, Amber `#8D5100`, Green `#146E3C` — darkening raises white-label contrast to ≥6.2 and is visible. Selection stays the 2px `TextOnAccent` ring (≥4.82 on every fill and wash — validated).
+
+**Color has a job.** Every token signals state or action; none is decoration. `Accent`/`AccentText` appear only where a thing is the **primary action or the current selection** (plus the XP line/level fills — the gamification identity the owner requested). Semantic colors appear only for **verdicts** (correct/incorrect, needs-practice, blocked-generation banners, difficulty chips). State is never color alone: badges carry labels, verdicts carry glyph + word, the signed-in row carries weight + a "You" chip. Unlocked achievements are a **possession** state → accent family, deliberately **not** Success-green (success stays a quiz verdict; ten green cards would be semantic color as decoration).
 
 ### 2.2 Typography
 
@@ -118,6 +168,8 @@ One typeface: **Segoe UI** — the Windows system font, standing in for iOS's SF
 
 - `BodySemibold` (Segoe UI Semibold 10pt): row and card titles, the primary button's label, the quiz question being answered, form field labels.
 - `CaptionSemibold` (Segoe UI Semibold 9pt): badge text where extra presence is needed.
+
+On dark, hierarchy is carried by the same scale **plus the ink ramp** (`TextPrimary`/`Secondary`/`Tertiary`) — never by inventing sizes or weights. Glyph fonts: `NavGlyph` 12pt (nav) and one new display instance `AchievementGlyph` (Segoe MDL2 Assets 16pt) for the 40px achievement tiles (§5.14) — icons, not text sizes.
 
 Mapping note for implementers: the iOS Dynamic Type "Large (default)" scale (Large Title 34 → Caption 2 11) is phone-scale; the desktop scale above preserves its shape — title ≈ 1.6× body, caption ≈ 0.9× body, emphasis by weight at constant size — rather than transplanting point values. Desktop minimum size is Caption 9pt; nothing in the UI is smaller.
 
@@ -150,16 +202,21 @@ Drawn with `GraphicsPath` arcs (GDI+ has no native rounded rectangle fill); all 
 
 ### 2.5 Hairline separator style
 
-- Row separators inside a list/grid: **1px solid `SeparatorHairline` (#E5E5EA)**, nothing heavier, never a bevel or 3D edge (GDI+ flat drawing only).
+- Row separators inside a list/grid: **1px solid `SeparatorHairline` (#2A2F3A)**, nothing heavier, never a bevel or 3D edge (GDI+ flat drawing only).
 - Separators are **left-inset 16px to align with the row's text** and run to the container's right edge — the iOS inset-grouped-list separator convention.
 - Between separate cards or groups there is **no separator at all** — a 16px (or 24px, per §2.3) gap does the grouping; the HIG explicitly lists negative space, container shapes, and separator lines as the three grouping tools and this design assigns each its own job (containers group controls, gaps group sections, separators only separate rows within one container).
 
 ### 2.6 Accessibility floors
 
-- **Contrast:** body copy is always `TextPrimary` on `Surface`/`Background` (21:1). `TextSecondary` (#8E8E93, ≈3.3:1 on white) is reserved for non-essential metadata at Caption size; anything a user must read to act — validation errors, banner text, empty-state explanations — uses `TextPrimary` or the semantic *text* tokens (which are the HIG increased-contrast variants, chosen for exactly this). White text appears only on `Accent`/`AccentHover`/`AccentPressed`/`Danger` fills (≥3.5:1; large/bold button labels), never on `Fill` or tints.
-- **INTERIM — status-strip verdict text (F3, until the R-D3 theme re-issue):** verdict lines in the content-header status strip (§5 preamble) — success AND failure/blocked lines alike — render in `Body` `TextPrimary` on `Background` (AA-compliant with a wide margin). The semantic text tokens currently measure 4.07:1 (`SuccessText`) and 4.08:1 (`DangerText`) on `Background` — below the 4.5:1 AA floor (P8 ux-review) — so they are out of the strip until R-D3 re-issues them with compliant ratios; at that point this mapping is discarded and the strip uses the re-issued tokens. The same tokens keep their on-`Surface` uses (§5.7/§5.9 marks, §4.4 error lines, §4.1 destructive text), where they measure ≥4.5:1 on white.
-- **Focus is visible:** every control shows keyboard focus — inputs get a 1px `Accent` border swap plus the caret; buttons and nav items get a 1px `Accent` outline inset 1px; DataGridView rows show the `AccentTint` selection fill. Focus order is top-to-bottom, left-to-right; Tab and arrow keys are first-class navigation (rubric: "forms are easy to navigate").
-- **No color-only meaning:** Draft/Approved, correct/incorrect, and the needs-practice flag all pair color with a text label or a distinct mark shape (HIG inclusive-color rule).
+- **Contrast (D4 re-issue):** body copy is `TextPrimary` on `Surface`/`Background` (14.49:1 / 15.59:1). `TextSecondary` (6.88:1 on Surface) carries metadata and captions; anything a user must read to act — validation errors, banner text, empty-state explanations, unlock rules — uses `TextPrimary` or the semantic *text* tokens. **AA-exempt roles:** `TextTertiary` (3.66 on Surface) is reserved for placeholders, disabled content, and decorative hints — nothing a user must read. White text appears **only** on `Accent`/`AccentHover`/`AccentPressed`, `Danger`/`DangerHover`/`DangerPressed`, and the four tiles/washes — never on `Fill`, `Surface`, tints, or washes (the rule re-pinned for dark: the four tiles' white labels clear 4.5 at 4.82–4.93; the `Level*` fills are text-on-wash tokens, never a white-text background).
+- **Status-strip verdict text (D4 final):** verdict lines in the content-header status strip (§5 preamble) render in the semantic text tokens — `SuccessText` (8.31:1), `DangerText` (6.90:1), `WarningText` (8.92:1) on `Background`. The P8.1 interim all-`TextPrimary` rule is **definitively discarded** (it was an R-D3 stopgap; the D4 semantic tokens are AA on the dark strip).
+- **Focus is visible (D4 ring rule):** exactly one ring vocabulary, 1px, inset 1px, never a glow:
+  1. **Default ring = `AccentText`** — on `Background` 7.72, `Surface` 7.18, `Fill` 6.08, `AccentTint` 5.83, `NavItemPressed` 6.20 — all ≥3.0. Applies to secondary buttons, nav items, segmented controls, grid action cells, and the **input focus border swap** (§4.4's border swap is `AccentText`).
+  2. **Ring over filled `Accent`/`Danger` fills = `TextPrimary`** — 4.04 / 4.15 ✓ (the light rule "Accent outline on Accent fill" is invisible on dark: 2.0:1 — the case was latent in light too; fixed here).
+  3. **Ring over `AccentTint` selection = `AccentText`** (5.83 ✓; plain `Accent` measures 2.91 — documented fail).
+  The `AnswerTile`'s 2px white focus ring is unchanged (≥4.82 on every tile and wash). Focus order is top-to-bottom, left-to-right; Tab and arrow keys are first-class navigation (rubric: "forms are easy to navigate").
+- **Disabled states (D4 recipe):** one recipe — dim variant fill (`AccentDisabled` `#262938` / `DangerDisabled` `#2E2325` / `Fill` for inputs) + `TextTertiary` label/content, no border on inputs. All EXEMPT but kept perceivable (3.03–3.19): disabled must read as disabled. Disabled nav items during generation (§5.2) use `TextTertiary` glyph + label on transparent.
+- **No color-only meaning:** Draft/Approved, correct/incorrect, the needs-practice flag, and the signed-in row all pair color with a text label or a distinct mark (HIG inclusive-color rule).
 - **Target sizes:** interactive rows ≥ 36px tall; buttons ≥ 32px tall; the nav list uses full-width hit areas.
 
 ## 3. ui-reference derivations
@@ -206,6 +263,29 @@ Drawn with `GraphicsPath` arcs (GDI+ has no native rounded rectangle fill); all 
 
 ## 4. Control restyle recipes (WinForms / GDI+)
 
+> **D4 amendment (2026-11-08 — dark-only re-issue; full rules in §2.1 and the
+> D4 amendment document).** The per-recipe deltas the tables above now carry:
+> **§4.1** — the secondary button's label ink is `AccentText` (accent-as-ink
+> rule), its default fill is *transparent* (the container surface shows
+> through, at any elevation), and disabled filled buttons use the dim fills
+> (`AccentDisabled`/`DangerDisabled`) with a `TextTertiary` label. Destructive
+> hover/pressed/disabled are the D4 dark states. The focus ring follows the
+> §2.6 three-case rule. **§4.2** — every card gains the 1px `BorderHairline`
+> edge (dark). **§4.3** — the active item's glyph renders `AccentText`
+> (Accent on the tint is 2.91:1); pressed is `NavItemPressed`; disabled rows
+> are `TextTertiary` on transparent. **§4.4/§4.5** — the focus border swap is
+> `AccentText`; disabled values per §2.6. **§4.6** — column-header ink is
+> `AccentText` (7.18:1 on the dark Surface), and `DataGridView.BackgroundColor`
+> is pinned to `Surface` explicitly (it defaults to a light system color and
+> would render a light band around the grid). **§4.9** — unselected-segment
+> hover is `SegmentHover`. **§4.11** — the dialog fill is `SurfaceRaised`, its
+> edge 1px `BorderHairline`, plus the native `CS_DROPSHADOW` (the single,
+> owner-mandated shadow). **§4.13** — unchanged; note the progress fill's
+> margin over the track is 3.04:1 (tightest pass — do not lighten `Fill`).
+> **Painter-audit rule (dark):** a rounded control's corner cutouts and
+> below-field labels must equal its *actual* container surface — resolved at
+> paint time (`UITheme.ContainerSurface`), never a fixed token.
+
 Every recipe assumes: `FlatStyle.Flat`, all chrome owner-drawn with GDI+ (`GraphicsPath` for radii, flat `Fill` — no gradients, no drop shadows, no bevels anywhere), tokens from §2, sizes on the §2.3 grid. Height numbers are for standard-DPI; implementers scale with `DeviceDpi`.
 
 ### 4.1 Flat button — three variants
@@ -219,16 +299,16 @@ All: 8px radius, 32px height, 16px horizontal padding, `Body` label, no border u
 | Default | `Accent` fill, `TextOnAccent` label |
 | Hover | `AccentHover` fill (pointer feedback — an addition over touch iOS, which has no hover) |
 | Pressed | `AccentPressed` fill |
-| Focus (keyboard) | Default paint + 1px `Accent` outline inset 1px |
-| Disabled | `AccentDisabled` fill, `TextOnAccent` label; disabled by `Enabled=false` (e.g. Generate while a generation runs) |
+| Focus (keyboard) | Default paint + the §2.6 focus ring: 1px outline inset 1px — over this filled variant the ink is `TextPrimary` (D4 three-case rule) |
+| Disabled | `AccentDisabled` fill, `TextTertiary` label (D4 disabled recipe — disabled must read as disabled); disabled by `Enabled=false` (e.g. Generate while a generation runs) |
 
-**Secondary (plain)** — cancel/auxiliary actions: transparent fill, `Accent` label, no border. Hover: `Fill` background. Pressed: `FillPressed` (`#D8D8DE`, designer-derived darker step of `Fill`). Focus/disabled per the table above, disabled label `TextTertiary`.
+**Secondary (plain)** — cancel/auxiliary actions: transparent fill (the container surface shows through, D4), `AccentText` label, no border. Hover: `Fill` background. Pressed: `FillPressed` (`#2A303D`, one step above `Fill`). Focus/disabled per the table above, disabled label `TextTertiary`.
 
-**Destructive** — delete/confirm-destroy: `Danger` fill with `TextOnAccent` label; hover `#E62E32`, pressed `#CC1F2A` (designer-derived darken steps); row-level destructive text actions use `DangerText` label on transparent instead of a fill. Disabled: `#F5B5B7` fill (derived tint).
+**Destructive** — delete/confirm-destroy: `Danger` fill with `TextOnAccent` label; hover `DangerHover` (`#B32A24`), pressed `DangerPressed` (`#97201B` — the D4 dark darken steps; white label 6.42/8.27); row-level destructive text actions use `DangerText` label on transparent instead of a fill. Disabled: `DangerDisabled` fill (`#2E2325`) with a `TextTertiary` label — disabled must read as disabled (D4 §2.6).
 
 ### 4.2 Rounded panel / card
 
-A `Panel` subclass: `Surface` fill, 12px radius, **no border and no shadow by default** — the white-on-`Background` contrast does the separation (§3.6: borders instead of shadows). A 1px `SeparatorHairline` edge is permitted only when a card must sit on a white surface (e.g. inside a dialog card). Groups of controls inside one card get 8px internal gaps and a 16px inset from the card edge.
+A `Panel` subclass: `Surface` fill, 12px radius, **1px `BorderHairline` edge on all four sides, no shadow** — on dark the hairline replaces the light theme's contrast-only separation (Surface vs Background is 1.08:1 in both themes, but dark reads flatter, so the border does real work; D4 §2). No gradients, no glow, no painted shadows on cards — ever; a card never carries both a border and a shadow (the dialog is the single owner-mandated shadow exception, §4.11). Groups of controls inside one card get 8px internal gaps and a 16px inset from the card edge.
 
 ### 4.3 Sidebar nav item
 
@@ -239,8 +319,8 @@ Full-width row, 40px tall, 16px horizontal padding, glyph (Segoe MDL2 Assets, 12
 | Inactive | transparent fill (on `Background`), `TextPrimary` label, `TextSecondary` glyph |
 | Hover | `Fill` background |
 | Active | `AccentTint` background, `Accent` glyph, `BodySemibold` label |
-| Pressed | `#D6EBFF` background (derived darker tint step) |
-| Focus | 1px `Accent` outline inset 1px, in addition to any state |
+| Pressed | `NavItemPressed` background (`#262244`, D4 — `AccentText` ink on it 6.20:1) |
+| Focus | 1px `AccentText` outline inset 1px, in addition to any state (§2.6 D4 — `AccentText` is case 1 on `Background` and case 3 over the `AccentTint` selection) |
 
 Hit area is the full row width. One item is active at a time; the active item always matches the visible panel (rubric: ease of navigation).
 
@@ -251,7 +331,7 @@ Hit area is the full row width. One item is active at a time; the active item al
 | State | Recipe |
 |---|---|
 | Default | `BorderControl` border |
-| Focus | border color swaps to `Accent` (1px; no glow) + caret |
+| Focus | border color swaps to `AccentText` (1px; no glow) + caret (D4 accent-as-ink rule) |
 | Error | border `DangerText` + an inline error line directly below in `DangerText` `Caption` (8px gap), e.g. "Enter a topic name." — the error line persists until the value validates; it never appears as a dialog |
 | Disabled | `Fill` background, `TextTertiary` text, no border |
 
@@ -261,7 +341,7 @@ Multi-line editors (question text, explanation): same recipe, minimum 64px heigh
 
 ### 4.5 ComboBox
 
-For bounded-choice fields — the category dropdown, filter combos. `DropDownStyle = DropDownList` **always** (free text is impossible by construction — the R-2 #7 lock for category). Recipe: `Surface` fill, 8px radius, 1px `BorderControl` border, 32px height, `Body` text; the dropdown list renders `Surface` rows with hairline separators, `Fill` hover row, `AccentTint` selected row; the drop arrow is a small chevron glyph in `TextSecondary` (no native 3D arrow). Focus: border swaps to `Accent`. Disabled: `Fill` background, `TextTertiary`. The category dropdown contains exactly two items: `Programming`, `Cybersecurity` — never an editable field, never a third value.
+For bounded-choice fields — the category dropdown, filter combos. `DropDownStyle = DropDownList` **always** (free text is impossible by construction — the R-2 #7 lock for category). Recipe: `Surface` fill, 8px radius, 1px `BorderControl` border, 32px height, `Body` text; the dropdown list renders `Surface` rows with hairline separators, `Fill` hover row, `AccentTint` selected row; the drop arrow is a small chevron glyph in `TextSecondary` (no native 3D arrow). Focus: border swaps to `AccentText` (D4). Disabled: `Fill` background, `TextTertiary`. The category dropdown contains exactly two items: `Programming`, `Cybersecurity` - never an editable field, never a third value.
 
 ### 4.6 DataGridView as an iOS list
 
@@ -269,7 +349,7 @@ The management, history, and report grids all read as iOS inset-grouped lists, n
 
 - **Container:** the grid sits inside a §4.2 card (12px radius, `Surface`), its own `BorderStyle = None`.
 - **Row headers:** invisible (`RowHeadersVisible = false`).
-- **Column headers:** quiet — 32px tall, `Background` fill (`EnableHeadersVisualStyles = false`), `Caption`-size `TextSecondary` labels, no 3D chrome, sorted-column indicator a small plain glyph, single 1px `SeparatorHairline` under the header row.
+- **Column headers:** quiet — 32px tall, `Surface` fill (`EnableHeadersVisualStyles = false`), `Caption`-size labels in `AccentText` (the fun-accent header treatment, D4 ink — 7.18:1 on the dark Surface), no 3D chrome, sorted-column indicator a small plain glyph, single 1px `SeparatorHairline` under the header row; `DataGridView.BackgroundColor` pinned to `Surface` explicitly (it defaults to a light system color and would render a light band around the grid on dark).
 - **Row separators:** `CellBorderStyle = None`; each row paints its own 1px `SeparatorHairline` line (row `RowPostPaint`), **left-inset 16px** to align with row text, running to the right edge (§2.5).
 - **Rows:** 36px tall, 12px vertical padding, `Body` text in `TextPrimary`; alternating row colors **off**.
 - **Selection:** `FullRowSelect` with `SelectionBackColor = AccentTint`, `SelectionForeColor = TextPrimary` — **never** the default blue selection chrome.
@@ -279,12 +359,12 @@ The management, history, and report grids all read as iOS inset-grouped lists, n
 - **Keyboard-operability of row actions (F1, WCAG 2.1.1):** the trailing action column keeps its painted recipe — quiet text actions per §4.1's secondary/destructive text styles (§5.3, §5.4, §5.5) — and gains this interaction contract, which every §4.6 grid with an action column honors identically:
   - **Reach:** the focused cell moves with the arrow keys (left/right/up/down) and with Tab, cell by cell through the whole grid — including into the trailing action column, in both directions (Shift+Tab reverses). §2.6's rule (Tab and arrows are first-class navigation) applies inside the grid, not just between controls.
   - **Activate:** `Enter` or `Space` on a focused action cell invokes that row's action (Space is the button idiom, Enter the list idiom; both work so no key memory is needed). The grid's default Enter behavior (move down one row) is suppressed only while an action cell has focus. Disabled action cells (§5.5's up on the first row, down on the last) render their glyph in `TextTertiary` and activation is a no-op. Where a screen defines a row-level activation (§5.8 opens the attempt review), `Enter` on its rows performs it; action cells always activate their own action.
-  - **Focus indicator:** the focused action cell paints the §4.1 focus ring — a 1px `Accent` outline inset 1px — over its normal paint, while its row keeps the `AccentTint` selection fill. No glow, no halo — the same ring vocabulary as buttons, nav items, and segments.
+  - **Focus indicator:** the focused action cell paints the §4.1 focus ring — a 1px outline inset 1px in `AccentText` (§2.6 D4 case 3: plain `Accent` measures 2.91:1 on the `AccentTint` selection, documented fail) — over its normal paint, while its row keeps the `AccentTint` selection fill. No glow, no halo - the same ring vocabulary as buttons, nav items, and segments.
   - **Discoverability:** a focused row's accessible description lists its actions in column order (e.g. "Actions: Edit, Edit questions, Delete."), so a screen-reader user hears what the row offers when the row takes focus; each action cell's accessible Name is its visible text (the §4.4 naming rule — "Edit", not "Edit button for row 3"). Screens with an action column also show one quiet hint line directly beneath the grid card — `Caption` in `TextSecondary`, 8px below the card: "Enter activates a focused row action." — so keyboard activation is documented on-screen, not discovered by accident.
 
 ### 4.7 CheckBox
 
-Custom-drawn 16px rounded-4px square: unchecked = `Surface` fill + 1px `BorderControl`; checked = `Accent` fill + white check glyph; focus = 1px `Accent` outline; disabled = `Fill` fill + `TextTertiary`. Label `Body` in `TextPrimary`, 8px gap. Used for per-choice correct-answer marking in the question editor (a question has exactly one correct choice — the editor enforces it with the §5.5 message, the checkbox just marks it).
+Custom-drawn 16px rounded-4px square: unchecked = `Surface` fill + 1px `BorderControl`; checked = `Accent` fill + white check glyph; focus = 1px ring per §2.6 (ink `TextPrimary` over the checked accent fill, `AccentText` otherwise — D4); disabled = `Fill` fill + `TextTertiary`. Label `Body` in `TextPrimary`, 8px gap. Used for per-choice correct-answer marking in the question editor (a question has exactly one correct choice — the editor enforces it with the §5.5 message, the checkbox just marks it).
 
 **Accessibility contract (F2, WCAG 4.1.2):** the control is never absent from the UIA tree and never an unnamed pane. It overrides `CreateAccessibleInstance` to expose its own `AccessibleObject`: **role** `CheckBox`; **name** = its visible label's text verbatim — the `Label` this recipe pairs with the box is the source of the name (§4.4's association rule), never a longer invented description; **state** = checked/unchecked mapped to the UIA toggle state, so marking and unmarking a choice is announced as it happens. §5.5 fixes the per-row visible wording ("Mark choice n as the correct answer"), so the name follows it exactly. Real `CheckBox`/`RadioButton` hosts are NOT used — the overrides carry the accessibility; the custom visuals stay untouched.
 
@@ -294,7 +374,7 @@ Custom-drawn 16px circle: 1px `BorderControl` ring on `Surface`; selected adds a
 
 ### 4.9 Segmented control
 
-For 2–4 fixed, equal options (difficulty Easy/Medium/Hard; status filter All/Draft/Approved): a single 8px-radius container filled `Fill`, containing equal-width segments; each segment 32px tall, `Body` label; **selected segment = `Surface` fill + `BodySemibold` label** (the iOS segmented style), unselected = transparent + `TextPrimary`. Hover on unselected: `#ECECF1` (derived quiet step). Focus (keyboard): the group is one Tab stop and arrow keys move the selection within it (§2.6); the focused segment carries the standard 1px `Accent` outline inset 1px — the §4.1/§4.3 ring — over its selected or unselected paint. Disabled (whole control, e.g. the §5.11 generation lock): segments stop responding to hover and clicks, every label renders `TextTertiary` (the §4.4/§4.5 disabled tokens), and the selected segment keeps its `Surface` fill so the stored value stays legible. No per-segment borders. This is the difficulty picker and the quiz-status filter — never free text, never a different pattern per screen.
+For 2–4 fixed, equal options (difficulty Easy/Medium/Hard; status filter All/Draft/Approved): a single 8px-radius container filled `Fill`, containing equal-width segments; each segment 32px tall, `Body` label; **selected segment = `Surface` fill + `BodySemibold` label** (the iOS segmented style), unselected = transparent + `TextPrimary`. Hover on unselected: `SegmentHover` (`#2C3140`, D4 — the quiet step above `Fill`). Focus (keyboard): the group is one Tab stop and arrow keys move the selection within it (§2.6); the focused segment carries the standard 1px `AccentText` ring inset 1px - the §4.1/§4.3 ring (D4 ink) - over its selected or unselected paint. Disabled (whole control, e.g. the §5.11 generation lock): segments stop responding to hover and clicks, every label renders `TextTertiary` (the §4.4/§4.5 disabled tokens), and the selected segment keeps its `Surface` fill so the stored value stays legible. No per-segment borders. This is the difficulty picker and the quiz-status filter — never free text, never a different pattern per screen.
 
 **Accessibility contract (F2, WCAG 4.1.2):** the group overrides `CreateAccessibleInstance`: **role** `Group` with **name** = the group's visible label ("Difficulty", "Type", "Status" — every segmented control sits behind a visible label; the §5.4 toolbar filter carries one). Each segment is a child accessible object: **role** `RadioButton` (one-of-N selection semantics), **name** = the segment's visible text, **state** = `Selected` on the active segment. Keyboard selection is already this recipe's one-Tab-stop/arrow contract; the exposed selected state makes the current value perceivable without moving focus.
 
@@ -315,17 +395,17 @@ They appear in the quiz management grid (status column), on the quiz review scre
 
 `System.Windows.Forms.MessageBox` is **not used** — it cannot be styled. All confirmations and blockers run through one custom modal dialog form:
 
-- **Layout:** a `Surface` card (12px radius) centered over the owner window; no drop shadow, no dimmed backdrop (flat modal — the owner simply stops accepting input). Min width 400px. Content inset 24px. Title in `BodySemibold`, message in `Body` `TextPrimary`, buttons in a right-aligned (trailing) row, 8px apart.
+- **Layout:** a `SurfaceRaised` card (12px radius, 1px `BorderHairline` edge) centered over the owner window; **native `CS_DROPSHADOW`** via a `CreateParams` override (class style 0x20000) — platform-drawn, the app's only shadow (D4 §2, owner-mandated; §6 sign 8 amended accordingly). No dimmed backdrop (flat modal — the owner simply stops accepting input). Min width 400px. Content inset 24px. Title in `BodySemibold`, message in `Body` `TextPrimary`, buttons in a right-aligned (trailing) row, 8px apart.
 - **Buttons (HIG alert rules, §3.4):** the action the user is confirming is a specific verb on a filled button ("Delete", "Approve", "Discard"), default button on the trailing side; every dialog that performs or precedes a destructive/irreversible action includes a "Cancel" secondary button that is never the default; purely informational dialogs may use "OK"; "Yes"/"No" are never used.
 - **Copy:** title = the situation in one line ("Delete this topic?"); body = one short sentence stating the consequence ("This topic will be removed. This cannot be undone." — §5.3's confirm body, offered only when the topic has no quizzes; §5.3 defines both delete branches). No emoji, no exclamation marks, no "Error" as a title, no error codes as titles.
-- **Success feedback is not a dialog.** After any create/update/delete, the screen shows an inline success line — `Body` text in the content-header status strip (§5.2), auto-clearing after ~4 seconds ("Topic saved.", "Quiz approved."). HIG: don't interrupt with an alert to convey information. **INTERIM strip token (F3, until the R-D3 theme re-issue):** all verdict lines in the strip — success AND failure/blocked — render in `TextPrimary` on `Background` (§2.6's interim rule; the semantic text tokens measure 4.07:1/4.08:1 there, below AA). Nothing else distinguishes verdict lines in the interim — the wording carries the meaning — and R-D3's re-issued tokens replace this mapping.
+- **Success feedback is not a dialog.** After any create/update/delete, the screen shows an inline success line — `Body` text in the content-header status strip (§5.2), auto-clearing after ~4 seconds ("Topic saved.", "Quiz approved."). HIG: don't interrupt with an alert to convey information. Verdict lines in the strip use the semantic text tokens (§2.6 D4 final — `SuccessText`/`DangerText` on `Background`, 8.31/6.90 ✓; the interim all-`TextPrimary` rule is discarded).
 - **Validation errors** are inline (§4.4/§4.5), never dialogs. **Unexpected exceptions** (P14): one dialog — title "Something went wrong", body a plain-language sentence plus a hint to retry, buttons "Try again" (secondary) and "Close"; never a stack trace, never raw exception text.
 - **Startup blocker (P7):** if the database file is missing at launch — title "CodeQuest can't find its database"; body "The database file was not found next to the app. Restore codequest.db or run database/schema.sql and database/seed.sql, then start the app again."; single "Close" button. This is the one startup dialog; nothing else interrupts launch.
 - **Modals never navigate (F5).** The dialog card serves confirmations, blockers, and the small create/edit forms (§5.3, §5.4). Screens that navigate into content — the question editor (§5.5), attempt review (§5.9), quiz review (§5.12's review view) — are shell drill-in panels (§5 preamble), never a second window: no default window chrome, no duplicated title; the drill-in's in-content header is the only title.
 
 ### 4.12 Numeric stepper (question count)
 
-`NumericUpDown` restyled: `Surface` fill, 8px radius, 1px `BorderControl` border, 32px height, value `Body` in `TextPrimary`; the two spin zones render as quiet `−`/`+` glyph buttons (`TextSecondary`, hover `Fill`) inside the right edge. Min 5, max 20 (P13's range); typed out-of-range input clamps on leave with the inline hint "Choose between 5 and 20 questions." Focus (keyboard): the border swaps to `Accent` exactly per §4.4 (1px, no glow) plus the caret; the field is one Tab stop and Up/Down arrows step the value. Disabled (e.g. the §5.11 generation lock): `Fill` background, `TextTertiary` value text, no border — §4.4's disabled recipe — and the `−`/`+` zones render `TextTertiary` with no hover response. A plain `ComboBox` prefilled 5–20 is an acceptable fallback if the custom stepper proves fragile — but one of the two, never a bare default `NumericUpDown`.
+`NumericUpDown` restyled: `Surface` fill, 8px radius, 1px `BorderControl` border, 32px height, value `Body` in `TextPrimary`; the two spin zones render as quiet `−`/`+` glyph buttons (`TextSecondary`, hover `Fill`) inside the right edge. Min 5, max 20 (P13's range); typed out-of-range input clamps on leave with the inline hint "Choose between 5 and 20 questions." Focus (keyboard): the border swaps to `AccentText` exactly per §4.4 (1px, no glow) plus the caret; the field is one Tab stop and Up/Down arrows step the value. Disabled (e.g. the §5.11 generation lock): `Fill` background, `TextTertiary` value text, no border — §4.4's disabled recipe — and the `−`/`+` zones render `TextTertiary` with no hover response. A plain `ComboBox` prefilled 5–20 is an acceptable fallback if the custom stepper proves fragile — but one of the two, never a bare default `NumericUpDown`.
 
 ### 4.13 ProgressBar / busy indicator
 
@@ -337,9 +417,17 @@ For the P13 generation call (and any other long operation):
 - **Controls during the run:** the Generate button enters its disabled state; a secondary **Cancel** button appears beside the track. The UI stays responsive — the generation call runs off the UI thread (R-5 #3 / R-3 threading note; binding — a frozen window is a review defect), and this indicator is the visible proof.
 - **No looping decorative animation exists anywhere else in the app** — the marquee is the single animated element, it only runs while real work runs, and it stops the moment the call returns (§6, stillness rule).
 
+### 4.14 Sidebar level chip (D4 — amends §5.2's account block; reused by §5.13/§5.7a)
+
+- **Anatomy:** inside the account block, 16px below the nav list: row 1 = signed-in display name (`Caption` `TextSecondary`, leading) + **level chip** (trailing); 8px below: **progress bar** spanning the sidebar content width (220 − 2×24 = 172px standard-DPI), **4px tall** (thin variant of the §4.13 pill), track `Fill`, fill `Accent` (vs track **3.04** ✓). 16px below: "Log out" nav item (unchanged).
+- **Chip recipe:** 20px tall, `RadiusChip` 4, 8px horizontal padding, `CaptionSemibold` text `Lvl N`, `AccentTint` fill, `AccentText` text (**5.83** ✓).
+- **Math:** progress = (XP − threshold(n)) ÷ (threshold(n+1) − threshold(n)); thresholds 25(n−1)(n+2) — L2@100, L3@250, L4@450, L5@700, L6@1000. Example: 380 XP → Lvl 3, bar at 38%, caption not shown in sidebar (the caption lives on Scoreboard/result). Level 1 at 0 XP: empty track, "Lvl 1".
+- **States:** static — not a control: no hover, no focus, no tab stop. Role `StaticText`, name **"Level 3"**; the bar exposes accessible name/value "380 of 450 XP to level 4". Values repaint on `IModulePanel.RefreshData` and after attempt submit; a level-up is an instant paint swap (no animation — §6 stillness).
+- **One implementation**, reused by the Scoreboard summary card and the result reveal — never a second chip design.
+
 ## 5. Screen-by-screen layouts (P7–P13)
 
-Every screen follows the same anatomy: content header row (screen `Title` at the leading side, any primary action trailing), a 20px status strip beneath it for success/failure feedback (§4.11 — dialogs are never used for success; verdict lines use the §2.6/§4.11 interim token until R-D3), then the screen's content on `Background` with 24px inset. All screens share one window; modules are panels the shell swaps (P7), so the sidebar and header never move — the rubric's "consistent and organized interface." Drill-in screens (§5.5, §5.9, §5.12's review view) are panel states the shell swaps inside their module — never separate windows (F5): no default window chrome, no duplicated title; the drill-in's in-content header (with its leading "Back" affordance, §5.9/§5.12's pattern) is the only title, and the sidebar and header stay unchanged while it is open — the module's nav item remains active, nothing dims, nothing disables.
+Every screen follows the same anatomy: content header row (screen `Title` at the leading side, any primary action trailing), a 20px status strip beneath it for success/failure feedback (§4.11 — dialogs are never used for success; verdict lines use the semantic text tokens, §2.6 D4 final), then the screen's content on `Background` with 24px inset. All screens share one window; modules are panels the shell swaps (P7), so the sidebar and header never move — the rubric's "consistent and organized interface." Drill-in screens (§5.5, §5.9, §5.12's review view) are panel states the shell swaps inside their module — never separate windows (F5): no default window chrome, no duplicated title; the drill-in's in-content header (with its leading "Back" affordance, §5.9/§5.12's pattern) is the only title, and the sidebar and header stay unchanged while it is open — the module's nav item remains active, nothing dims, nothing disables.
 
 ### 5.1 Login (P7 — `LoginForm`)
 
@@ -356,6 +444,10 @@ Every screen follows the same anatomy: content header row (screen `Title` at the
 - **States:** "Take quiz" is active after login. Panels persist (show/hide, not recreate) so switching modules never loses in-progress data — P7's "returns without data loss" is a structural rule, not a save feature. While a generation is running (§5.11) the other nav items are disabled with the caption "Generation in progress."
 - **Feedback:** the shell itself is silent; all feedback lives in the module's status strip. Log out returns to the login form; if the user is mid-quiz, the §5.6 leave-confirmation applies first.
 
+### 5.2a Navigation amendment (D4 — gamification cluster)
+
+Two entries join the nav list immediately after "Take quiz" (the learner cluster): **Scoreboard** — glyph `E8BC` **ShowResults**; **Achievements** — glyph `E735` **FavoriteStarFill**. Full order: Take quiz · Scoreboard · Achievements · History · Reports · Generate quiz · Topics (Review and Quiz management are not in the current nav). All §4.3 states apply; **on dark the active item's glyph and any accent ink render `AccentText`** (`Accent` glyph on `AccentTint` measures 2.91 — below the 3:1 non-text floor). Existing glyphs verified against MDL2: E80F Home, E823 Recent, E9D9 Diagnostic, E710 Add, E8EC Tag. New panels are persistent `ModulePanel`s that reload on show (§5.2 persistence rule); names per plan: `ScoreboardForm`, `AchievementsForm`. The account block gains the §4.14 level chip + progress bar.
+
 ### 5.3 Topic management (P8 — `TopicManageForm`)
 
 - **Layout:** header "Topics"; toolbar row (8px gaps): search box (§4.4, "Search topics…", 240px), "New topic" primary button trailing; 16px; one full-height grid card (§4.6): columns **Name** · **Category** · **Quizzes** (count) · **Created**. Row actions (Edit, Delete) as quiet secondary text buttons in a trailing action column.
@@ -364,6 +456,17 @@ Every screen follows the same anatomy: content header row (screen `Title` at the
 - **Search:** live filter while typing (P8: "search filters the grid live"); no submit button.
 - **States:** **empty** — grid shows nothing and a centered panel reads "No topics yet" (`Body`, `TextPrimary`) + "Choose New topic to add the first one." (`Caption`, `TextSecondary`); **no search match** — "No topics match your search." + "Clear search" secondary; **loading** — none (local SQLite reads are instant; no spinner is designed); **read error** — §4.11 unexpected dialog.
 - **Feedback:** success — "Topic saved." / "Topic updated." / "Topic deleted." in the status strip. Failure — inline form errors: "Enter a topic name." (empty), "A topic with this name already exists." (duplicate — the R-2 #5 friendly-duplicate rule). Delete flow — schema fact: `quizzes.topic_id` is ON DELETE RESTRICT, so a topic is deletable only when it has no quizzes, and the flow branches on that before any dialog: **topic with no quizzes** — confirm dialog first ("Delete this topic?" / "This topic will be removed. This cannot be undone." — Delete destructive + Cancel), then "Topic deleted." in the strip; **topic with quizzes** — the delete is blocked (nothing is removed), no confirm dialog is shown, and the status strip reads "This topic still has quizzes. Delete its quizzes first." — never a raw SQLite error (P8 acceptance).
+
+### 5.3a AI New-topic dialog (D4 — reworks §5.3's topic form; the Edit-topic flow is unchanged and stays manual)
+
+- **Shell:** one §4.11 modal card — `SurfaceRaised`, 12px radius, 1px `BorderHairline`, native `CS_DROPSHADOW`; min width 480; content inset 24; title "New topic" (`BodySemibold`); commit buttons in the trailing row, 8px apart. No dimmed backdrop.
+- **Describe field:** label "Describe your topic" (`BodySemibold`, associated with the input per §4.4 naming) + multi-line §4.4 input (min 64px, top-aligned), placeholder "e.g. Common SQL injection attacks and how to prevent them" (`TextTertiary`). Required 5–300 chars (FR1); violation → §4.4 inline error line directly below, `Caption` `DangerText`: "Use between 5 and 300 characters."
+- **Generate row:** "Generate with AI" primary (§4.1), 12px below the field, leading-aligned; the quiet note "Needs an internet connection." (`Caption` `TextSecondary`) 8px below the button — §5.11's voice.
+- **Busy state:** the Generate button enters its disabled state with the label **"Generating…"**; the describe field disables (§4.4 disabled recipe); the **§4.13 busy block appears in place of the note**: marquee track (240px) + "Generating topic…" (`Caption`) + live elapsed-seconds counter + a "Cancel" secondary beside the track — the app's one busy pattern, reused verbatim. The call runs off the UI thread (R-5 #3; a frozen dialog is a review defect). Cancel follows §5.11's semantics: request aborted, or the late result discarded — never a half-saved topic. **Save is disabled while busy.** Preview fields stay enabled (manual editing is always possible, FR1).
+- **Preview group (on success):** quiet group header "AI suggestion — edit anything before saving" (`Caption` `TextSecondary`); then **Name** (§4.4 input), **Category** (§4.5 combo — exactly `Programming` / `Cybersecurity`, `DropDownStyle = DropDownList`, never free text, R-2 #7), **Description** (multi-line §4.4) — all prefilled from the AI result, all editable, 16px field↔field. Manual-first: the dialog opens with these fields empty and enabled; filling them and pressing Save without generating is a first-class path.
+- **Typed failure line (generation class):** a compact banner between the Generate row and the preview group (8px gaps): `WarningTint` wash, 8px radius, 12px padding — line 1 (`BodySemibold`, `WarningText`): "Topic generation is unavailable right now."; line 2 (`Body`, `TextPrimary`): the typed reason, **verbatim from §5.11's map** ("No AI provider is configured." / "The AI provider rejected the request. Check the provider configuration." / "The AI provider reached its request limit. Try again later." / "Couldn't reach the AI provider. Check the internet connection."); line 3 (`Body`, `TextPrimary`): "You can still fill in the fields manually and save." — the §5.11 offline-pointer pattern. The banner persists until a successful generate or dialog close. Rationale: generation unavailability is the *warning* class (§5.11), not the validation class — field-validation errors stay the §4.4 inline `DangerText` lines. Two failure classes, two placements, never mixed.
+- **Commit row:** **Save** (primary, trailing, default) / **Cancel** (secondary, never the default — §4.11). Save runs the existing duplicate/empty validation (FR1): "Enter a topic name." / "A topic with this name already exists." (R-2 #5) as inline errors. Success closes the dialog; "Topic saved." lands in the host screen's strip (§5.3 feedback unchanged).
+- **Accessibility:** labels associated per §4.4; the banner exposes `StaticText` with its text; the busy state is announced by the button's accessible name becoming "Generating…"; the marquee runs only while real work runs (§4.13 stillness rule).
 
 ### 5.4 Quiz management (P8 — `QuizManageForm`)
 
@@ -401,6 +504,12 @@ Every screen follows the same anatomy: content header row (screen `Title` at the
 - **Actions:** "View answers" (secondary → §5.9 for this attempt), "Retake" (primary — restarts §5.6 moment 2 with the same quiz), "Done" (secondary → home list).
 - **States:** always has data (the attempt was just scored and saved — one `QuizAttempt` + its `SubmittedAnswer` rows, one transaction). No empty/loading/error state exists by construction.
 - **Feedback:** the screen itself is the success feedback; no dialogs.
+
+### 5.7a Result reveal (D4 — amends §5.7's hero card; carries A2)
+
+- **The hero card gains, below the score/context lines:** 16px; **XP line**: "+120 XP" (`BodySemibold`, `AccentText` — 7.18 ✓). 8px; **level row**: "Lvl 4" chip (§4.14 recipe) + the 8px progress track (`Fill` track, `Accent` fill) filling the remaining width + "70 XP to Lvl 5" (`Caption` `TextSecondary`) right-aligned. 16px; **achievement chips** (only when the submit unlocked something): quiet group label "Achievements unlocked" (`Caption` `TextSecondary`), 8px, then a wrapping chip row (8px gaps): each chip 28px tall, `RadiusChip` 4, 8px horizontal padding, `AccentTint` fill — glyph (MDL2 10pt, `AccentText`, 5.83 on the tint ✓) + 4px gap + title (`CaptionSemibold` `TextPrimary`). Only **newly unlocked** achievements appear; if none, the block is omitted entirely (omission, not a "none" message — restraint).
+- **Values shown are post-submit** (XP/level derived from the stored attempt per A3; the UI reads `ILevelService`/evaluator output — no XP arithmetic in the painter).
+- **Motion restraint (Lead decision: no fade ships):** the reveal is an instant paint change — no confetti, no glow, no scale/bounce, no fade, no looping anything. All other §5.7 anatomy and states are unchanged; the reveal adds no states (the attempt always exists by construction).
 
 ### 5.8 History (P10 — `HistoryForm`)
 
@@ -447,20 +556,38 @@ Every screen follows the same anatomy: content header row (screen `Title` at the
 - **States:** **empty** — "No quizzes to review" + "Generated quizzes appear here as drafts."; zero-question quiz — Approve is disabled with the inline hint "Add at least one question before approving."; busy/error as §5.3.
 - **Feedback:** "Quiz approved." strip line; the badge flips to Approved in place (the state change is the moment — no dialog, no animation); after approval the quiz appears takeable in §5.6 (P13 acceptance, verified in the P9 flow). Draft quizzes from this screen never appear startable anywhere.
 
+### 5.13 Scoreboard (D4 — gamification, `ScoreboardForm`)
+
+- **Layout:** header "Scoreboard" (`Title`) — read-only screen, no trailing primary action; status strip per §5 preamble (verdict lines in `SuccessText`/`DangerText` on `Background` — 8.31/6.90 ✓). Content inset 24px.
+- **Personal summary card** (§4.2 + hairline, 16px internal inset), 16px above the table card: leading block = display name (`BodySemibold` `TextPrimary`) + "Lvl 3" chip (§4.14) with an 8px gap; 8px below: 8px progress track (`Fill`) with `Accent` fill + "70 XP to Lvl 4" (`Caption` `TextSecondary`) right-aligned on the same row. Trailing block: total XP in `Title` over "total XP" (`Caption` `TextSecondary`). With 0 XP the card still renders (real data): "Lvl 1", empty track, "100 XP to Lvl 2".
+- **Leaderboard table card** (§4.6 grid, no action column): columns **Rank · Player · Level · XP · Quizzes**. Typography: headers `Caption` in **`AccentText`** (§4.6's quiet-header slot; the fun-accent header treatment re-issued with the readable ink — 7.18 ✓; Lead-approved); cells `Body` `TextPrimary`; **Rank / XP / Quizzes right-aligned, Player / Level left-aligned**. Row height 36, 1px `SeparatorHairline` separators inset 16px (§2.5), alternating rows off, sort indicator per §4.6. Rank = 1-based position; ordering XP desc, tie → more quizzes, tie → name (FR3) — display only.
+- **Signed-in row highlight:** `AccentTint` full-row fill + player name in `BodySemibold` + a 20px "You" chip (`RadiusChip` 4, `Surface` fill, `CaptionSemibold` `AccentText` — 7.18 ✓) trailing the name. Triple-coded (fill + weight + label), never color alone.
+- **States:** **empty** — centered panel in the card: "No quizzes taken yet" (`Body` `TextPrimary`) + "Take a quiz and the scoreboard will fill in." (`Caption` `TextSecondary`); **loading** — none (local SQLite reads are instant); **read error** — §4.11 unexpected dialog.
+- **Interaction:** read-only — no action column, **selection disabled**, grid not a tab stop; the §4.6 action-hint line does not apply (it belongs to action grids). Screen readers get the cell text.
+
+### 5.14 Achievements (D4 — gamification, `AchievementsForm`)
+
+- **Layout:** header "Achievements" (`Title`) + explaining caption "Unlocks are recorded as you play." (`Body` `TextSecondary` — the §5.12 pattern). Content inset 24px. A wrapping grid of achievement cards: each card **240×120** standard-DPI (grid-friendly), **16px** card↔card gaps, 16px internal inset, §4.2 + hairline.
+- **Card anatomy:** row 1 = **glyph tile** 40×40 (`RadiusControl` 8 rounded square) + achievement title (`BodySemibold` `TextPrimary`) beside it, 8px gap, vertically centered; 8px; description (`Caption` `TextSecondary`, two lines max); 8px; status line (`Caption`).
+- **Unlocked state:** tile = `AccentTint` fill + the achievement's own glyph (Segoe MDL2, `AchievementGlyph` 16pt, `AccentText` — 5.83 ✓); status line "Unlocked Nov 8, 2026" (`Caption` `TextSecondary`). Date = first unlock timestamp (A5: re-completing never duplicates, so the date never changes).
+- **Locked state:** tile = `Fill` fill + **Lock glyph `E72E`** (`TextTertiary`); title `TextSecondary`; description **stays `TextSecondary`** (it tells the player what to do — it must be readable, 6.88 ✓); status line "Locked" (`Caption` `TextTertiary`). No card-level opacity tricks, no lock overlay, no recolor — the ink ramp does the muting.
+- **Glyph assignments (all verified real MDL2 names/codepoints):** first-quiz `E768` Play · perfect-run `E73E` CheckMark · perfect-hard `E930` Completed · 10-quizzes `E7BC` ReadingList · 30-quizzes `E8F1` Library · 50-correct `E8FB` Accept · level-5 `E870` SignalBars5 · level-10 `E945` LightningBolt · 3-distinct-topics `E81E` MapLayers · both-categories `EA86` Puzzle. (Note: **MDL2 has no "Trophy"** — verified by search; `E734` is FavoriteStar and was rejected for the nav in favor of the filled star `E735`.)
+- **States:** **no empty state exists by construction** — the catalog is code-defined; all ten cards always render, locked until earned (mirrors §5.7's "no empty state by construction"). Read error → §4.11. **No per-card interaction:** cards are display-only — no hover, no focus ring, no tab stops; accessible semantics `StaticText` with name = title text (date/description as description text).
+
 ## 6. The unslop bar (acceptance checklist)
 
 This section is the acceptance checklist P16 audits every screen against. Each claim is a **negative assertion about this design**: the pattern does not exist in any §2–§5 recipe, and implementers cannot reintroduce it without a spec change.
 
 | # | Sign | Assertion — where the design forecloses it |
 |---|---|---|
-| 1 | **No purple gradients (or any gradients)** | Asserted. One accent exists: `Accent` #0088FF blue (§2.1). Every fill in §4 is a flat GDI+ color; the §4 preamble bans gradients outright, and §3.6 adopts "never gradient backgrounds" as a ban. |
+| 1 | **No purple gradients (or any gradients)** | Asserted. One accent exists: `Accent` #6C5CE7 indigo (§2.1, D4 re-issue — the stale "#0088FF blue" note is corrected). Every fill in §4 is a flat GDI+ color; the §4 preamble bans gradients outright, and §3.6 adopts "never gradient backgrounds" as a ban. |
 | 2 | **No glows** | Asserted. Focus is a 1px border color swap or a 1px outline (§4.3/§4.4); no painted glow, no outer halo, no luminous anything. |
 | 3 | **No gradient text** | Asserted. Text renders in exactly the §2.1 single-color text tokens; §2.2 defines no text effect. |
 | 4 | **No emoji labels** | Asserted. Every string in §5 is plain language; iconography follows §3.7 — text labels by default, Segoe MDL2 glyphs only where one earns its place: nav marks, correct/incorrect marks, and the small in-control glyphs (drop chevron §4.5, column sort indicator §4.6, stepper −/+ §4.12, reorder chevrons §5.5); no external icon assets, no emoji. Feedback copy ("Save", "Try again", "No quizzes yet") contains none. |
 | 5 | **No uppercase tracked labels** | Asserted. §2.2 defines sentence-style labels with no letter-spacing; nothing in §4 draws uppercase-transformed or tracked text. |
 | 6 | **No glossy blobs / floating shapes / aurora** | Asserted. The design contains zero decorative shapes — every element is a functional control on the §2.1 surfaces; §3.6's tell list (orbs, particles) is adopted as a ban. |
 | 7 | **No fake or looping motion** | Asserted. One animated element exists in the entire app: the P13 marquee, which runs only while a real generation call is in flight and stops the moment it returns (§4.13). No bounce, no fade-up, no pulse, no spinner decoration; state changes are instant paint changes. Stillness is the default; motion must prove real work. |
-| 8 | **No drop shadows on every card** | Asserted. Cards separate by surface contrast; the modal dialog has no shadow either (§4.11); §3.6's "borders instead of shadows" rule is baked into §4.2. |
+| 8 | **No drop shadows on every card** | Asserted. Cards separate by surface contrast **plus the 1px `BorderHairline` edge (D4 §2)**; the modal dialog is the single, native, owner-mandated `CS_DROPSHADOW` exception (§4.11, D4); §3.6's "borders instead of shadows" rule is baked into §4.2. |
 | 9 | **No one-radius-everywhere** | Asserted. §2.4 fixes 12/8/4 by element class — the tell of a single radius applied to all elements cannot occur. |
 | 10 | **No colored left-border panels** | Asserted (the strongest single AI tell per the ui-reference catalog). No recipe in §4 draws an accent left edge on any card, row, or panel; emphasis is background tint, weight, or a badge. |
 | 11 | **No default blue selection chrome** | Asserted. Grid selection is `AccentTint` + `TextPrimary` (§4.6); the WinForms native highlight is disabled wherever a list renders. |
@@ -490,7 +617,7 @@ Traceability from the plan's rulings and backlog to the design decisions that ca
 | P16 | The five-line direction | Its checklist is restated item-by-item as §6; P16 audits against that table |
 | P8 ux-review F1 (P6.1) | Grid row actions keyboard-operable (WCAG 2.1.1) — every action reachable and activatable by keyboard, visible focus | §4.6 keyboard-operability contract (arrows/Tab reach, Enter/Space activate, §4.1 ring, row action announcement + grid hint) |
 | P8 ux-review F2 (P6.1) | Custom controls expose role/name/state (WCAG 4.1.2); accessible name equals the visible label | §4.7/§4.9/§4.10 accessibility contracts (`AccessibleObject`/`CreateAccessibleInstance` overrides); §4.4 label↔input naming |
-| P8 ux-review F3 interim (P6.1) | Strip verdict text meets AA before the R-D3 re-issue | §2.6 interim bullet + §4.11 interim strip token (`TextPrimary` on `Background`) — clearly marked interim, discarded by R-D3 |
+| P8 ux-review F3 interim (P6.1) | Strip verdict text meets AA before the R-D3 re-issue | ~~Interim `TextPrimary` rule~~ **Resolved by D4**: the semantic verdict tokens are AA on the dark strip (8.31/6.90/8.92 — §2.6); the interim mapping is definitively discarded |
 | P8 ux-review F5 (P6.1) | The question editor is a shell drill-in panel, never a default window | §5 preamble drill-in rule; §5.5 layout; §4.11 modals-never-navigate |
 | P8 ux-review F11 (P6.1) | Grid columns match the schema (`created_at` only); the §5.5 path exists in P8 | §5.4 — "Created" column, "Edit questions" action, "Questions (count)" disambiguation |
 

@@ -68,13 +68,17 @@ public sealed class LoginForm : Form
         int chipX = (ClientSize.Width - chipSize) / 2;
 
         // The brand mark: the same "CQ" chip the website and the taskbar icon
-        // use — a small dose of the fun identity on the login screen.
+        // use — a small dose of the fun identity on the login screen. The
+        // panel's BackColor is the TRUE parent surface (the form's
+        // Background): the rounded chip's corner cutouts show it, not the
+        // accent — a square Accent corner on the dark window background is a
+        // high-contrast artifact (D4 audit rule #1).
         var logo = new Panel
         {
             Name = "LoginLogoChip",
             Size = new Size(chipSize, chipSize),
             Location = new Point((ClientSize.Width - chipSize) / 2, blockTop),
-            BackColor = UITheme.Accent,
+            BackColor = UITheme.Background,
         };
         logo.Paint += static (sender, e) =>
         {

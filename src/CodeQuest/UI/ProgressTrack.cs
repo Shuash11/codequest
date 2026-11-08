@@ -29,6 +29,9 @@ public sealed class ProgressTrack : Control
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
         SetStyle(ControlStyles.ResizeRedraw, true);
+        // The pill corners show the CONTAINER's surface, resolved at paint
+        // time (OnPaintBackground) — a track sits on module backgrounds AND
+        // inside cards (D4 audit rule #1; §5.7a puts one on a card).
         BackColor = UITheme.Background;
         Height = UITheme.Scaled(this, 8);
         TabStop = false; // a read-only indicator is not a Tab stop
@@ -115,6 +118,15 @@ public sealed class ProgressTrack : Control
             _value = clamped;
             Invalidate(); // the pill paints the fraction — a new value must repaint
         }
+    }
+
+    /// <summary>
+    /// The corner cutouts around the pill show the CONTAINER's surface, not a
+    /// fixed token (D4 audit rule #1) — the pill paints in OnPaint.
+    /// </summary>
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        e.Graphics.Clear(UITheme.ContainerSurface(this));
     }
 
     /// <summary>Paints the Fill pill and the Accent segment (recipe 4.13).</summary>

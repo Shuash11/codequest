@@ -3,11 +3,14 @@
 // Recipe 4.4 of the design of record, multi-line editors: "Multi-line editors
 // (question text, explanation): same recipe, minimum 64px height, top-aligned."
 // Look at: the same Surface field, 8px radius, 1px border with the
-//          default/focus/error swaps as <see cref="InputField"/>, but the
-//          TextBox inside is multiline, top-aligned, and the field is as tall
-//          as the form asks (≥64px). The inline error line below (DangerText
-//          Caption) is owned here like InputField owns it — errors are inline,
-//          never dialogs (§4.4).
+//          default/focus/error swaps as <see cref="InputField"/> (the focus
+//          swap is AccentText on dark), but the TextBox inside is multiline,
+//          top-aligned, and the field is as tall as the form asks (≥64px).
+//          The area outside the rounded field (corner cutouts and the error-
+//          line slot) shows the CONTAINER's surface, resolved via
+//          UITheme.ContainerSurface (D4 audit rules #1/#9). The inline error
+//          line below (DangerText Caption) is owned here like InputField
+//          owns it — errors are inline, never dialogs (§4.4).
 // =============================================================================
 
 using System.Windows.Forms;
@@ -39,7 +42,7 @@ public sealed class InputArea : Panel
         SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
         SetStyle(ControlStyles.ResizeRedraw, true);
 
-        BackColor = UITheme.Surface;
+        BackColor = UITheme.Surface; // the field fill token (see OnPaint/OnPaintBackground)
         _fallbackAccessibleName = accessibleName;
 
         _box.Multiline = true;
@@ -58,10 +61,32 @@ public sealed class InputArea : Panel
 
         _errorLine.AutoSize = true;
         _errorLine.Font = UITheme.Caption;
-        _errorLine.BackColor = UITheme.Surface;
+        _errorLine.BackColor = UITheme.Surface; // corrected to the container surface on attach (OnParentChanged)
         Controls.Add(_errorLine);
 
         LayoutArea();
+    }
+
+    /// <summary>
+    /// The area was placed on its container: the error line sits directly on
+    /// that surface (below the rounded field), so its BackColor must equal
+    /// the container's — never a fixed token (D4 audit rules #1/#9).
+    /// </summary>
+    protected override void OnParentChanged(EventArgs e)
+    {
+        base.OnParentChanged(e);
+        _errorLine.BackColor = UITheme.ContainerSurface(this);
+        Invalidate();
+    }
+
+    /// <summary>
+    /// Everything OUTSIDE the rounded field — the corner cutouts and the
+    /// error-line slot — shows the container's surface (D4 audit rule #1).
+    /// The field fill itself paints in OnPaint.
+    /// </summary>
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        e.Graphics.Clear(UITheme.ContainerSurface(this));
     }
 
     /// <summary>The entered text.</summary>
@@ -147,18 +172,28 @@ public sealed class InputArea : Panel
     {
         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
+        // The field fill: Surface (the input fill token at every elevation),
+        // or the recipe's disabled Fill — over the container surface the
+        // background pass already filled.
+        var bounds = new System.Drawing.Rectangle(0, 0, Width - 1, FieldHeight - 1);
+        using (var fieldPath = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl)))
+        using (var fieldBrush = new System.Drawing.SolidBrush(Enabled ? UITheme.Surface : UITheme.Fill))
+        {
+            e.Graphics.FillPath(fieldBrush, fieldPath);
+        }
+
         if (!Enabled)
         {
             return; // the disabled state has no border at all (recipe 4.4)
         }
 
+        // The focus swap is AccentText on dark (the accent-as-ink rule).
         Color borderColor = _borderError ? UITheme.DangerText
-            : _box.Focused ? UITheme.Accent
+            : _box.Focused ? UITheme.AccentText
             : UITheme.BorderControl;
 
-        var bounds = new System.Drawing.Rectangle(0, 0, Width - 1, FieldHeight - 1);
-        using var path = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl));
-        e.Graphics.DrawPath(new System.Drawing.Pen(borderColor), path);
+        using var borderPath = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl));
+        e.Graphics.DrawPath(new System.Drawing.Pen(borderColor), borderPath);
     }
 
     /// <summary>The editable area height: the control's height minus the reserved error slot.</summary>

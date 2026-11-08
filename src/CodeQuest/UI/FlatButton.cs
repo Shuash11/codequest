@@ -3,11 +3,15 @@
 // Recipe 4.1 of the design of record: the custom flat button.
 // Look at: OnPaint — one flat rounded fill per interaction state (the state
 //          tables live in UITheme.FlatButtonFill/FlatButtonLabel), a 1px
-//          accent outline inset 1px when keyboard-focused (§2.6 "focus is
-//          visible"), and the centered Body label. No borders, no bevels, no
-//          gradients anywhere (§4 preamble). The three variants (primary /
-//          secondary / destructive) are one class — spec section 8: one
-//          implementation per recipe, reused on every screen.
+//          focus outline inset 1px when keyboard-focused (§2.6 "focus is
+//          visible"; D4 three-case ring: TextPrimary over filled accent/
+//          danger, AccentText everywhere else), and the centered Body label.
+//          No borders, no bevels, no gradients anywhere (§4 preamble). The
+//          three variants (primary / secondary / destructive) are one class —
+//          spec section 8: one implementation per recipe, reused on every
+//          screen. The secondary variant's default is transparent: the
+//          container surface shows through (fills resolve the actual parent
+//          via UITheme.ContainerSurface — D4 audit rule #1).
 // Inheritance note: this extends WinForms' Button (not for behavior, but so
 //          the control keeps Button's keyboard activation, tab stop and
 //          UIAutomation Invoke pattern for free) while painting all of its
@@ -41,7 +45,11 @@ public sealed class FlatButton : Button
         Height = UITheme.Scaled(this, 32);
         // The themed default button face must be off, or it shows through the
         // rounded corner cutouts (the paint fills the recipe colors itself).
-        BackColor = UITheme.Surface; // matches the cards/dialogs the button sits on
+        // BackColor is only the parentless fallback: at paint time the corner
+        // cutouts read UITheme.ContainerSurface(this) — the surface the
+        // button actually sits on (cards, dialogs, module backgrounds differ;
+        // D4 audit rule #1: never assume a fixed token).
+        BackColor = UITheme.Surface;
         UseVisualStyleBackColor = false;
     }
 
@@ -114,27 +122,33 @@ public sealed class FlatButton : Button
 
         // Paint the button background ourselves — ButtonBase's own background
         // pass leaves the rounded corner cutouts unpainted (black specks).
-        using (var backgroundBrush = new System.Drawing.SolidBrush(BackColor))
+        // The cutout color is the CONTAINER's surface (D4 audit rule #1):
+        // a fixed token shows square corners on any other elevation.
+        using (var backgroundBrush = new System.Drawing.SolidBrush(UITheme.ContainerSurface(this)))
         {
             e.Graphics.FillRectangle(backgroundBrush, ClientRectangle);
         }
 
         System.Drawing.Rectangle bounds = new(0, 0, Width - 1, Height - 1);
-        using (var fillPath = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl)))
+        if (!fill.IsEmpty) // Secondary default is transparent (§4.1) — skip the fill pass
         {
-            using var fillBrush = new System.Drawing.SolidBrush(fill);
-            e.Graphics.FillPath(fillBrush, fillPath);
-
-            if (Focused)
+            using (var fillPath = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl)))
             {
-                // Recipe 4.1 focus row: default paint + 1px accent outline
-                // inset 1px (§2.6 — focus is always visible, including while
-                // the pointer happens to hover the focused button).
-                bounds.Inflate(-1, -1);
-                using var outlinePath = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl));
-                using var outlinePen = new System.Drawing.Pen(UITheme.Accent);
-                e.Graphics.DrawPath(outlinePen, outlinePath);
+                using var fillBrush = new System.Drawing.SolidBrush(fill);
+                e.Graphics.FillPath(fillBrush, fillPath);
             }
+        }
+
+        if (Focused)
+        {
+            // §2.6 focus ring (D4 three-case rule): 1px, inset 1px, never a
+            // glow — TextPrimary over the filled accent/danger variants
+            // (accent-on-accent is 2.0:1 on dark, invisible), AccentText
+            // everywhere else.
+            bounds.Inflate(-1, -1);
+            using var outlinePath = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl));
+            using var outlinePen = new System.Drawing.Pen(UITheme.FlatButtonFocusRing(_variant));
+            e.Graphics.DrawPath(outlinePen, outlinePath);
         }
 
         TextRenderer.DrawText(

@@ -89,8 +89,17 @@ public sealed class StatusBadge : Control
         SetStyle(ControlStyles.AllPaintingInWmPaint, true);
         SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
         SetStyle(ControlStyles.ResizeRedraw, true);
-        BackColor = UITheme.Surface; // the headers the badge sits on are Surface cards
+        BackColor = UITheme.Surface; // fallback — corners resolve the container (OnPaintBackground)
         TabStop = false; // a badge is non-interactive (§4.10)
+    }
+
+    /// <summary>
+    /// The corner cutouts around the 4px chip show the CONTAINER's surface,
+    /// not a fixed token (D4 audit rule #1) — the chip paints in OnPaint.
+    /// </summary>
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        e.Graphics.Clear(UITheme.ContainerSurface(this));
     }
 
     /// <summary>The quiz status this badge shows.</summary>

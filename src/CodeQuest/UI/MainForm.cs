@@ -47,10 +47,18 @@ namespace CodeQuest.UI;
 /// </summary>
 public sealed class MainForm : Form
 {
-    /// <summary>The seven nav entries of spec 5.2, in sidebar order.</summary>
+    /// <summary>
+    /// The nav entries of spec 5.2, in sidebar order — amended by §5.2a (the
+    /// D4 gamification amendment): the learner cluster leads, so Scoreboard
+    /// and Achievements sit directly after Take quiz (Lead-approved order).
+    /// Glyphs are verified Segoe MDL2 codepoints (§5.2a: E8BC ShowResults,
+    /// E735 FavoriteStarFill — MDL2 has no "Trophy").
+    /// </summary>
     private static readonly (string Key, string Title, string Glyph, string PhaseNote)[] Modules =
     {
         ("TakeQuiz", "Take quiz", "\uE80F", ""),
+        ("Scoreboard", "Scoreboard", "\uE8BC", ""),
+        ("Achievements", "Achievements", "\uE735", ""),
         ("History", "History", "\uE823", ""),
         ("Reports", "Reports", "\uE9D9", ""),
         ("GenerateQuiz", "Generate quiz", "\uE710", ""),
@@ -68,6 +76,9 @@ public sealed class MainForm : Form
     private readonly System.Windows.Forms.Timer _statusClearTimer = new() { Interval = StatusAutoClearMilliseconds };
     private readonly Dictionary<string, NavItemButton> _navItems = new();
     private NavItemButton _logoutButton = null!; // not a nav item, but it locks with them (the I4 busy state)
+    private LevelChip _sidebarLevelChip = null!;   // assigned during construction (BuildSidebar, §4.14)
+    private ProgressTrack _sidebarXpBar = null!;   // assigned during construction (BuildSidebar, §4.14)
+    private readonly IGamificationRepository _gamification; // the sidebar level block's data source (§4.14)
     private readonly Dictionary<string, Control> _modulePanels = new();
     private string _activeModule = string.Empty; // the module key currently on screen (§5.2)
 
@@ -88,6 +99,15 @@ public sealed class MainForm : Form
         var choices = new ChoiceRepository(database);
         var attempts = new AttemptRepository(database);
         var answers = new SubmittedAnswerRepository(database);
+
+        // The gamification aggregates (WP1): the Scoreboard and Achievements
+        // modules read the derived XP/levels and the unlock records through
+        // the IGamificationRepository contract only; the achievement catalog
+        // comes from the evaluator (plan section 5). The default level
+        // service lives inside the repository.
+        var gamification = new GamificationRepository(database);
+        IAchievementEvaluator achievementEvaluator = new AchievementEvaluator();
+        _gamification = gamification;
 
         Text = "CodeQuest";
         StartPosition = FormStartPosition.CenterScreen;
@@ -118,7 +138,7 @@ public sealed class MainForm : Form
         IReportService reports = new ReportService(attempts, quizzes, topics);
         var generation = new QuizGenerationService(_config);
 
-        Controls.Add(BuildContentArea(topics, quizzes, questions, choices, attempts, answers, scoring, reports, generation));
+        Controls.Add(BuildContentArea(topics, quizzes, questions, choices, attempts, answers, scoring, reports, generation, gamification, achievementEvaluator));
         Controls.Add(BuildSidebar());
     }
 
@@ -226,6 +246,22 @@ public sealed class MainForm : Form
         };
         sidebar.Controls.Add(avatar);
 
+        // §4.14 (D4 gamification amendment): row 1 of the account block is
+        // the signed-in name (leading) and the LEVEL CHIP (trailing) — the
+        // one shared LevelChip implementation; 8px below sits the thin 4px
+        // progress bar (the §4.13 pill's thin variant: Fill track, Accent
+        // fill — its corner cutouts resolve the sidebar Background); 16px
+        // below that, "Log out". Values repaint on every module switch
+        // (UpdateSidebarLevel) — an instant paint swap, no animation.
+        _sidebarLevelChip = new LevelChip
+        {
+            Name = "SidebarLevelChip",
+        };
+        _sidebarLevelChip.Location = new Point(
+            inset + navWidth - _sidebarLevelChip.Width,
+            accountTop + ((avatarSize - _sidebarLevelChip.Height) / 2));
+        sidebar.Controls.Add(_sidebarLevelChip);
+
         var signedInName = new Label
         {
             Name = "SignedInName",
@@ -238,16 +274,27 @@ public sealed class MainForm : Form
             Location = new Point(
                 inset + avatarSize + UITheme.Scaled(this, UITheme.Spacing8),
                 accountTop + ((avatarSize - UITheme.Scaled(this, 18)) / 2)),
-            Size = new Size(navWidth - avatarSize - UITheme.Scaled(this, UITheme.Spacing8), UITheme.Scaled(this, 18)),
+            Size = new Size(
+                navWidth - avatarSize - UITheme.Scaled(this, UITheme.Spacing8) - _sidebarLevelChip.Width - UITheme.Scaled(this, UITheme.Spacing8),
+                UITheme.Scaled(this, 18)),
         };
         sidebar.Controls.Add(signedInName);
+
+        _sidebarXpBar = new ProgressTrack
+        {
+            Name = "SidebarXpBar",
+            AccessibleName = "Level progress",
+        };
+        _sidebarXpBar.Location = new Point(inset, accountTop + avatarSize + UITheme.Scaled(this, UITheme.Spacing8));
+        _sidebarXpBar.Size = new Size(navWidth, UITheme.Scaled(this, 4)); // the §4.14 thin variant
+        sidebar.Controls.Add(_sidebarXpBar);
 
         _logoutButton = new NavItemButton
         {
             Name = "NavLogout",
             Text = "Log out",
             SecondaryAction = true,
-            Location = new Point(inset, accountTop + avatarSize + UITheme.Scaled(this, UITheme.Spacing8)),
+            Location = new Point(inset, accountTop + avatarSize + UITheme.Scaled(this, UITheme.Spacing8 + 4 + UITheme.Spacing16)),
             Size = new Size(navWidth, rowHeight),
         };
         _logoutButton.Click += static (sender, e) =>
@@ -282,7 +329,9 @@ public sealed class MainForm : Form
         SubmittedAnswerRepository answers,
         IScoringService scoring,
         IReportService reports,
-        QuizGenerationService generation)
+        QuizGenerationService generation,
+        IGamificationRepository gamification,
+        IAchievementEvaluator achievementEvaluator)
     {
         int inset = UITheme.Scaled(this, UITheme.Spacing24);
         int headerTop = inset;
@@ -340,11 +389,16 @@ public sealed class MainForm : Form
                 // Every nav entry is a real module screen now (spec 5.3-5.12);
                 // the switch keeps the placeholder fallback for safety.
                 "TakeQuiz" => BuildModulePanel(
-                    new QuizTakeForm(quizzes, questions, topics, attempts, answers, scoring, _user), key),
+                    new QuizTakeForm(quizzes, questions, topics, attempts, answers, scoring, _user, gamification, achievementEvaluator), key),
                 "History" => BuildModulePanel(new HistoryForm(_user, attempts, quizzes, topics, answers), key),
                 "Reports" => BuildModulePanel(new ReportsForm(_user, reports), key),
                 "GenerateQuiz" => BuildModulePanel(new GenerateQuizForm(quizzes, topics, generation, _user), key),
-                "Topics" => BuildModulePanel(new TopicManageForm(topics, quizzes), key),
+                "Topics" => BuildModulePanel(new TopicManageForm(topics, quizzes, new TopicGenerationService(_config)), key),
+
+                // The gamification modules (§5.13/§5.14): read-only screens
+                // over the derived aggregates and the recorded unlocks.
+                "Scoreboard" => BuildModulePanel(new ScoreboardForm(_user, gamification), key),
+                "Achievements" => BuildModulePanel(new AchievementsForm(_user, gamification, achievementEvaluator), key),
                 _ => BuildPlaceholderPanel(key, moduleTitle, phaseNote),
             };
 
@@ -476,8 +530,26 @@ public sealed class MainForm : Form
             }
         }
 
+        // §4.14: the sidebar level block repaints with the module switch, so
+        // its numbers are always current (the attempt path re-calls this too).
+        UpdateSidebarLevel();
+
         _contentHeader.Text = Modules.First(module => module.Key == key).Title;
         _activeModule = key;
+    }
+
+    /// <summary>
+    /// Repaints the §4.14 sidebar level block from the DERIVED progress
+    /// (no XP is stored — the repository aggregates the attempts). Internal:
+    /// the quiz result reveal re-calls it right after an attempt is saved,
+    /// the module switches re-call it here. No animation — an instant paint
+    /// swap (§4.14 states).
+    /// </summary>
+    internal void UpdateSidebarLevel()
+    {
+        UserProgress progress = _gamification.GetUserProgress(_user.UserId);
+        _sidebarLevelChip.SetLevel(progress.Level);
+        _sidebarXpBar.Value = progress.ProgressFraction;
     }
 
     /// <summary>

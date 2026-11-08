@@ -48,6 +48,11 @@ internal static class Program
             return;
         }
 
+        // Gamification (plan WP1/A7): the achievements table is added to
+        // existing databases by an idempotent startup migration — it never
+        // touches the existing rows, so it is safe on every launch.
+        DatabaseMigrator.EnsureSchema(db);
+
         var users = new UserRepository(db);
 
         // Login → shell → (logout →) login, until the user leaves the login.

@@ -38,12 +38,24 @@ public sealed class MarkedCheckBox : Control
         SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
         SetStyle(ControlStyles.ResizeRedraw, true);
 
-        BackColor = UITheme.Surface; // the form card the box sits on
+        // The form card the box sits on — resolved at paint time (see
+        // OnPaintBackground; D4 audit rule #1: never assume a fixed token).
+        BackColor = UITheme.Surface;
         TabStop = true;
         Size = new System.Drawing.Size(UITheme.Scaled(this, 16), UITheme.Scaled(this, 16));
         // A 16px box is smaller than the §2.6 target size, so the accessible
         // role/name must say what the mark means (screen readers, UX F1 rule).
         AccessibleRole = System.Windows.Forms.AccessibleRole.CheckButton;
+    }
+
+    /// <summary>
+    /// The corner cutouts around the 4px-rounded box show the CONTAINER's
+    /// surface, not a fixed token (D4 audit rule #1) — the box path paints
+    /// in OnPaint.
+    /// </summary>
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        e.Graphics.Clear(UITheme.ContainerSurface(this));
     }
 
     /// <summary>
@@ -157,9 +169,12 @@ public sealed class MarkedCheckBox : Control
 
         if (Focused && Enabled)
         {
+            // §2.6 D4 ring, case-mapped: over the filled accent box (checked)
+            // the ring is TextPrimary — accent-on-accent is 2.0:1 on dark;
+            // over the unchecked Surface box it is AccentText.
             var outline = new System.Drawing.Rectangle(box.X - 1, box.Y - 1, box.Width + 2, box.Height + 2);
             using var outlinePath = UITheme.RoundedPath(outline, radius);
-            using var outlinePen = new System.Drawing.Pen(UITheme.Accent);
+            using var outlinePen = new System.Drawing.Pen(_checked ? UITheme.TextPrimary : UITheme.AccentText);
             e.Graphics.DrawPath(outlinePen, outlinePath);
         }
     }

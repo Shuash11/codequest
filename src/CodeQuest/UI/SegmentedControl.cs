@@ -46,10 +46,20 @@ public sealed class SegmentedControl : Control
         SetStyle(ControlStyles.ResizeRedraw, true);
         SetStyle(ControlStyles.SupportsTransparentBackColor, false);
 
-        BackColor = UITheme.Surface; // the cards the control sits on
+        BackColor = UITheme.Surface; // fallback — corners resolve the container (OnPaintBackground)
         Font = UITheme.Body;
         Height = UITheme.Scaled(this, 32);
         TabStop = true; // the group is one Tab stop (recipe 4.9)
+    }
+
+    /// <summary>
+    /// The corner cutouts around the 8px-radius container show the
+    /// CONTAINER's surface, not a fixed token (D4 audit rule #1) — the Fill
+    /// container paints in OnPaint.
+    /// </summary>
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        e.Graphics.Clear(UITheme.ContainerSurface(this));
     }
 
     /// <summary>The fixed option labels of the group, in order.</summary>
@@ -236,7 +246,10 @@ public sealed class SegmentedControl : Control
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
 
             // Focus (keyboard): the selected segment carries the standard 1px
-            // accent outline inset 1px, over its selected paint (recipe 4.9).
+            // ring inset 1px over its selected paint (recipe 4.9) — the D4
+            // ring ink is AccentText (case 1: over the Surface segment on
+            // the Fill container; plain Accent is 3.59:1 as a boundary ink
+            // and the §2.6 ring vocabulary is one color for this case).
             if (selected && Focused && Enabled)
             {
                 var outlineBounds = new Rectangle(
@@ -246,7 +259,7 @@ public sealed class SegmentedControl : Control
                     Height - 2);
 
                 using var outlinePath = UITheme.RoundedPath(outlineBounds, UITheme.Scaled(this, UITheme.RadiusControl));
-                using var outlinePen = new Pen(UITheme.Accent);
+                using var outlinePen = new Pen(UITheme.AccentText); // §2.6 D4 ring ink
                 e.Graphics.DrawPath(outlinePen, outlinePath);
             }
         }

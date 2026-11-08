@@ -23,7 +23,11 @@
 //          convention documented here is the contract that phase builds on.
 // Note:    this class never creates tables and never seeds data — the database
 //          file is built by running database/schema.sql and database/seed.sql
-//          against it (see the header of database/schema.sql).
+//          against it (see the header of database/schema.sql). The one
+//          sanctioned exception is Data/DatabaseMigrator.EnsureSchema(), whose
+//          idempotent CREATE TABLE IF NOT EXISTS migration adds the
+//          user_achievements table to existing databases at startup without
+//          touching any existing row.
 // =============================================================================
 
 using System.Text.Json;

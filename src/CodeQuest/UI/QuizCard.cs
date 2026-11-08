@@ -46,12 +46,13 @@ public sealed class QuizCard : Panel
         Margin = new Padding(0, 0, UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16));
         BackColor = UITheme.Surface;
 
-        // The hairline border of the elegant card (painted, not a band).
+        // The hairline border of the elegant card (painted, not a band) — the
+        // D4 BorderHairline, the passive-container edge token (§2 card rule).
         Paint += static (sender, e) =>
         {
             if (sender is Panel panel)
             {
-                using var pen = new Pen(UITheme.SeparatorHairline);
+                using var pen = new Pen(UITheme.BorderHairline);
                 using GraphicsPath path = UITheme.RoundedPath(
                     new Rectangle(0, 0, panel.Width - 1, panel.Height - 1), UITheme.Scaled(panel, 14));
                 e.Graphics.DrawPath(pen, path);

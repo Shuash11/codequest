@@ -2,20 +2,26 @@
 // CodeQuest — Phase P7: UI Shell & Navigation
 // Recipe 4.2 of the design of record: the rounded panel / card.
 // Look at: UpdateRegion — the card is a Surface panel whose Region is the
-//          12px rounded path of the spec (§2.4 large-container radius), so
-//          the Background shows through the corners. No border and no shadow
-//          by default — the white-on-Background contrast does the separation
-//          (§4.2; §3.6: borders instead of shadows). Groups of controls
-//          inside one card get 8px internal gaps and a 16px inset from the
-//          card edge (the forms place their children with those values).
+//          12px rounded path of the spec (§2.4 large-container radius), and
+//          OnPaint — the 1px BorderHairline edge on all four sides (D4 §2:
+//          on dark the hairline replaces the light theme's contrast-only
+//          separation — Surface vs Background reads flatter, so the border
+//          does real work). No shadow, ever (§4.2; §3.6: borders instead of
+//          shadows; a card never carries both a border and a shadow — the
+//          dialog is the single owner-mandated shadow exception).
+//          Groups of controls inside one card get 8px internal gaps and a
+//          16px inset from the card edge (the forms place their children
+//          with those values).
 // =============================================================================
 
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
 /// <summary>
-/// The card of recipe 4.2: Surface fill, 12px radius, no border, no shadow.
+/// The card of recipe 4.2: Surface fill, 12px radius, 1px BorderHairline
+/// edge, no shadow.
 /// </summary>
 public sealed class CardPanel : Panel
 {
@@ -25,6 +31,18 @@ public sealed class CardPanel : Panel
         SetStyle(ControlStyles.ResizeRedraw, true);
         SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
         BackColor = UITheme.Surface;
+    }
+
+    /// <summary>The D4 hairline edge: 1px BorderHairline on all four sides.</summary>
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+
+        using var borderPath = UITheme.RoundedPath(
+            new Rectangle(0, 0, Width - 1, Height - 1),
+            UITheme.Scaled(this, UITheme.RadiusCard));
+        using var borderPen = new Pen(UITheme.BorderHairline);
+        e.Graphics.DrawPath(borderPen, borderPath);
     }
 
     protected override void OnResize(EventArgs eventargs)

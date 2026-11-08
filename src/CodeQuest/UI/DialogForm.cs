@@ -3,9 +3,13 @@
 // Recipe 4.11 of the design of record: the custom modal dialog.
 // System.Windows.Forms.MessageBox is NOT used anywhere — it cannot be styled
 // (spec 4.11 bans it; all confirmations and blockers run through this form).
-// Look at: the layout — a Surface card (12px radius, hairline border like the
-//          quiz card) centered over the owner window, no drop shadow, no
-//          dimmed backdrop (flat modal); min width 400px. The alert anatomy:
+// Look at: the layout — a SurfaceRaised card (12px radius, 1px BorderHairline
+//          border) centered over the owner window, no dimmed backdrop (flat
+//          modal); min width 400px. D4 §2: the dialog is the app's ONLY
+//          floating level — SurfaceRaised is elevation level 3 — and the one
+//          element with both a hairline and a shadow: the native CS_DROPSHADOW
+//          (CreateParams class style 0x20000), platform-drawn, owner-mandated;
+//          no GDI+ shadow painting. The alert anatomy:
 //          a centered soft-tinted mark circle (DangerTint for the unexpected
 //          error and the destructive confirms, WarningTint for the startup
 //          blocker — the glyph + tint are the situation, never color alone),
@@ -55,8 +59,23 @@ public sealed class DialogForm : Form
         Text = title;
         StartPosition = FormStartPosition.CenterParent;
         ShowInTaskbar = false;
-        BackColor = UITheme.Surface;
+        BackColor = UITheme.SurfaceRaised; // the one floating elevation level (D4 §2)
         KeyPreview = true;
+    }
+
+    /// <summary>
+    /// The dialog's native drop shadow (D4 §2, owner-mandated): the
+    /// CS_DROPSHADOW class style (0x20000), drawn by the platform — the only
+    /// shadow in the app, and the only chrome this form adds.
+    /// </summary>
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams parameters = base.CreateParams;
+            parameters.ClassStyle |= 0x20000; // CS_DROPSHADOW
+            return parameters;
+        }
     }
 
     protected override void OnLoad(EventArgs e)
@@ -201,7 +220,7 @@ public sealed class DialogForm : Form
             Text = title,
             Font = UITheme.Title,
             ForeColor = UITheme.TextPrimary,
-            BackColor = UITheme.Surface,
+            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
             AutoSize = false,
             TextAlign = ContentAlignment.MiddleCenter,
             Location = new Point(inset, titleTop),
@@ -213,24 +232,24 @@ public sealed class DialogForm : Form
             Text = message,
             Font = UITheme.Body,
             ForeColor = UITheme.TextPrimary,
-            BackColor = UITheme.Surface,
+            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
             AutoSize = false,
             TextAlign = ContentAlignment.MiddleCenter,
             Location = new Point(inset, bodyTop),
             Size = new Size(width - inset * 2, messageSize.Height),
         };
 
-        // The card's chrome: the hairline border (the quiz-card treatment)
-        // and the centered mark — a soft-tinted circle with the status glyph,
-        // so the dialog's situation reads at a glance (mark + words, never
-        // color alone).
+        // The card's chrome: the D4 hairline border (the card treatment —
+        // BorderHairline per §2, not a separator) and the centered mark — a
+        // soft-tinted circle with the status glyph, so the dialog's situation
+        // reads at a glance (mark + words, never color alone).
         DialogMark activeMark = mark ?? UnexpectedErrorMark;
         int markX = (width - markSize) / 2;
         dialog.Paint += (sender, e) =>
         {
             if (sender is Form form)
             {
-                using var borderPen = new Pen(UITheme.SeparatorHairline);
+                using var borderPen = new Pen(UITheme.BorderHairline); // D4: the dialog edge is a hairline, not a separator
                 using GraphicsPath borderPath = UITheme.RoundedPath(
                     new Rectangle(0, 0, form.Width - 1, form.Height - 1), UITheme.RadiusCard);
                 e.Graphics.DrawPath(borderPen, borderPath);

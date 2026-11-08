@@ -2,17 +2,22 @@
 // CodeQuest — Phase P7: UI Shell & Navigation
 // Recipe 4.4 of the design of record: the text input.
 // Look at: OnPaint — a Surface field with the 8px radius and a 1px border
-//          that swaps BorderControl → Accent on keyboard focus (no glow) and
-//          → DangerText in the error state. The borderless TextBox inside
-//          carries the native PlaceholderText and the Body font. The inline
-//          error line (DangerText Caption, 8px below the field — "the error
-//          line persists until the value validates; it never appears as a
-//          dialog") is owned here: forms call ShowError/ShowNote/ClearError.
-//          The recipe's disabled state (Fill background, TextTertiary text,
-//          no border) is painted too. With ReserveErrorLine the line's slot
-//          is always reserved (login card, spec 5.1: "inline error line
-//          slots"), so the layout never jumps; without it the line only
-//          exists while an error shows.
+//          that swaps BorderControl → AccentText on keyboard focus (no glow;
+//          the D4 accent-as-ink rule) and → DangerText in the error state.
+//          The area OUTSIDE the rounded field (corner cutouts and the error-
+//          line slot) shows the CONTAINER's surface — resolved via
+//          UITheme.ContainerSurface at paint time (D4 audit rule #1: the same
+//          field sits on cards, dialogs and module backgrounds), and the
+//          error line's BackColor follows it (audit rule #9). The borderless
+//          TextBox inside carries the native PlaceholderText and the Body
+//          font. The inline error line (DangerText Caption, 8px below the
+//          field — "the error line persists until the value validates; it
+//          never appears as a dialog") is owned here: forms call
+//          ShowError/ShowNote/ClearError. The recipe's disabled state (Fill
+//          background, TextTertiary text, no border) is painted too. With
+//          ReserveErrorLine the line's slot is always reserved (login card,
+//          spec 5.1: "inline error line slots"), so the layout never jumps;
+//          without it the line only exists while an error shows.
 // =============================================================================
 
 using System.Windows.Forms;
@@ -44,7 +49,7 @@ public sealed class InputField : Panel
         SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
         SetStyle(ControlStyles.ResizeRedraw, true);
 
-        BackColor = UITheme.Surface;
+        BackColor = UITheme.Surface; // the field fill token (see OnPaint/OnPaintBackground)
         ReserveErrorLine = reserveErrorLine;
         _fallbackAccessibleName = accessibleName;
 
@@ -61,10 +66,32 @@ public sealed class InputField : Panel
 
         _errorLine.AutoSize = true;
         _errorLine.Font = UITheme.Caption;
-        _errorLine.BackColor = UITheme.Surface;
+        _errorLine.BackColor = UITheme.Surface; // corrected to the container surface on attach (OnParentChanged)
         Controls.Add(_errorLine);
 
         LayoutField();
+    }
+
+    /// <summary>
+    /// The field was placed on its container: the error line sits directly on
+    /// that surface (below the rounded field), so its BackColor must equal
+    /// the container's — never a fixed token (D4 audit rules #1/#9).
+    /// </summary>
+    protected override void OnParentChanged(EventArgs e)
+    {
+        base.OnParentChanged(e);
+        _errorLine.BackColor = UITheme.ContainerSurface(this);
+        Invalidate();
+    }
+
+    /// <summary>
+    /// Everything OUTSIDE the rounded field — the corner cutouts and the
+    /// error-line slot — shows the container's surface (D4 audit rule #1).
+    /// The field fill itself paints in OnPaint.
+    /// </summary>
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        e.Graphics.Clear(UITheme.ContainerSurface(this));
     }
 
     /// <summary>
@@ -183,20 +210,30 @@ public sealed class InputField : Panel
     {
         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
+        // The field fill: Surface (the input fill token at every elevation),
+        // or the recipe's disabled Fill. The background pass already filled
+        // the container surface around the rounded field.
+        System.Drawing.Rectangle bounds = new(0, 0, Width - 1, FieldHeight - 1);
+        using (var fieldPath = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl)))
+        using (var fieldBrush = new System.Drawing.SolidBrush(Enabled ? UITheme.Surface : UITheme.Fill))
+        {
+            e.Graphics.FillPath(fieldBrush, fieldPath);
+        }
+
         // Recipe 4.4 disabled state has no border at all; otherwise the 1px
-        // border carries the default/focus/error colors of the state table.
+        // border carries the default/focus/error colors of the state table
+        // (the focus swap is AccentText on dark — the accent-as-ink rule).
         if (!Enabled)
         {
             return;
         }
 
         Color borderColor = _borderError ? UITheme.DangerText
-            : _box.Focused ? UITheme.Accent
+            : _box.Focused ? UITheme.AccentText
             : UITheme.BorderControl;
 
-        System.Drawing.Rectangle bounds = new(0, 0, Width - 1, FieldHeight - 1);
-        using var path = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl));
-        e.Graphics.DrawPath(new System.Drawing.Pen(borderColor), path);
+        using var borderPath = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl));
+        e.Graphics.DrawPath(new System.Drawing.Pen(borderColor), borderPath);
     }
 
     /// <summary>The box part of the field: 32px at standard DPI (recipe 4.4).</summary>

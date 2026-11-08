@@ -10,11 +10,12 @@
 //          (RowPostPaint), left-inset 16px to align with the row text (§2.5);
 //          FullRowSelect with SelectionBackColor AccentTint — never the
 //          default blue selection chrome; empty grid renders no message of
-//          its own. Column headers carry the fun accent (the 2026-11-08
-//          fun-accent amendment: "the table headers render in the accent") —
-//          Accent Caption labels on a Surface fill, so the quiet header sits
-//          inside the white card with AA contrast (4.86:1). Action columns paint as quiet text buttons (recipe 4.1's
-//          row-level text actions: Accent label, destructive text actions in
+//          its own. Column headers carry the fun accent as INK — the D4 rule
+//          (§2.1/§5.2a): AccentText Caption labels on the Surface header
+//          fill (7.18:1 on the dark Surface, AA; plain Accent would measure
+//          3.59 — below the floor), with DataGridView.BackgroundColor pinned
+//          to Surface so no light system band shows around the grid. Action columns paint as quiet text buttons (recipe 4.1's
+//          row-level text actions: AccentText label, destructive text actions in
 //          DangerText, disabled in TextTertiary) with the Fill hover of the
 //          secondary variant; badge columns draw the §4.10 chip.
 //          Keyboard-operability of row actions (F1, §4.6): the focused cell
@@ -129,8 +130,9 @@ public sealed class IosListGrid : DataGridView
         AutoGenerateColumns = false;
         RowTemplate.Height = UITheme.Scaled(this, 36);
 
-        // Recipe 4.6 quiet column headers — with the fun-accent amendment's
-        // accent labels on the card's own Surface fill (4.86:1 on white, AA).
+        // Recipe 4.6 quiet column headers — with the D4 accent-ink amendment:
+        // AccentText labels on the card's own Surface fill (7.18:1, AA —
+        // plain Accent is 3.59 on the dark Surface, below the floor).
         EnableHeadersVisualStyles = false;
         ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
         ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
@@ -138,7 +140,7 @@ public sealed class IosListGrid : DataGridView
         ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
         {
             BackColor = UITheme.Surface,
-            ForeColor = UITheme.Accent, // the fun accent on the table headers (4.8:1 — AA)
+            ForeColor = UITheme.AccentText, // the accent as ink on dark (§2.1 D4 rule; audit #3)
             Font = UITheme.Caption,
             Alignment = DataGridViewContentAlignment.MiddleLeft,
             WrapMode = DataGridViewTriState.False,
@@ -520,7 +522,7 @@ public sealed class IosListGrid : DataGridView
                 headerText,
                 UITheme.Caption,
                 e.CellBounds,
-                UITheme.Accent,
+                UITheme.AccentText, // the accent as ink on dark (§2.1 D4 rule; audit #3)
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
         }
     }
@@ -550,7 +552,7 @@ public sealed class IosListGrid : DataGridView
 
         Color label = !enabled ? UITheme.TextTertiary
             : kind == GridActionKind.Destructive ? UITheme.DangerText
-            : UITheme.Accent;
+            : UITheme.AccentText; // the accent as ink on dark (§2.1 D4 rule)
 
         Font font = kind == GridActionKind.Glyph ? UITheme.NavGlyph : UITheme.Body;
 
@@ -563,13 +565,15 @@ public sealed class IosListGrid : DataGridView
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
 
         // Recipe 4.6's focus indicator (F1): the focused action cell paints
-        // §4.1's ring — a 1px Accent outline inset 1px — over its normal
-        // paint, while its row keeps the AccentTint selection fill. No glow,
-        // no halo — the same ring vocabulary as buttons and segments.
+        // the §2.6 ring — a 1px outline inset 1px — over its normal paint,
+        // while its row keeps the AccentTint selection fill. The D4 ring ink
+        // over the tint is AccentText (case 3: plain Accent measures 2.91:1
+        // on the tint, documented fail). No glow, no halo — the same ring
+        // vocabulary as buttons and segments.
         if (Focused && CurrentCellAddress.X == e.ColumnIndex && CurrentCellAddress.Y == e.RowIndex)
         {
             var ring = new Rectangle(e.CellBounds.X + 1, e.CellBounds.Y + 1, e.CellBounds.Width - 3, e.CellBounds.Height - 3);
-            using var ringPen = new Pen(UITheme.Accent);
+            using var ringPen = new Pen(UITheme.AccentText);
             graphics.DrawRectangle(ringPen, ring);
         }
     }

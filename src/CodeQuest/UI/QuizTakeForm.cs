@@ -13,10 +13,12 @@
 // own question count, and the double-submit guard stays.
 // =============================================================================
 
+using CodeQuest.Data;
 using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
 using CodeQuest.Services;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
@@ -45,6 +47,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private readonly SubmittedAnswerRepository _answers;
     private readonly IScoringService _scoring;
     private readonly UserAccount _user;
+    private readonly IGamificationRepository _gamification; // the §5.7a reveal's derived progress + unlock records
+    private readonly IAchievementEvaluator _achievements;   // the achievement catalog + rules (plan FR4)
 
     // The run/result controls are assigned in builder methods — readonly
     // fields cannot be assigned from a method, so these are plain fields
@@ -67,10 +71,22 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private Label _resultContext = null!;
     private Panel _resultListCard = null!;
     private Panel _resultActions = null!;
+    private Panel _heroCard = null!; // the §5.7 hero card — its height follows the §5.7a reveal
     private FlatButton _viewAnswersButton = null!;
     private FlatButton _retakeButton = null!;
     private FlatButton _doneButton = null!;
     private AttemptReviewForm? _reviewPanel; // the §5.9 drill-in state, created on first open
+
+    // The §5.7a reveal (WP5): the XP line, the level row and the achievement
+    // chips, inside the hero card below the context line. Built once in
+    // BuildResultView; each attempt fills and sizes them.
+    private Panel _resultReveal = null!;
+    private Label _resultXpLine = null!;
+    private LevelChip _resultLevelChip = null!;
+    private ProgressTrack _resultLevelBar = null!;
+    private Label _resultLevelCaption = null!;
+    private Label _resultAchievementsCaption = null!;
+    private FlowLayoutPanel _resultAchievementsFlow = null!;
 
     private Dictionary<int, string> _topicNames = new();
 
@@ -88,6 +104,9 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private Quiz? _resultQuiz;
     private int _resultCorrect;
     private bool _awaitingSavedAnnouncement;
+    private long _resultXpEarned;                            // §5.7a: the attempt's derived XP
+    private UserProgress? _resultProgress;                    // §5.7a: the post-submit level state (null = recording failed)
+    private IReadOnlyList<AchievementDefinition> _resultNewlyUnlocked = Array.Empty<AchievementDefinition>(); // §5.7a
 
     /// <summary>Creates the quiz-taking module over the data layer.</summary>
     public QuizTakeForm(
@@ -97,7 +116,9 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         AttemptRepository attempts,
         SubmittedAnswerRepository answers,
         IScoringService scoring,
-        UserAccount user)
+        UserAccount user,
+        IGamificationRepository gamification,
+        IAchievementEvaluator achievements)
     {
         ArgumentNullException.ThrowIfNull(quizzes);
         ArgumentNullException.ThrowIfNull(questions);
@@ -106,6 +127,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         ArgumentNullException.ThrowIfNull(answers);
         ArgumentNullException.ThrowIfNull(scoring);
         ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(gamification);
+        ArgumentNullException.ThrowIfNull(achievements);
         _quizzes = quizzes;
         _questions = questions;
         _topics = topics;
@@ -113,6 +136,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _answers = answers;
         _scoring = scoring;
         _user = user;
+        _gamification = gamification;
+        _achievements = achievements;
 
         Dock = DockStyle.Fill;
         BackColor = UITheme.Background;
@@ -564,10 +589,16 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     /// </summary>
     private void HandleTileClick(AnswerTile tile)
     {
-        if (_runQuiz is null || _submitting || _revealed[_runIndex] || tile.Tag is not int choiceId)
+        if (_runQuiz is null || _submitting || _revealed[_runIndex])
         {
             return;
         }
+
+        // The tile's choice id travels on the tile itself (RenderQuestion
+        // sets AnswerTile.ChoiceId). The old guard read tile.Tag, which was
+        // never assigned — a pre-existing defect that made every mouse click
+        // no-op (found in the WP3 audit, confirmed against HEAD; plan §7 log).
+        int choiceId = tile.ChoiceId;
 
         _selections[_runIndex] = choiceId;
         _revealed[_runIndex] = true;
@@ -669,6 +700,14 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             };
             _attempts.AddWithAnswers(attempt, answers);
 
+            // The §5.7a reveal data (WP5): XP is DERIVED from the saved attempt
+            // (score × difficulty weight — plan A3, pure math, no extra read);
+            // the achievements are evaluated against the post-submit aggregates
+            // and RECORDED in user_achievements — only rows that were actually
+            // new come back, so a re-earned achievement never re-celebrates.
+            _resultXpEarned = (long)score.CorrectCount * DifficultyXpWeights.For(quiz.Difficulty);
+            (_resultProgress, _resultNewlyUnlocked) = RecordProgress();
+
             _resultAttemptId = attempt.AttemptId;
             _resultQuiz = quiz;
             _resultCorrect = score.CorrectCount;
@@ -697,6 +736,47 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _nextButton.Enabled = true;
     }
 
+    /// <summary>
+    /// Evaluates and records what the just-saved attempt earned (plan A2/A5):
+    /// the derived post-submit progress, then the achievements that fired —
+    /// recorded through <c>AddAchievementsIfNew</c>, so the unlock date is the
+    /// FIRST earn and a repeat never duplicates. A storage failure here must
+    /// not fail the saved attempt (it is already committed): the reveal hides
+    /// gracefully and the strip explains the block (§4.11 semantics).
+    /// </summary>
+    private (UserProgress? Progress, IReadOnlyList<AchievementDefinition> NewlyUnlocked) RecordProgress()
+    {
+        try
+        {
+            UserProgress progress = _gamification.GetUserProgress(_user.UserId);
+            UserGamificationStats stats = _gamification.GetUserStats(_user.UserId);
+            IReadOnlyList<AchievementDefinition> earned = _achievements.Evaluate(
+                new AchievementContext(progress.Level, stats));
+
+            if (earned.Count == 0)
+            {
+                return (progress, Array.Empty<AchievementDefinition>());
+            }
+
+            IReadOnlyList<UnlockedAchievement> recorded = _gamification.AddAchievementsIfNew(
+                _user.UserId,
+                earned.Select(definition => definition.Key));
+
+            if (recorded.Count == 0)
+            {
+                return (progress, Array.Empty<AchievementDefinition>()); // all already on record
+            }
+
+            HashSet<string> recordedKeys = recorded.Select(unlocked => unlocked.Key).ToHashSet();
+            return (progress, earned.Where(definition => recordedKeys.Contains(definition.Key)).ToArray());
+        }
+        catch (Exception)
+        {
+            ReportStatus("The score was saved, but progress could not be recorded.", success: false);
+            return (null, Array.Empty<AchievementDefinition>());
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Result — the fun summary (§5.7)
     // -------------------------------------------------------------------------
@@ -720,11 +800,12 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             Location = new Point(0, 0),
             Size = new Size(cardWidth, UITheme.Scaled(this, 150)),
         };
+        _heroCard = hero;
         _resultScore = new Label
         {
             Name = "ResultScoreLabel",
             Font = UITheme.Display,
-            ForeColor = UITheme.FunPrimary,
+            ForeColor = UITheme.AccentText, // the accent as ink on dark (§2.1 D4 rule; Accent is a fill only)
             BackColor = UITheme.Surface,
             AutoSize = true,
             Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing12)),
@@ -763,6 +844,85 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         hero.Controls.Add(_resultPercent);
         hero.Controls.Add(_resultMessage);
         hero.Controls.Add(_resultContext);
+
+        // The §5.7a reveal (WP5): the XP line, the level row and — only when
+        // the submit unlocked something — the achievement chips, inside the
+        // hero card below the context line. Built once; ShowResult fills and
+        // sizes them, and grows the hero card to fit (no fade — the Lead's
+        // stillness ruling; the reveal is an instant paint change).
+        _resultReveal = new Panel
+        {
+            Name = "ResultReveal",
+            BackColor = UITheme.Surface,
+            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, 104)),
+            Size = new Size(Math.Max(cardWidth - UITheme.Scaled(this, UITheme.Spacing32), 1), 0),
+        };
+
+        _resultXpLine = new Label
+        {
+            Name = "ResultXpLine",
+            Font = UITheme.BodySemibold,
+            ForeColor = UITheme.AccentText, // accent as ink on dark (§2.1 D4; 7.18 on Surface)
+            BackColor = UITheme.Surface,
+            AutoSize = true,
+            Location = new Point(0, 0),
+        };
+
+        _resultLevelChip = new LevelChip
+        {
+            Name = "ResultLevelChip",
+            Location = new Point(0, UITheme.Scaled(this, UITheme.Spacing8 + 18)),
+        };
+
+        _resultLevelBar = new ProgressTrack
+        {
+            Name = "ResultLevelBar",
+            AccessibleName = "Level progress",
+        };
+
+        _resultLevelCaption = new Label
+        {
+            Name = "ResultLevelCaption",
+            Font = UITheme.Caption,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.Surface,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleRight,
+            Size = new Size(UITheme.Scaled(this, 120), UITheme.Scaled(this, 16)),
+        };
+
+        _resultAchievementsCaption = new Label
+        {
+            Name = "ResultAchievementsCaption",
+            Text = "Achievements unlocked",
+            Font = UITheme.Caption,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.Surface,
+            AutoSize = true,
+            Visible = false, // omission, not a "none" message (§5.7a restraint)
+        };
+
+        _resultAchievementsFlow = new FlowLayoutPanel
+        {
+            Name = "ResultAchievementsFlow",
+            BackColor = UITheme.Surface,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = true,
+            AutoSize = true,
+            Margin = new Padding(0),
+            Padding = new Padding(0),
+            Visible = false,
+            TabStop = false,
+        };
+
+        _resultReveal.Controls.Add(_resultXpLine);
+        _resultReveal.Controls.Add(_resultLevelChip);
+        _resultReveal.Controls.Add(_resultLevelBar);
+        _resultReveal.Controls.Add(_resultLevelCaption);
+        _resultReveal.Controls.Add(_resultAchievementsCaption);
+        _resultReveal.Controls.Add(_resultAchievementsFlow);
+        hero.Controls.Add(_resultReveal);
+
         result.Controls.Add(hero);
 
         _resultListCard = new CardPanel
@@ -865,9 +1025,198 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         };
         _resultContext.Text = $"{topicName} \u2014 {_resultQuiz.Difficulty}";
 
+        // The §5.7a reveal: XP earned, the post-submit level row, and only the
+        // achievements this attempt newly unlocked (omission when none — §5.7a
+        // restraint). The hero card grows to fit; the rows and actions follow.
+        FillReveal();
+        LayoutReveal();
+        SizeHeroForResult();
+        _resultListCard.Location = new Point(0, _heroCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16));
+        _resultListCard.Width = Math.Max(_heroCard.Width, 1);
+
         BuildResultRows(_resultQuiz);
         _resultActions.Location = new Point(0, _resultListCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16));
         ShowView(_resultView);
+
+        // §4.14: the sidebar level block repaints right after an attempt (the
+        // module-switch refresh covers every other path).
+        this.FindAncestor<MainForm>()?.UpdateSidebarLevel();
+    }
+
+    /// <summary>The hero card of the result view — its height follows the reveal.</summary>
+    private void SizeHeroForResult()
+    {
+        if (_resultReveal.Visible)
+        {
+            _heroCard.Height = _resultReveal.Bottom + UITheme.Scaled(this, UITheme.Spacing16);
+        }
+        else
+        {
+            _heroCard.Height = UITheme.Scaled(this, 150); // the §5.7 base height without the reveal
+        }
+    }
+
+    /// <summary>Fills the §5.7a reveal from the post-submit state (no DB read — Submit captured it).</summary>
+    private void FillReveal()
+    {
+        if (_resultProgress is not { } progress)
+        {
+            _resultReveal.Visible = false; // the recording failed — the strip already explained
+            return;
+        }
+
+        _resultReveal.Visible = true;
+        _resultXpLine.Text = "+" + _resultXpEarned.ToString(System.Globalization.CultureInfo.InvariantCulture) + " XP";
+        _resultLevelChip.SetLevel(progress.Level);
+        _resultLevelBar.Value = progress.ProgressFraction;
+
+        // The §4.14 caption: the XP still missing for the next level ("70 XP
+        // to Lvl 5"); at the top of the level range the caption says so.
+        _resultLevelCaption.Text = progress.XpForNextLevel == 0
+            ? "Max level"
+            : (progress.XpForNextLevel - progress.XpIntoLevel).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                + " XP to Lvl " + (progress.Level + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        foreach (Control existing in _resultAchievementsFlow.Controls)
+        {
+            existing.Dispose();
+        }
+        _resultAchievementsFlow.Controls.Clear();
+
+        bool any = _resultNewlyUnlocked.Count > 0;
+        _resultAchievementsCaption.Visible = any;
+        _resultAchievementsFlow.Visible = any;
+
+        foreach (AchievementDefinition definition in _resultNewlyUnlocked)
+        {
+            _resultAchievementsFlow.Controls.Add(new AchievementChipPanel(definition));
+        }
+    }
+
+    /// <summary>
+    /// Lays the §5.7a reveal out: the XP line; 8px; the level row (chip + the
+    /// 8px progress track + the remaining-XP caption right-aligned); 16px; the
+    /// achievement group label and its wrapping chip row (only when unlocked).
+    /// </summary>
+    private void LayoutReveal()
+    {
+        if (!_resultReveal.Visible)
+        {
+            return;
+        }
+
+        int revealWidth = Math.Max(_resultReveal.Width, 1);
+        int rowGap = UITheme.Scaled(this, UITheme.Spacing8);
+        int blockGap = UITheme.Scaled(this, UITheme.Spacing16);
+
+        _resultLevelChip.Location = new Point(0, _resultXpLine.Bottom + rowGap);
+
+        Size captionSize = TextRenderer.MeasureText(_resultLevelCaption.Text, UITheme.Caption);
+        _resultLevelCaption.Size = new Size(Math.Max(captionSize.Width, UITheme.Scaled(this, 40)), UITheme.Scaled(this, 16));
+        _resultLevelCaption.Location = new Point(
+            Math.Max(revealWidth - _resultLevelCaption.Width, 0),
+            _resultLevelChip.Location.Y + ((_resultLevelChip.Height - _resultLevelCaption.Height) / 2));
+
+        int barWidth = Math.Max(
+            _resultLevelCaption.Left - _resultLevelChip.Right - rowGap,
+            UITheme.Scaled(this, 40));
+        _resultLevelBar.Location = new Point(
+            _resultLevelChip.Right + rowGap,
+            _resultLevelChip.Location.Y + ((_resultLevelChip.Height - UITheme.Scaled(this, 8)) / 2));
+        _resultLevelBar.Size = new Size(barWidth, UITheme.Scaled(this, 8));
+
+        int rowBottom = Math.Max(_resultLevelChip.Bottom, _resultLevelBar.Bottom);
+
+        if (_resultAchievementsCaption.Visible)
+        {
+            // The flow wraps its chips, so its width must be pinned BEFORE its
+            // AutoSize height is read (wrapping changes the height).
+            _resultAchievementsFlow.Width = Math.Max(revealWidth, 1);
+            _resultAchievementsCaption.Location = new Point(0, rowBottom + blockGap);
+            _resultAchievementsFlow.Location = new Point(0, _resultAchievementsCaption.Bottom + rowGap);
+            _resultReveal.Height = _resultAchievementsFlow.Bottom;
+        }
+        else
+        {
+            _resultReveal.Height = rowBottom;
+        }
+    }
+
+    /// <summary>
+    /// One §5.7a achievement chip: the §4.14 chip shape (RadiusChip pill,
+    /// AccentTint fill) carrying the achievement's own MDL2 glyph in
+    /// AccentText and its title in CaptionSemibold TextPrimary (5.83 on the
+    /// tint ✓). Display-only: no hover, no focus, no tab stop. The corner
+    /// cutouts resolve the hero card's Surface at paint time (D4 audit #1).
+    /// </summary>
+    private sealed class AchievementChipPanel : Panel
+    {
+        /// <summary>The chip is 28px tall with 8px horizontal padding (§5.7a).</summary>
+        private const int ChipHeight = 28;
+
+        private readonly string _glyph;
+        private readonly string _title;
+
+        public AchievementChipPanel(AchievementDefinition definition)
+        {
+            ArgumentNullException.ThrowIfNull(definition);
+
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            SetStyle(ControlStyles.ResizeRedraw, true);
+            Name = "ResultAchievementChip" + definition.Key;
+            TabStop = false;
+            _glyph = definition.Glyph;
+            _title = definition.Title;
+
+            int inset = UITheme.Scaled(this, UITheme.Spacing8);
+            int glyphWidth = TextRenderer.MeasureText(_glyph, UITheme.NavGlyph).Width;
+            int titleWidth = TextRenderer.MeasureText(_title, UITheme.CaptionSemibold).Width;
+            Width = inset + glyphWidth + UITheme.Scaled(this, UITheme.Spacing4) + titleWidth + inset;
+            Height = UITheme.Scaled(this, ChipHeight);
+            Margin = new Padding(0, 0, UITheme.Scaled(this, UITheme.Spacing8), 0); // 8px chip↔chip
+            AccessibleName = _title; // the chip speaks the achievement's name (§2.6)
+        }
+
+        /// <summary>The corner cutouts show the hero card's Surface, never the chip fill.</summary>
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            e.Graphics.Clear(UITheme.ContainerSurface(this));
+        }
+
+        /// <summary>Paints the AccentTint pill, then glyph + title side by side.</summary>
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+
+            var bounds = new Rectangle(0, 0, Width, Height);
+            using GraphicsPath path = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusChip));
+            using var brush = new SolidBrush(UITheme.AccentTint);
+            e.Graphics.FillPath(brush, path);
+
+            int inset = UITheme.Scaled(this, UITheme.Spacing8);
+            int glyphWidth = TextRenderer.MeasureText(_glyph, UITheme.NavGlyph).Width;
+            var glyphBounds = new Rectangle(inset, 0, glyphWidth, Height);
+            TextRenderer.DrawText(
+                e.Graphics,
+                _glyph,
+                UITheme.NavGlyph,
+                glyphBounds,
+                UITheme.AccentText,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+
+            var titleBounds = new Rectangle(
+                inset + glyphWidth + UITheme.Scaled(this, UITheme.Spacing4),
+                0,
+                Math.Max(Width - inset - glyphWidth - UITheme.Scaled(this, UITheme.Spacing4) - inset, 1),
+                Height);
+            TextRenderer.DrawText(
+                e.Graphics,
+                _title,
+                UITheme.CaptionSemibold,
+                titleBounds,
+                UITheme.TextPrimary,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
+        }
     }
 
     /// <summary>Builds the §5.7 per-question verdict rows (glyph + word, never color alone).</summary>

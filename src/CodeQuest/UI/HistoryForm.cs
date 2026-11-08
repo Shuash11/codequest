@@ -3,9 +3,10 @@
 // attempts as CARDS, not table rows. The toolbar keeps search ("Search
 // quizzes…"), the topic filter, and the score filter (Any / ≥80% / 50–79% /
 // <50%); each attempt renders as a card — date, quiz title, topic, and a
-// colored score pill (green ≥80%, amber 50–79%, red <50% — pill text always
-// carries the numbers, never color alone) — with a "Review" button that opens
-// the §5.9 answer-review drill-in.
+// score pill (wash fill + Level* text: green ≥80%, amber 50–79%, red <50% —
+// the numbers always ride on the pill, never color alone; the D4 audit #5
+// recipe — a Level* fill behind white text failed AA) — with a "Review"
+// button that opens the §5.9 answer-review drill-in.
 // Derived data (R-2 #1): the score denominator is the quiz's own question
 // count, computed live. Fully local — no network dependency (proposal line
 // 23). Read-only by design: no CRUD feedback lines on this screen.
@@ -183,11 +184,15 @@ public sealed class HistoryForm : ModulePanel
     /// <summary>Builds one attempt card: date, quiz, topic, colored score pill, Review button.</summary>
     private Control BuildAttemptCard(QuizAttempt attempt, Quiz quiz, string topicName, int total, double percent)
     {
-        Color pillBack = percent switch
+        // The score pill (D4 audit #5): a Level* fill behind white text fails
+        // AA on dark (2.26/2.10/2.72:1 — and light's 4.17 already failed).
+        // The recipe is the wash fill + the Level* text token (6.30/6.70/
+        // 5.77 ✓) — text always carries the numbers, never color alone.
+        (Color pillBack, Color pillText) = percent switch
         {
-            >= 80d => UITheme.LevelEasy,
-            >= 50d => UITheme.LevelMedium,
-            _ => UITheme.LevelHard,
+            >= 80d => (UITheme.SuccessTint, UITheme.LevelEasy),
+            >= 50d => (UITheme.WarningTint, UITheme.LevelMedium),
+            _ => (UITheme.DangerTint, UITheme.LevelHard),
         };
 
         var card = new Panel
@@ -237,7 +242,7 @@ public sealed class HistoryForm : ModulePanel
             Name = "HistoryCardScore" + attempt.AttemptId,
             Text = $"{attempt.Score}/{total}  ({percent:0}%)",
             Font = UITheme.BodySemibold,
-            ForeColor = UITheme.TextOnAccent,
+            ForeColor = pillText, // Level* on its wash — the D4 audit #5 recipe
             BackColor = pillBack,
             AutoSize = false,
             TextAlign = ContentAlignment.MiddleCenter,

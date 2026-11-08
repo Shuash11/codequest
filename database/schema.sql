@@ -1,6 +1,6 @@
 -- =============================================================================
 -- CodeQuest — database/schema.sql
--- SQLite DDL for the CodeQuest quiz system: 7 tables in Third Normal Form (3NF).
+-- SQLite DDL for the CodeQuest quiz system: 8 tables in Third Normal Form (3NF).
 --
 -- Phase   : P1 — Database Schema, Seed Data & 3NF Documentation
 -- Engine  : SQLite 3 (file-based, no server; see docs/codequest-proposal.md line 19)
@@ -200,6 +200,38 @@ CREATE TABLE submitted_answers (
 );
 
 
+-- -----------------------------------------------------------------------------
+-- user_achievements — one row per unlocked achievement of one user
+-- (gamification, plan WP1 / acceptance A5).
+--
+-- The catalog itself (key, title, description, glyph, rule) is defined in the
+-- code (Services/AchievementEvaluator.cs); this table records only WHO
+-- unlocked WHAT and WHEN. Nothing is ever updated: an unlock happens once.
+--
+-- Primary key (user_id, achievement_key): an achievement unlocks ONCE per
+-- user — re-completing the same feat must never duplicate the row (A5). The
+-- service layer writes with INSERT OR IGNORE, so a repeated unlock is a no-op
+-- instead of an error.
+--
+-- ON DELETE user_id = CASCADE: an unlock record only means something for its
+-- user, so when an account is deleted its unlock records go with it. (This is
+-- deliberately different from quiz_attempts.user_id = RESTRICT: attempts are
+-- the historical record the screens must keep readable, while an achievement
+-- row of a deleted account would be an orphan with no owner to show it.)
+-- unlocked_at is ISO-8601 UTC text, the same format as every other timestamp.
+-- -----------------------------------------------------------------------------
+CREATE TABLE user_achievements (
+    user_id         INTEGER NOT NULL,
+    achievement_key TEXT    NOT NULL,
+    unlocked_at     TEXT    NOT NULL,                  -- ISO-8601 UTC
+
+    PRIMARY KEY (user_id, achievement_key),
+
+    CONSTRAINT fk_user_achievements_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+
+
 -- =============================================================================
 -- Indexes
 -- SQLite requires (or strongly recommends) an index on every foreign key
@@ -216,3 +248,4 @@ CREATE INDEX idx_quiz_attempts_user_id         ON quiz_attempts (user_id);
 CREATE INDEX idx_submitted_answers_attempt_id  ON submitted_answers (attempt_id);
 CREATE INDEX idx_submitted_answers_question_id ON submitted_answers (question_id);
 CREATE INDEX idx_submitted_answers_choice_id   ON submitted_answers (chosen_choice_id);
+CREATE INDEX idx_user_achievements_user_id     ON user_achievements (user_id);

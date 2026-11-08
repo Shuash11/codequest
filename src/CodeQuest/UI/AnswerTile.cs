@@ -40,11 +40,21 @@ public sealed class AnswerTile : Control
         SetStyle(ControlStyles.Selectable, true);
         _baseColor = baseColor;
         ShapeGlyph = ShapeGlyphs[positionIndex % ShapeGlyphs.Length];
-        BackColor = baseColor;
+        BackColor = baseColor; // fallback only — corners resolve the container (OnPaintBackground)
         Font = UITheme.BodySemibold;
         Text = choiceText;
         Height = UITheme.Scaled(this, 54);
         Cursor = Cursors.Hand;
+    }
+
+    /// <summary>
+    /// The corner cutouts around the 8px-rounded tile show the CONTAINER's
+    /// surface, never the tile color (D4 audit rule #1) — the tile fill
+    /// paints in OnPaint.
+    /// </summary>
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        e.Graphics.Clear(UITheme.ContainerSurface(this));
     }
 
     /// <summary>The choice text this tile represents.</summary>
