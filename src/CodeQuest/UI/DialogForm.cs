@@ -226,7 +226,7 @@ public sealed class DialogForm : Form
         // color alone).
         DialogMark activeMark = mark ?? UnexpectedErrorMark;
         int markX = (width - markSize) / 2;
-        dialog.Paint += static (sender, e) =>
+        dialog.Paint += (sender, e) =>
         {
             if (sender is Form form)
             {
