@@ -27,11 +27,12 @@ jobs:
       - name: Test
         run: dotnet test CodeQuest.sln --no-build --configuration Release
 
-      - name: Publish (self-contained single-file .exe)
+      - name: Publish (self-contained single-file .exe, symbols embedded for line-level crash stacks)
         run: >
           dotnet publish src/CodeQuest/CodeQuest.csproj
           -c Release -r win-x64 --self-contained true
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=embedded
           -o publish
 
       - name: Write runtime config (AI provider key from repo secret)
@@ -55,6 +56,16 @@ jobs:
           con.executescript(open('database/seed.sql', encoding='utf-8').read());
           con.commit(); con.close()"
 
+      - name: Build the installer (Inno Setup, per-user)
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $version = (Select-String -Path 'src/CodeQuest/CodeQuest.csproj' -Pattern '<Version>([^<]+)</Version>').Matches[0].Groups[1].Value
+          Write-Output "installer version: $version"
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = (Get-ChildItem 'C:\Program Files (x86)' -Filter 'ISCC.exe' -Recurse | Select-Object -First 1).FullName }
+          & $iscc /DAppVersion=$version installer/codequest.iss
+
       - name: Upload exe artifact
         uses: actions/upload-artifact@v4
         with:
@@ -63,4 +74,11 @@ jobs:
             publish/CodeQuest.exe
             publish/config/config.local.json
             publish/codequest.db
+          if-no-files-found: error
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodeQuest-Setup
+          path: installer/CodeQuest-Setup-*.exe
           if-no-files-found: error
