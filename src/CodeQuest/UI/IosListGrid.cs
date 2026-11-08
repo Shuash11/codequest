@@ -10,7 +10,10 @@
 //          (RowPostPaint), left-inset 16px to align with the row text (§2.5);
 //          FullRowSelect with SelectionBackColor AccentTint — never the
 //          default blue selection chrome; empty grid renders no message of
-//          its own. Action columns paint as quiet text buttons (recipe 4.1's
+//          its own. Column headers carry the fun accent (the 2026-11-08
+//          fun-accent amendment: "the table headers render in the accent") —
+//          Accent Caption labels on a Surface fill, so the quiet header sits
+//          inside the white card with AA contrast (4.86:1). Action columns paint as quiet text buttons (recipe 4.1's
 //          row-level text actions: Accent label, destructive text actions in
 //          DangerText, disabled in TextTertiary) with the Fill hover of the
 //          secondary variant; badge columns draw the §4.10 chip.
@@ -126,19 +129,20 @@ public sealed class IosListGrid : DataGridView
         AutoGenerateColumns = false;
         RowTemplate.Height = UITheme.Scaled(this, 36);
 
-        // Recipe 4.6 quiet column headers.
+        // Recipe 4.6 quiet column headers — with the fun-accent amendment's
+        // accent labels on the card's own Surface fill (4.86:1 on white, AA).
         EnableHeadersVisualStyles = false;
         ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
         ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
         ColumnHeadersHeight = UITheme.Scaled(this, 32);
         ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
         {
-            BackColor = UITheme.Background,
+            BackColor = UITheme.Surface,
             ForeColor = UITheme.Accent, // the fun accent on the table headers (4.8:1 — AA)
             Font = UITheme.Caption,
             Alignment = DataGridViewContentAlignment.MiddleLeft,
             WrapMode = DataGridViewTriState.False,
-            SelectionBackColor = UITheme.Background,
+            SelectionBackColor = UITheme.Surface,
             SelectionForeColor = UITheme.TextSecondary,
         };
 
@@ -485,7 +489,7 @@ public sealed class IosListGrid : DataGridView
         }
     }
 
-    /// <summary>Quiet header of recipe 4.6: Background fill, Caption TextSecondary, hairline below.</summary>
+    /// <summary>Quiet header of recipe 4.6 with the fun-accent amendment: Surface fill, Caption Accent, hairline below.</summary>
     private void PaintQuietHeader(DataGridViewCellPaintingEventArgs e)
     {
         if (e.Graphics is not { } graphics)
@@ -493,7 +497,7 @@ public sealed class IosListGrid : DataGridView
             return;
         }
 
-        using (var backgroundBrush = new SolidBrush(UITheme.Background))
+        using (var backgroundBrush = new SolidBrush(UITheme.Surface))
         {
             graphics.FillRectangle(backgroundBrush, e.CellBounds);
         }
@@ -516,7 +520,7 @@ public sealed class IosListGrid : DataGridView
                 headerText,
                 UITheme.Caption,
                 e.CellBounds,
-                UITheme.TextSecondary,
+                UITheme.Accent,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
         }
     }

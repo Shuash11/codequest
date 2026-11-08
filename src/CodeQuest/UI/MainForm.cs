@@ -5,9 +5,10 @@
 // Look at: the layout — minimum window 1024×640 on Background; the leading
 //          sidebar (220px, Background, 1px SeparatorHairline right edge, 24px
 //          inset): "CodeQuest" (BodySemibold), 24px, the nav list (recipe 4.3
-//          rows), 16px, the account block (signed-in name in Caption
-//          TextSecondary, "Log out" as a secondary-style nav item — not pinned
-//          to the window bottom, §3.5). The trailing content area follows the
+//          rows), 16px, the account block (an accent avatar chip with the
+//          account's initial, the signed-in name in Caption TextSecondary
+//          beside it, "Log out" as a secondary-style nav item beneath — not
+//          pinned to the window bottom, §3.5). The trailing content area follows the
 //          screen anatomy (§5): content header row, 20px status strip, then
 //          the active module panel inset 24px (32px below the header block).
 // Nav entries (§5.2, one per feature cluster): Take quiz (P9, home, active
@@ -36,6 +37,7 @@ using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
 using CodeQuest.Services;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
@@ -189,8 +191,41 @@ public sealed class MainForm : Form
             sidebar.Controls.Add(item);
         }
 
-        // Account block, directly beneath the nav list (§5.2, §3.5).
+        // Account block, directly beneath the nav list (§5.2, §3.5): an
+        // accent avatar chip carrying the account's initial, the signed-in
+        // name beside it, and "Log out" beneath — not pinned to the window's
+        // bottom edge.
         int accountTop = navTop + Modules.Length * rowHeight + UITheme.Scaled(this, UITheme.Spacing16);
+        int avatarSize = UITheme.Scaled(this, 32);
+        string avatarInitial = _user.DisplayName.Length == 0
+            ? "?"
+            : char.ToUpperInvariant(_user.DisplayName[0]).ToString();
+
+        var avatar = new Panel
+        {
+            Name = "AccountAvatar",
+            Size = new Size(avatarSize, avatarSize),
+            Location = new Point(inset, accountTop),
+            BackColor = UITheme.Background,
+        };
+        avatar.Paint += static (sender, e) =>
+        {
+            if (sender is Panel panel)
+            {
+                using GraphicsPath avatarPath = UITheme.RoundedPath(
+                    new Rectangle(0, 0, panel.Width - 1, panel.Height - 1), panel.Width / 2);
+                using var brush = new SolidBrush(UITheme.Accent);
+                e.Graphics.FillPath(brush, avatarPath);
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    avatarInitial,
+                    UITheme.CaptionSemibold,
+                    panel.ClientRectangle,
+                    UITheme.TextOnAccent,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            }
+        };
+        sidebar.Controls.Add(avatar);
 
         var signedInName = new Label
         {
@@ -200,8 +235,11 @@ public sealed class MainForm : Form
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Background,
             AutoSize = false,
-            Location = new Point(inset + UITheme.Scaled(this, UITheme.Spacing16), accountTop),
-            Size = new Size(navWidth, UITheme.Scaled(this, 18)),
+            AutoEllipsis = true,
+            Location = new Point(
+                inset + avatarSize + UITheme.Scaled(this, UITheme.Spacing8),
+                accountTop + ((avatarSize - UITheme.Scaled(this, 18)) / 2)),
+            Size = new Size(navWidth - avatarSize - UITheme.Scaled(this, UITheme.Spacing8), UITheme.Scaled(this, 18)),
         };
         sidebar.Controls.Add(signedInName);
 
@@ -210,7 +248,7 @@ public sealed class MainForm : Form
             Name = "NavLogout",
             Text = "Log out",
             SecondaryAction = true,
-            Location = new Point(inset, accountTop + signedInName.Height + UITheme.Scaled(this, UITheme.Spacing8)),
+            Location = new Point(inset, accountTop + avatarSize + UITheme.Scaled(this, UITheme.Spacing8)),
             Size = new Size(navWidth, rowHeight),
         };
         _logoutButton.Click += static (sender, e) =>

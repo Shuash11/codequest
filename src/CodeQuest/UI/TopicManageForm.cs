@@ -2,13 +2,18 @@
 // CodeQuest — Phase P8: Topic & Quiz Management
 // The topic management screen of the design of record (spec 5.3), hosted as
 // the shell's "Topics" module panel (§5.2 — panels persist, the shell swaps).
-// Look at: the layout — toolbar row (8px gaps): the search box ("Search
-//          topics…", 240px) and the trailing "New topic" primary button;
-//          16px; one full-height grid card (recipe 4.6) with the columns
-//          Name · Category · Quizzes · Created and the trailing Edit/Delete
-//          text actions. The search filters live while typing (no submit
-//          button). The topic form is a modal card ("New topic" / "Edit
-//          topic") with the Name input and the category ComboBox — exactly
+// Look at: the layout — an explaining caption over the toolbar ("Topics
+//          group your quizzes; every quiz belongs to one." — the same
+//          caption-over-list anatomy the Review module uses), then the
+//          toolbar row (8px gaps): the search box ("Search topics…", 240px)
+//          and the trailing "New topic" primary button (with its "+" mark —
+//          the PLAY-pill glyph language of the quiz card); 16px; one
+//          full-height grid card (recipe 4.6, accent column headers) with
+//          the columns Name · Category · Quizzes · Created and the trailing
+//          Edit/Delete text actions. The search filters live while typing
+//          (no submit button). The topic form is a modal card ("New topic" /
+//          "Edit topic") with a Title-font header and the recipe's hairline
+//          card border, the Name input and the category ComboBox — exactly
 //          the two values Programming / Cybersecurity, DropDownList, never
 //          free text (R-2 #7).
 // Delete flow (the CORRECTED two-branch flow of spec 5.3): the schema keeps
@@ -27,6 +32,7 @@
 using CodeQuest.Data;
 using CodeQuest.Models;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
@@ -54,9 +60,12 @@ public sealed class TopicManageForm : ModulePanel
 
     private const string EditAction = "Edit";
     private const string DeleteAction = "Delete";
+    private const string ListCaption = "Topics group your quizzes; every quiz belongs to one.";
+    private const string NewTopicLabel = "+  New topic";
 
     private readonly ITopicRepository _topics;
     private readonly IQuizRepository _quizzes;
+    private readonly Label _listCaption;
     private readonly InputField _search;
     private readonly FlatButton _newTopic;
     private readonly ListCardGrid _list;
@@ -74,13 +83,27 @@ public sealed class TopicManageForm : ModulePanel
         Dock = DockStyle.Fill;
         Visible = false;
 
+        int captionHeight = UITheme.Scaled(this, 20);
+        _listCaption = new Label
+        {
+            Name = "TopicsListCaption",
+            Text = ListCaption,
+            Font = UITheme.Body,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.Background,
+            AutoSize = false,
+            Location = new Point(0, 0),
+            Size = new Size(Math.Max(Width, 1), captionHeight),
+        };
+
         int toolbarHeight = UITheme.Scaled(this, 32);
+        int toolbarTop = captionHeight + UITheme.Scaled(this, UITheme.Spacing16);
 
         _search = new InputField(accessibleName: "Search topics…") // §4.4: name from the visible placeholder
         {
             Name = "TopicsSearchField",
             PlaceholderText = "Search topics…",
-            Location = new Point(0, 0),
+            Location = new Point(0, toolbarTop),
             Size = new Size(UITheme.Scaled(this, 240), toolbarHeight),
         };
         _search.TextChanged += static (sender, e) =>
@@ -94,9 +117,10 @@ public sealed class TopicManageForm : ModulePanel
         _newTopic = new FlatButton
         {
             Name = "NewTopicButton",
-            Text = "New topic",
-            Location = new Point(Width - UITheme.Scaled(this, 110), 0),
-            Size = new Size(UITheme.Scaled(this, 110), toolbarHeight),
+            Text = NewTopicLabel,
+            AccessibleName = "New topic", // the "+" is the visual mark, not the name
+            Location = new Point(Width - UITheme.Scaled(this, 124), toolbarTop),
+            Size = new Size(UITheme.Scaled(this, 124), toolbarHeight),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
         };
         _newTopic.Click += static (sender, e) =>
@@ -110,8 +134,8 @@ public sealed class TopicManageForm : ModulePanel
         _list = new ListCardGrid
         {
             Name = "TopicsListCard",
-            Location = new Point(0, toolbarHeight + UITheme.Scaled(this, UITheme.Spacing16)),
-            Size = new Size(Width, Height - toolbarHeight - UITheme.Scaled(this, UITheme.Spacing16)),
+            Location = new Point(0, toolbarTop + toolbarHeight + UITheme.Scaled(this, UITheme.Spacing16)),
+            Size = new Size(Width, Height - toolbarTop - toolbarHeight - UITheme.Scaled(this, UITheme.Spacing16)),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
         };
         _list.Grid.Name = "TopicsGrid";
@@ -140,6 +164,7 @@ public sealed class TopicManageForm : ModulePanel
         Controls.Add(_search);
         Controls.Add(_newTopic);
         Controls.Add(_list);
+        Controls.Add(_listCaption);
     }
 
     /// <inheritdoc />
@@ -154,7 +179,15 @@ public sealed class TopicManageForm : ModulePanel
         }
 
         _quizCounts = counts;
+        _listCaption.Width = Math.Max(Width, 1); // the caption was built at the pre-layout width (M6)
         ApplyFilter();
+    }
+
+    /// <summary>Keeps the list caption full-width as the module resizes (M6).</summary>
+    protected override void OnResize(EventArgs eventargs)
+    {
+        base.OnResize(eventargs);
+        _listCaption.Width = Math.Max(Width, 1);
     }
 
     /// <summary>Applies the live search to the grid (spec 5.3: filter while typing).</summary>
@@ -383,10 +416,23 @@ public sealed class TopicFormDialog : Form
         BackColor = UITheme.Surface;
         KeyPreview = true;
 
+        // The recipe's hairline card border (the quiz-card treatment): the
+        // white card keeps a crisp edge over the app window behind it.
+        Paint += static (sender, e) =>
+        {
+            if (sender is Form form)
+            {
+                using var borderPen = new Pen(UITheme.SeparatorHairline);
+                using GraphicsPath borderPath = UITheme.RoundedPath(
+                    new Rectangle(0, 0, form.Width - 1, form.Height - 1), UITheme.RadiusCard);
+                e.Graphics.DrawPath(borderPen, borderPath);
+            }
+        };
+
         var titleLabel = new Label
         {
             Text = title,
-            Font = UITheme.BodySemibold,
+            Font = UITheme.Title,
             ForeColor = UITheme.TextPrimary,
             BackColor = UITheme.Surface,
             AutoSize = false,
@@ -537,7 +583,7 @@ public sealed class TopicFormDialog : Form
     /// <summary>Sizes the card and places its content (§4.11 dialog anatomy).</summary>
     private void LayoutDialog(Control titleLabel, Control nameLabel, Control categoryLabel)
     {
-        int titleHeight = UITheme.Scaled(this, 22);
+        int titleHeight = UITheme.Scaled(this, 30); // the Title-font header line
         int labelHeight = UITheme.Scaled(this, 18);
         int buttonHeight = UITheme.Scaled(this, 32);
         int fieldHeight = UITheme.Scaled(this, 52); // the 32px field + the reserved error slot

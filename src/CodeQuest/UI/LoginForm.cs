@@ -6,7 +6,7 @@
 // password flow; the spec amendment rides the I5 designer pass.
 // Look at: the layout — centered fixed window (420×380) on Background; app
 //          name "CodeQuest" (Title), subtitle "Programming and cybersecurity
-//          practice quizzes" (Caption, TextSecondary), 24px, one card (§4.2)
+//          practice quizzes" (Caption, TextSecondary), 32px, one card (§4.2)
 //          holding the Name field (with its inline error line, §4.4) and the
 //          full-width "Sign in" primary button (§4.1). Enter submits; the tab
 //          order is name → button.
@@ -57,13 +57,13 @@ public sealed class LoginForm : Form
         BackColor = UITheme.Background;
         ClientSize = new Size(UITheme.Scaled(this, 420), UITheme.Scaled(this, 380));
 
-        // Vertical block: logo chip + 12 + title + 4 + subtitle + 24 + card, centered.
+        // Vertical block: logo chip + 12 + title + 8 + subtitle + 32 + card, centered.
         int chipSize = UITheme.Scaled(this, 44);
         int titleHeight = UITheme.Scaled(this, 32);
         int subtitleHeight = UITheme.Scaled(this, 18);
         int cardHeight = UITheme.Scaled(this, 138);
-        int blockHeight = chipSize + UITheme.Scaled(this, UITheme.Spacing12) + titleHeight + UITheme.Scaled(this, UITheme.Spacing4)
-            + subtitleHeight + UITheme.Scaled(this, UITheme.Spacing24) + cardHeight;
+        int blockHeight = chipSize + UITheme.Scaled(this, UITheme.Spacing12) + titleHeight + UITheme.Scaled(this, UITheme.Spacing8)
+            + subtitleHeight + UITheme.Scaled(this, UITheme.Spacing32) + cardHeight;
         int blockTop = (ClientSize.Height - blockHeight) / 2;
         int chipX = (ClientSize.Width - chipSize) / 2;
 
@@ -114,7 +114,7 @@ public sealed class LoginForm : Form
             TextAlign = ContentAlignment.MiddleCenter,
             Location = new Point(
                 0,
-                blockTop + chipSize + UITheme.Scaled(this, UITheme.Spacing12) + titleHeight + UITheme.Scaled(this, UITheme.Spacing4)),
+                blockTop + chipSize + UITheme.Scaled(this, UITheme.Spacing12) + titleHeight + UITheme.Scaled(this, UITheme.Spacing8)),
             Size = new Size(ClientSize.Width, subtitleHeight),
         };
 
@@ -128,8 +128,8 @@ public sealed class LoginForm : Form
         {
             Location = new Point(
                 UITheme.Scaled(this, UITheme.Spacing24),
-                blockTop + chipSize + UITheme.Scaled(this, UITheme.Spacing12) + titleHeight + UITheme.Scaled(this, UITheme.Spacing4)
-                    + subtitleHeight + UITheme.Scaled(this, UITheme.Spacing24)),
+                blockTop + chipSize + UITheme.Scaled(this, UITheme.Spacing12) + titleHeight + UITheme.Scaled(this, UITheme.Spacing8)
+                    + subtitleHeight + UITheme.Scaled(this, UITheme.Spacing32)),
             Size = new Size(cardWidth, cardHeight),
         };
 

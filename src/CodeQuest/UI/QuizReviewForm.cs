@@ -1,16 +1,20 @@
 // =============================================================================
 // CodeQuest — AI Quiz Review / Approve (I4): the review screen of spec 5.12.
-// List view: the explaining caption, then the draft list card (§4.6): Title —
-// Topic — Difficulty — Questions — Generated — Draft badge, with the trailing
-// "Review" action (the Accent text action — the grid's primary style).
+// List view: the explaining caption, then the draft list card (§4.6, accent
+// column headers): Title — Topic — Difficulty — Questions — Generated — Draft
+// badge, with the trailing "Review" action (the Accent text action — the
+// grid's primary style).
 // Review view (drill-in): header (Back + quiz title + Draft badge) with the
 // actions row — "Approve" (primary; disabled while the quiz has zero
 // questions, with the inline hint), "Edit questions" (the §5.5 editor, the
 // reviewer's correct-it path), "Discard" (destructive, behind the §4.11
-// confirm) — then the AI's questions as cards: question text, the choice rows
-// with the AI's claimed correct answer highlighted (AccentTint + the "AI's
+// confirm) — then the AI's questions as cards in the modern card language of
+// the attempt review (§5.9): a "Question N" caption line, the question text,
+// the choice rows as rounded pills (the answer-tile silhouette, quiet for the
+// reviewer: Fill, and AccentTint on the AI's claimed answer with the "AI's
 // answer" label — the claim is highlighted, NOT validated), and the
-// explanation inset ("(No explanation was provided.)" when empty, R-2 #6).
+// explanation in a quiet inset box ("(No explanation was provided.)" when
+// empty, R-2 #6).
 // Approve flips the status Draft → Approved ONLY (R-2 #4: no audit fields),
 // the badge flips in place (the state change is the moment), the strip says
 // "Quiz approved.", and the quiz becomes takeable in the take-quiz list.
@@ -22,6 +26,7 @@ using CodeQuest.Data;
 using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
@@ -106,8 +111,8 @@ public sealed class QuizReviewForm : ModulePanel
         _list = new ListCardGrid
         {
             Name = "ReviewListCard",
-            Location = new Point(0, captionHeight + UITheme.Scaled(this, UITheme.Spacing8)),
-            Size = new Size(Math.Max(Width, 1), Math.Max(Height - captionHeight - UITheme.Scaled(this, UITheme.Spacing8), 1)),
+            Location = new Point(0, captionHeight + UITheme.Scaled(this, UITheme.Spacing16)),
+            Size = new Size(Math.Max(Width, 1), Math.Max(Height - captionHeight - UITheme.Scaled(this, UITheme.Spacing16), 1)),
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
         };
         _list.Grid.Name = "ReviewGrid";
@@ -234,7 +239,7 @@ public sealed class QuizReviewForm : ModulePanel
         {
             Name = "ReviewDrillInHeader",
             Dock = DockStyle.Top,
-            Height = UITheme.Scaled(this, 58),
+            Height = UITheme.Scaled(this, 64),
             BackColor = UITheme.Background,
         };
         var back = new FlatButton
@@ -242,7 +247,7 @@ public sealed class QuizReviewForm : ModulePanel
             Name = "ReviewDrillInBack",
             Text = "Back",
             Variant = UITheme.FlatButtonVariant.Secondary,
-            Location = new Point(0, 0),
+            Location = new Point(0, UITheme.Scaled(this, 8)),
             Size = new Size(UITheme.Scaled(this, 90), UITheme.Scaled(this, 32)),
         };
         back.Click += static (sender, e) =>
@@ -261,21 +266,21 @@ public sealed class QuizReviewForm : ModulePanel
             AutoSize = false,
             AutoEllipsis = true,
             TextAlign = ContentAlignment.MiddleLeft,
-            Location = new Point(UITheme.Scaled(this, 90) + UITheme.Scaled(this, UITheme.Spacing12), 0),
+            Location = new Point(UITheme.Scaled(this, 90) + UITheme.Scaled(this, UITheme.Spacing12), UITheme.Scaled(this, 8)),
             Size = new Size(UITheme.Scaled(this, 200), UITheme.Scaled(this, 32)),
         };
         _reviewBadge = new StatusBadge
         {
             Name = "ReviewDrillInBadge",
             Status = QuizStatus.Draft,
-            Location = new Point(UITheme.Scaled(this, 90) + UITheme.Scaled(this, 200) + UITheme.Scaled(this, UITheme.Spacing12), 4),
+            Location = new Point(UITheme.Scaled(this, 90) + UITheme.Scaled(this, 200) + UITheme.Scaled(this, UITheme.Spacing12), UITheme.Scaled(this, 14)),
             Size = new Size(UITheme.Scaled(this, 96), UITheme.Scaled(this, 24)),
         };
         _approve = new FlatButton
         {
             Name = "ReviewApproveButton",
             Text = ApproveButton,
-            Location = new Point(Width - UITheme.Scaled(this, 340), 0),
+            Location = new Point(Width - UITheme.Scaled(this, 340), UITheme.Scaled(this, 8)),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Size = new Size(UITheme.Scaled(this, 100), UITheme.Scaled(this, 32)),
         };
@@ -291,7 +296,7 @@ public sealed class QuizReviewForm : ModulePanel
             Name = "ReviewEditQuestionsButton",
             Text = EditQuestionsButton,
             Variant = UITheme.FlatButtonVariant.Secondary,
-            Location = new Point(Width - UITheme.Scaled(this, 230), 0),
+            Location = new Point(Width - UITheme.Scaled(this, 230), UITheme.Scaled(this, 8)),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Size = new Size(UITheme.Scaled(this, 120), UITheme.Scaled(this, 32)),
         };
@@ -307,7 +312,7 @@ public sealed class QuizReviewForm : ModulePanel
             Name = "ReviewDiscardButton",
             Text = DiscardButton,
             Variant = UITheme.FlatButtonVariant.Destructive,
-            Location = new Point(Width - UITheme.Scaled(this, 100), 0),
+            Location = new Point(Width - UITheme.Scaled(this, 100), UITheme.Scaled(this, 8)),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Size = new Size(UITheme.Scaled(this, 100), UITheme.Scaled(this, 32)),
         };
@@ -326,7 +331,7 @@ public sealed class QuizReviewForm : ModulePanel
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Background,
             AutoSize = false,
-            Location = new Point(Width - UITheme.Scaled(this, 344), UITheme.Scaled(this, 36)),
+            Location = new Point(Width - UITheme.Scaled(this, 344), UITheme.Scaled(this, 44)),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             Size = new Size(UITheme.Scaled(this, 344), UITheme.Scaled(this, 18)),
             TextAlign = ContentAlignment.MiddleRight,
@@ -421,20 +426,27 @@ public sealed class QuizReviewForm : ModulePanel
             Question question = quiz.Questions[i];
             Choice? claimed = question.GetCorrectChoice();
 
+            int contentWidth = Math.Max(cardWidth - inset * 2, 1);
             int textHeight = TextRenderer.MeasureText(
-                question.QuestionText, UITheme.Body, new Size(cardWidth - inset * 2, int.MaxValue), TextFormatFlags.WordBreak).Height;
+                question.QuestionText, UITheme.Body, new Size(contentWidth, int.MaxValue), TextFormatFlags.WordBreak).Height;
             string explanation = question.Explanation.Length == 0 ? NoExplanationText : question.Explanation;
             int explanationTextHeight = TextRenderer.MeasureText(
                 explanation,
                 UITheme.Body,
-                new Size(Math.Max(cardWidth - inset * 2, 1), int.MaxValue),
+                new Size(Math.Max(contentWidth - UITheme.Scaled(this, UITheme.Spacing12) * 2, 1), int.MaxValue),
                 TextFormatFlags.WordBreak).Height;
-            int explanationBlockHeight = UITheme.Scaled(this, 18) + UITheme.Scaled(this, explanationTextHeight);
-            int cardHeight = inset + textHeight + UITheme.Scaled(this, UITheme.Spacing12)
+
+            // The card block (the §5.9 order): "Question N" line, question
+            // text, the choice pills, then the explanation inset box (12px
+            // padding + 16px caption + text + 12px padding).
+            int cardHeight = inset
+                + UITheme.Scaled(this, 18) // the "Question N" top line
+                + UITheme.Scaled(this, UITheme.Spacing8)
+                + textHeight
+                + UITheme.Scaled(this, UITheme.Spacing12)
                 + (question.Choices.Count * UITheme.Scaled(this, 30))
                 + UITheme.Scaled(this, UITheme.Spacing12)
-                + explanationBlockHeight
-                + UITheme.Scaled(this, 12)
+                + explanationTextHeight + UITheme.Scaled(this, 40)
                 + inset;
 
             var card = new CardPanel
@@ -444,6 +456,19 @@ public sealed class QuizReviewForm : ModulePanel
                 Size = new Size(cardWidth, cardHeight),
             };
 
+            var number = new Label
+            {
+                Name = $"ReviewQuestionNumber{i}",
+                Text = $"Question {i + 1}",
+                Font = UITheme.Caption,
+                ForeColor = UITheme.TextSecondary,
+                BackColor = UITheme.Surface,
+                AutoSize = false,
+                Location = new Point(inset, inset),
+                Size = new Size(UITheme.Scaled(this, 90), UITheme.Scaled(this, 18)),
+            };
+            card.Controls.Add(number);
+
             var questionText = new Label
             {
                 Name = $"ReviewQuestionText{i}",
@@ -452,21 +477,22 @@ public sealed class QuizReviewForm : ModulePanel
                 ForeColor = UITheme.TextPrimary,
                 BackColor = UITheme.Surface,
                 AutoSize = false,
-                Location = new Point(inset, inset),
-                Size = new Size(cardWidth - inset * 2, textHeight),
+                Location = new Point(inset, inset + UITheme.Scaled(this, 18) + UITheme.Scaled(this, UITheme.Spacing8)),
+                Size = new Size(contentWidth, textHeight),
             };
             card.Controls.Add(questionText);
 
-            int choiceTop = inset + textHeight + UITheme.Scaled(this, UITheme.Spacing12);
+            int choiceTop = inset + UITheme.Scaled(this, 18) + UITheme.Scaled(this, UITheme.Spacing8) + textHeight
+                + UITheme.Scaled(this, UITheme.Spacing12);
             foreach (Choice choice in question.Choices.OrderBy(item => item.Position))
             {
                 bool claimedAnswer = claimed is not null && choice.ChoiceId == claimed.ChoiceId;
-                var choiceRow = new Panel
+                Color rowFill = claimedAnswer ? UITheme.AccentTint : UITheme.Fill;
+                var choiceRow = new ChoiceRowPanel(rowFill)
                 {
                     Name = $"ReviewChoiceRow{i}_{choice.ChoiceId}",
                     Location = new Point(inset, choiceTop),
-                    Size = new Size(cardWidth - inset * 2, UITheme.Scaled(this, 30) - UITheme.Scaled(this, UITheme.Spacing4)),
-                    BackColor = claimedAnswer ? UITheme.AccentTint : UITheme.Fill,
+                    Size = new Size(contentWidth, UITheme.Scaled(this, 30) - UITheme.Scaled(this, UITheme.Spacing4)),
                 };
                 var choiceText = new Label
                 {
@@ -474,11 +500,11 @@ public sealed class QuizReviewForm : ModulePanel
                     Text = choice.ChoiceText,
                     Font = UITheme.Body,
                     ForeColor = UITheme.TextPrimary,
-                    BackColor = choiceRow.BackColor,
+                    BackColor = rowFill,
                     AutoSize = false,
                     AutoEllipsis = true,
-                    Location = new Point(UITheme.Scaled(this, UITheme.Spacing8), 0),
-                    Size = new Size(choiceRow.Width - UITheme.Scaled(this, UITheme.Spacing16) - UITheme.Scaled(this, 90), choiceRow.Height),
+                    Location = new Point(UITheme.Scaled(this, UITheme.Spacing12), 0),
+                    Size = new Size(Math.Max(choiceRow.Width - UITheme.Scaled(this, UITheme.Spacing24) - UITheme.Scaled(this, 90), 1), choiceRow.Height),
                     TextAlign = ContentAlignment.MiddleLeft,
                 };
                 choiceRow.Controls.Add(choiceText);
@@ -489,11 +515,11 @@ public sealed class QuizReviewForm : ModulePanel
                     {
                         Name = $"ReviewAiAnswer{i}_{choice.ChoiceId}",
                         Text = AiAnswerLabel,
-                        Font = UITheme.Caption,
-                        ForeColor = UITheme.TextSecondary,
-                        BackColor = choiceRow.BackColor,
+                        Font = UITheme.CaptionSemibold,
+                        ForeColor = UITheme.TextPrimary, // 13.8:1 on AccentTint — the old TextSecondary pair was 4.16:1
+                        BackColor = rowFill,
                         AutoSize = false,
-                        Location = new Point(choiceRow.Width - UITheme.Scaled(this, 90) - UITheme.Scaled(this, UITheme.Spacing8), 0),
+                        Location = new Point(choiceRow.Width - UITheme.Scaled(this, 90) - UITheme.Scaled(this, UITheme.Spacing12), 0),
                         Size = new Size(UITheme.Scaled(this, 90), choiceRow.Height),
                         TextAlign = ContentAlignment.MiddleRight,
                     };
@@ -504,9 +530,18 @@ public sealed class QuizReviewForm : ModulePanel
                 choiceTop += UITheme.Scaled(this, 30);
             }
 
-            // The explanation inset: the AI's claimed reasoning, always rendered,
-            // measured so multi-line reasoning is never clipped (M8).
+            // The explanation inset box (the §5.9 quiet box): the AI's claimed
+            // reasoning, always rendered, measured so multi-line reasoning is
+            // never clipped (M8).
             int explanationTop = choiceTop + UITheme.Scaled(this, UITheme.Spacing12);
+            int boxTextWidth = Math.Max(contentWidth - UITheme.Scaled(this, UITheme.Spacing12) * 2, 1);
+            var explanationBox = new Panel
+            {
+                Name = $"ReviewExplanation{i}",
+                Location = new Point(inset, explanationTop),
+                Size = new Size(contentWidth, explanationTextHeight + UITheme.Scaled(this, 40)),
+                BackColor = UITheme.Fill,
+            };
             var explanationCaption = new Label
             {
                 Name = $"ReviewExplanationCaption{i}",
@@ -515,8 +550,8 @@ public sealed class QuizReviewForm : ModulePanel
                 ForeColor = UITheme.TextSecondary,
                 BackColor = UITheme.Fill,
                 AutoSize = false,
-                Location = new Point(inset, explanationTop),
-                Size = new Size(cardWidth - inset * 2, UITheme.Scaled(this, 18)),
+                Location = new Point(UITheme.Scaled(this, UITheme.Spacing12), UITheme.Scaled(this, UITheme.Spacing12)),
+                Size = new Size(boxTextWidth, UITheme.Scaled(this, 16)),
             };
             var explanationText = new Label
             {
@@ -526,17 +561,50 @@ public sealed class QuizReviewForm : ModulePanel
                 ForeColor = UITheme.TextPrimary,
                 BackColor = UITheme.Fill,
                 AutoSize = false,
-                Location = new Point(inset, explanationTop + UITheme.Scaled(this, 18)),
-                Size = new Size(cardWidth - inset * 2, explanationTextHeight),
+                Location = new Point(
+                    UITheme.Scaled(this, UITheme.Spacing12),
+                    UITheme.Scaled(this, UITheme.Spacing12) + UITheme.Scaled(this, 16)),
+                Size = new Size(boxTextWidth, explanationTextHeight),
             };
-            card.Controls.Add(explanationCaption);
-            card.Controls.Add(explanationText);
+            explanationBox.Controls.Add(explanationCaption);
+            explanationBox.Controls.Add(explanationText);
+            card.Controls.Add(explanationBox);
 
             _questionStack.Controls.Add(card);
             top += cardHeight + UITheme.Scaled(this, UITheme.Spacing12);
         }
 
         _questionStack.ResumeLayout();
+    }
+
+    /// <summary>
+    /// One read-only choice row of the review card: the quiet Fill pill, or
+    /// the AccentTint pill that highlights the AI's claimed answer — rounded
+    /// like the run view's answer tiles, so the review echoes the fun quiz
+    /// language while staying a management surface (no vivid fills here).
+    /// </summary>
+    private sealed class ChoiceRowPanel : Panel
+    {
+        private readonly Color _fill;
+
+        public ChoiceRowPanel(Color fill)
+        {
+            _fill = fill;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            SetStyle(ControlStyles.ResizeRedraw, true);
+            BackColor = UITheme.Surface; // the card shows through the rounded corners
+        }
+
+        /// <summary>Paints the rounded pill over the card's Surface.</summary>
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var fillBrush = new SolidBrush(_fill);
+            using GraphicsPath path = UITheme.RoundedPath(
+                new Rectangle(0, 0, Width - 1, Height - 1), UITheme.Scaled(this, UITheme.RadiusControl));
+            e.Graphics.FillPath(fillBrush, path);
+        }
     }
 
     /// <summary>Approves the open draft: the status flip Draft → Approved ONLY (R-2 #4).</summary>

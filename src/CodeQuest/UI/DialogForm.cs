@@ -3,19 +3,25 @@
 // Recipe 4.11 of the design of record: the custom modal dialog.
 // System.Windows.Forms.MessageBox is NOT used anywhere — it cannot be styled
 // (spec 4.11 bans it; all confirmations and blockers run through this form).
-// Look at: the layout — a Surface card (12px radius) centered over the owner
-//          window, no drop shadow, no dimmed backdrop (flat modal); min width
-//          400px; content inset 24px; title in BodySemibold, message in Body
-//          TextPrimary; buttons in a right-aligned (trailing) row, 8px apart.
+// Look at: the layout — a Surface card (12px radius, hairline border like the
+//          quiz card) centered over the owner window, no drop shadow, no
+//          dimmed backdrop (flat modal); min width 400px. The alert anatomy:
+//          a centered soft-tinted mark circle (DangerTint for the unexpected
+//          error and the destructive confirms, WarningTint for the startup
+//          blocker — the glyph + tint are the situation, never color alone),
+//          the title in the Title font, the message in Body — both centered —
+//          then the buttons in a right-aligned (trailing) row, 8px apart.
 //          HIG alert rules (§3.4): the primary action is a specific verb on a
 //          filled button, default on the trailing side; a "Cancel"-style
 //          secondary is never the default; no "Error" titles, no exclamation
-//          marks. The two P7 dialogs carry the spec's canonical copy:
-//          the startup blocker (database missing) and the unexpected-error
-//          dialog (plain language + retry hint, never a stack trace).
+//          marks. The three P7/P8 dialogs carry the spec's canonical copy:
+//          the startup blocker (database missing), the unexpected-error
+//          dialog (plain language + retry hint, never a stack trace) and the
+//          destructive confirmations.
 // =============================================================================
 
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
@@ -30,6 +36,16 @@ public sealed class DialogForm : Form
     private const int ContentInset = UITheme.Spacing24;
     private const int ButtonGap = UITheme.Spacing8;
     private const int ButtonHeight = 32;
+    private const int MarkSize = 40;
+
+    /// <summary>The centered mark of the alert anatomy: tint circle + status glyph.</summary>
+    private sealed record DialogMark(Color Circle, Color GlyphColor, string Glyph);
+
+    // The three marks: the tinted circle carries the situation at a glance —
+    // red for errors and destructive confirms, amber for the startup blocker.
+    private static readonly DialogMark UnexpectedErrorMark = new(UITheme.DangerTint, UITheme.DangerText, "\uE783");
+    private static readonly DialogMark DestructiveConfirmMark = new(UITheme.DangerTint, UITheme.DangerText, "\uE7BA");
+    private static readonly DialogMark StartupBlockerMark = new(UITheme.WarningTint, UITheme.WarningText, "\uE7BA");
 
     private DialogForm(string title)
     {
@@ -81,7 +97,8 @@ public sealed class DialogForm : Form
             title: "CodeQuest can't find its database",
             message: "The database file was not found next to the app. Restore codequest.db or run database/schema.sql and database/seed.sql, then start the app again.",
             primaryText: "Close",
-            secondaryText: null);
+            secondaryText: null,
+            mark: StartupBlockerMark);
     }
 
     /// <summary>
@@ -97,7 +114,8 @@ public sealed class DialogForm : Form
             title: "Something went wrong",
             message: "An unexpected problem stopped the last action. You can try it again; if it keeps happening, close the app and start it again.",
             primaryText: "Close",
-            secondaryText: "Try again");
+            secondaryText: "Try again",
+            mark: UnexpectedErrorMark);
 
         return result == DialogResult.No;
     }
@@ -121,20 +139,23 @@ public sealed class DialogForm : Form
             message: message,
             primaryText: confirmText,
             secondaryText: secondaryText,
-            primaryVariant: UITheme.FlatButtonVariant.Destructive);
+            primaryVariant: UITheme.FlatButtonVariant.Destructive,
+            mark: DestructiveConfirmMark);
 
         return result == DialogResult.OK;
     }
 
     /// <summary>
-    /// Builds and shows one dialog card. The primary button is the filled,
-    /// default (trailing) one — the recipe's primary variant unless the caller
-    /// passes the destructive one (the confirmations of §4.11); the optional
+    /// Builds and shows one dialog card with the alert anatomy: a centered
+    /// tinted mark, the title and message centered beneath it, and the button
+    /// row on the trailing side. The primary button is the filled, default
+    /// (trailing) one — the recipe's primary variant unless the caller passes
+    /// the destructive one (the confirmations of §4.11); the optional
     /// secondary is a plain button to its left. The secondary answers with
     /// DialogResult.No, the primary with OK, so the caller can tell the two
     /// apart without comparing captions.
     /// </summary>
-    private static DialogResult Show(IWin32Window? owner, string title, string message, string primaryText, string? secondaryText, UITheme.FlatButtonVariant primaryVariant = UITheme.FlatButtonVariant.Primary)
+    private static DialogResult Show(IWin32Window? owner, string title, string message, string primaryText, string? secondaryText, UITheme.FlatButtonVariant primaryVariant = UITheme.FlatButtonVariant.Primary, DialogMark? mark = null)
     {
         using var dialog = new DialogForm(title);
         var primary = new FlatButton { Text = primaryText, Variant = primaryVariant };
@@ -146,36 +167,45 @@ public sealed class DialogForm : Form
             secondary.DialogResult = DialogResult.No;
         }
 
+        int inset = UITheme.Scaled(dialog, ContentInset);
+        int gap = UITheme.Scaled(dialog, ButtonGap);
+        int buttonHeight = UITheme.Scaled(dialog, ButtonHeight);
+
         // Measure the wrapped message and the button row, then size the card.
-        int contentWidth = UITheme.Scaled(dialog, MinDialogWidth) - ContentInset * 2;
+        int contentWidth = UITheme.Scaled(dialog, MinDialogWidth) - inset * 2;
         Size messageSize = TextRenderer.MeasureText(
             message,
             UITheme.Body,
             new Size(contentWidth, int.MaxValue),
             TextFormatFlags.WordBreak);
 
-        int primaryWidth = TextRenderer.MeasureText(primaryText, UITheme.Body).Width + ContentInset;
-        int secondaryWidth = secondaryText is null ? 0 : TextRenderer.MeasureText(secondaryText, UITheme.Body).Width + ContentInset;
-        int buttonRowWidth = primaryWidth + (secondary is null ? 0 : secondaryWidth + ButtonGap);
+        int primaryWidth = TextRenderer.MeasureText(primaryText, UITheme.Body).Width + inset;
+        int secondaryWidth = secondaryText is null ? 0 : TextRenderer.MeasureText(secondaryText, UITheme.Body).Width + inset;
+        int buttonRowWidth = primaryWidth + (secondary is null ? 0 : secondaryWidth + gap);
 
         int width = Math.Max(
             UITheme.Scaled(dialog, MinDialogWidth),
-            buttonRowWidth + ContentInset * 2);
+            buttonRowWidth + inset * 2);
 
-        int titleHeight = TextRenderer.MeasureText(title, UITheme.BodySemibold).Height;
-        int bodyTop = ContentInset + titleHeight + UITheme.Spacing8;
-        int buttonsTop = bodyTop + messageSize.Height + ContentInset;
-        int height = buttonsTop + ButtonHeight + ContentInset;
+        // The alert stack: mark circle, title, message, buttons.
+        int markSize = UITheme.Scaled(dialog, MarkSize);
+        int markTop = inset;
+        int titleTop = markTop + markSize + UITheme.Scaled(dialog, UITheme.Spacing16);
+        int titleHeight = TextRenderer.MeasureText(title, UITheme.Title).Height;
+        int bodyTop = titleTop + titleHeight + UITheme.Scaled(dialog, UITheme.Spacing8);
+        int buttonsTop = bodyTop + messageSize.Height + UITheme.Scaled(dialog, UITheme.Spacing24);
+        int height = buttonsTop + buttonHeight + inset;
 
         var titleLabel = new Label
         {
             Text = title,
-            Font = UITheme.BodySemibold,
+            Font = UITheme.Title,
             ForeColor = UITheme.TextPrimary,
             BackColor = UITheme.Surface,
             AutoSize = false,
-            Location = new Point(ContentInset, ContentInset),
-            Size = new Size(width - ContentInset * 2, titleHeight),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Location = new Point(inset, titleTop),
+            Size = new Size(width - inset * 2, titleHeight),
         };
 
         var messageLabel = new Label
@@ -185,16 +215,44 @@ public sealed class DialogForm : Form
             ForeColor = UITheme.TextPrimary,
             BackColor = UITheme.Surface,
             AutoSize = false,
-            Location = new Point(ContentInset, bodyTop),
-            Size = new Size(width - ContentInset * 2, messageSize.Height),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Location = new Point(inset, bodyTop),
+            Size = new Size(width - inset * 2, messageSize.Height),
         };
 
-        int cursorX = width - ContentInset - primaryWidth;
-        primary.SetBounds(cursorX, buttonsTop, primaryWidth, ButtonHeight);
+        // The card's chrome: the hairline border (the quiz-card treatment)
+        // and the centered mark — a soft-tinted circle with the status glyph,
+        // so the dialog's situation reads at a glance (mark + words, never
+        // color alone).
+        DialogMark activeMark = mark ?? UnexpectedErrorMark;
+        int markX = (width - markSize) / 2;
+        dialog.Paint += static (sender, e) =>
+        {
+            if (sender is Form form)
+            {
+                using var borderPen = new Pen(UITheme.SeparatorHairline);
+                using GraphicsPath borderPath = UITheme.RoundedPath(
+                    new Rectangle(0, 0, form.Width - 1, form.Height - 1), UITheme.RadiusCard);
+                e.Graphics.DrawPath(borderPen, borderPath);
+
+                using var circleBrush = new SolidBrush(activeMark.Circle);
+                e.Graphics.FillEllipse(circleBrush, markX, markTop, markSize, markSize);
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    activeMark.Glyph,
+                    UITheme.NavGlyph,
+                    new Rectangle(markX, markTop, markSize, markSize),
+                    activeMark.GlyphColor,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            }
+        };
+
+        int cursorX = width - inset - primaryWidth;
+        primary.SetBounds(cursorX, buttonsTop, primaryWidth, buttonHeight);
         if (secondary is not null)
         {
-            cursorX -= secondaryWidth + ButtonGap;
-            secondary.SetBounds(cursorX, buttonsTop, secondaryWidth, ButtonHeight);
+            cursorX -= secondaryWidth + gap;
+            secondary.SetBounds(cursorX, buttonsTop, secondaryWidth, buttonHeight);
             dialog.Controls.Add(secondary);
         }
 
