@@ -68,24 +68,25 @@ public static class UITheme
     /// <summary>Text/icons on filled accent or filled danger buttons.</summary>
     public static readonly Color TextOnAccent = ColorTranslator.FromHtml("#FFFFFF");
 
-    // Accent — exactly one, and grey (directive D3: the blue accent is gone).
-    // White text on the filled accent: 9.1:1; the accent as a text label on
-    // Surface (secondary buttons): 9.1:1.
+    // Accent — exactly one, and FUN (owner direction 2026-11-08: the app must
+    // feel like a quiz game, so the D3 grey accent yields to a vivid indigo).
+    // White text on the filled accent: 4.8:1; the accent as a text label on
+    // Surface: 4.8:1 — both AA.
 
     /// <summary>Primary action fill, sidebar active state, focused input border, links.</summary>
-    public static readonly Color Accent = ColorTranslator.FromHtml("#3A3A3C");
+    public static readonly Color Accent = ColorTranslator.FromHtml("#6C5CE7");
 
     /// <summary>Pointer hover on filled accent buttons (darken).</summary>
-    public static readonly Color AccentHover = ColorTranslator.FromHtml("#2C2C2E");
+    public static readonly Color AccentHover = ColorTranslator.FromHtml("#5A4BD1");
 
     /// <summary>Button while held (darken further).</summary>
-    public static readonly Color AccentPressed = ColorTranslator.FromHtml("#232326");
+    public static readonly Color AccentPressed = ColorTranslator.FromHtml("#493BB8");
 
     /// <summary>Disabled filled buttons (disabled text/fills are AA-exempt).</summary>
-    public static readonly Color AccentDisabled = ColorTranslator.FromHtml("#C7C7CC");
+    public static readonly Color AccentDisabled = ColorTranslator.FromHtml("#D5CFF5");
 
     /// <summary>Selected sidebar item background, focused control borders.</summary>
-    public static readonly Color AccentTint = ColorTranslator.FromHtml("#E0E0E5");
+    public static readonly Color AccentTint = ColorTranslator.FromHtml("#EAE6FB");
 
     // Semantic colors — the text variants meet AA on their tints and on white
     // (F3: the old 4.07/4.08:1 pair is gone; F8's badge text is 4.75:1).
@@ -123,7 +124,7 @@ public static class UITheme
     public static readonly Color FillPressed = ColorTranslator.FromHtml("#DCDCE2");
 
     /// <summary>Sidebar nav item pressed (recipe 4.3).</summary>
-    public static readonly Color NavItemPressed = ColorTranslator.FromHtml("#D5D5DA");
+    public static readonly Color NavItemPressed = ColorTranslator.FromHtml("#E4E0FA");
 
     /// <summary>Destructive flat button hover (recipe 4.1).</summary>
     public static readonly Color DangerHover = ColorTranslator.FromHtml("#AD241E");
@@ -144,10 +145,10 @@ public static class UITheme
     // (tile text is large bold — WCAG large-text floor is 3:1).
 
     /// <summary>Primary action of the learner surfaces (play buttons, progress).</summary>
-    public static readonly Color FunPrimary = ColorTranslator.FromHtml("#6C5CE7");
+    public static readonly Color FunPrimary = Accent;
 
     /// <summary>Hover state of the learner primary (darken).</summary>
-    public static readonly Color FunPrimaryHover = ColorTranslator.FromHtml("#5A4BD1");
+    public static readonly Color FunPrimaryHover = AccentHover;
 
     /// <summary>Answer tile 1 — the red tile.</summary>
     public static readonly Color TileRed = ColorTranslator.FromHtml("#D63040");

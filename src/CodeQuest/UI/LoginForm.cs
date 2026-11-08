@@ -57,12 +57,43 @@ public sealed class LoginForm : Form
         BackColor = UITheme.Background;
         ClientSize = new Size(UITheme.Scaled(this, 420), UITheme.Scaled(this, 380));
 
-        // Vertical block: title + 4 + subtitle + 24 + card(138), centered.
+        // Vertical block: logo chip + 12 + title + 4 + subtitle + 24 + card, centered.
+        int chipSize = UITheme.Scaled(this, 44);
+        int chipY = 0;
         int titleHeight = UITheme.Scaled(this, 32);
         int subtitleHeight = UITheme.Scaled(this, 18);
         int cardHeight = UITheme.Scaled(this, 138);
-        int blockTop = (ClientSize.Height - (titleHeight + UITheme.Scaled(this, UITheme.Spacing4) + subtitleHeight
-            + UITheme.Scaled(this, UITheme.Spacing24) + cardHeight)) / 2;
+        int blockHeight = chipSize + UITheme.Scaled(this, UITheme.Spacing12) + titleHeight + UITheme.Scaled(this, UITheme.Spacing4)
+            + subtitleHeight + UITheme.Scaled(this, UITheme.Spacing24) + cardHeight;
+        int blockTop = (ClientSize.Height - blockHeight) / 2;
+        int chipX = (ClientSize.Width - chipSize) / 2;
+
+        // The brand mark: the same "CQ" chip the website and the taskbar icon
+        // use — a small dose of the fun identity on the login screen.
+        var logo = new Panel
+        {
+            Name = "LoginLogoChip",
+            Size = new Size(chipSize, chipSize),
+            Location = new Point(chipX, blockTop),
+            BackColor = UITheme.Accent,
+        };
+        logo.Paint += static (sender, e) =>
+        {
+            if (sender is Panel panel)
+            {
+                using var path = UITheme.RoundedPath(
+                    new Rectangle(0, 0, panel.Width - 1, panel.Height - 1), UITheme.Scaled(panel, 12));
+                using var brush = new SolidBrush(UITheme.Accent);
+                e.Graphics.FillPath(brush, path);
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    "CQ",
+                    UITheme.BodySemibold,
+                    panel.ClientRectangle,
+                    Color.White,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            }
+        };
 
         var titleLabel = new Label
         {
@@ -71,7 +102,7 @@ public sealed class LoginForm : Form
             ForeColor = UITheme.TextPrimary,
             BackColor = UITheme.Background,
             TextAlign = ContentAlignment.MiddleCenter,
-            Location = new Point(0, blockTop),
+            Location = new Point(0, blockTop + chipSize + UITheme.Scaled(this, UITheme.Spacing12)),
             Size = new Size(ClientSize.Width, titleHeight),
         };
 
@@ -82,7 +113,9 @@ public sealed class LoginForm : Form
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Background,
             TextAlign = ContentAlignment.MiddleCenter,
-            Location = new Point(0, blockTop + titleHeight + UITheme.Scaled(this, UITheme.Spacing4)),
+            Location = new Point(
+                0,
+                blockTop + chipSize + UITheme.Scaled(this, UITheme.Spacing12) + titleHeight + UITheme.Scaled(this, UITheme.Spacing4)),
             Size = new Size(ClientSize.Width, subtitleHeight),
         };
 
@@ -96,8 +129,8 @@ public sealed class LoginForm : Form
         {
             Location = new Point(
                 UITheme.Scaled(this, UITheme.Spacing24),
-                blockTop + titleHeight + UITheme.Scaled(this, UITheme.Spacing4) + subtitleHeight
-                    + UITheme.Scaled(this, UITheme.Spacing24)),
+                blockTop + chipSize + UITheme.Scaled(this, UITheme.Spacing12) + titleHeight + UITheme.Scaled(this, UITheme.Spacing4)
+                    + subtitleHeight + UITheme.Scaled(this, UITheme.Spacing24)),
             Size = new Size(cardWidth, cardHeight),
         };
 
@@ -121,6 +154,7 @@ public sealed class LoginForm : Form
 
         card.Controls.Add(_name);
         card.Controls.Add(_signIn);
+        Controls.Add(logo);
         Controls.Add(titleLabel);
         Controls.Add(subtitleLabel);
         Controls.Add(card);

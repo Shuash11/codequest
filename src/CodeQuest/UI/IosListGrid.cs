@@ -134,7 +134,7 @@ public sealed class IosListGrid : DataGridView
         ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
         {
             BackColor = UITheme.Background,
-            ForeColor = UITheme.TextSecondary,
+            ForeColor = UITheme.Accent, // the fun accent on the table headers (4.8:1 — AA)
             Font = UITheme.Caption,
             Alignment = DataGridViewContentAlignment.MiddleLeft,
             WrapMode = DataGridViewTriState.False,

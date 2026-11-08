@@ -40,6 +40,14 @@ The palette, type scale, spacing, radii, and separators below are the tokens P7 
 > The grey accent stays the system base; the fun colors are learner-surface
 > tokens (`FunPrimary`, `TileRed/Blue/Amber/Green`, `LevelEasy/Medium/Hard`,
 > `CorrectWash`, `WrongWash`) in `UITheme.cs` — same single-source rule.
+>
+> **Fun accent amendment (2026-11-08, later the same day — "redesign all
+> including color so it's more fun and entertaining").** The app-wide Accent
+> itself becomes the fun indigo: `Accent #6C5CE7`, `AccentHover #5A4BD1`,
+> `AccentPressed #493BB8`, `AccentTint #EAE6FB`, `NavItemPressed #E4E0FA`,
+> and the table headers render in the accent (4.8:1 — AA). The D3 grey
+> remains for the neutral surfaces only; the accent is now the quiz-game
+> identity across every screen, management included.
 
 > **D3 re-issue (2026-11-08, owner directive "grey and modern theme").** The blue
 > accent is replaced by a grey accent, and the four contrast findings from the
