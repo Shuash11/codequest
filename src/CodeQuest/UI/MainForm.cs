@@ -54,7 +54,6 @@ public sealed class MainForm : Form
         ("GenerateQuiz", "Generate quiz", "\uE710", ""),
         ("Review", "Review", "\uE73E", ""),
         ("Topics", "Topics", "\uE8EC", ""),
-        ("QuizManagement", "Quiz management", "\uE70F", ""),
     };
 
     /// <summary>How long a success strip line stays before it auto-clears (§4.11).</summary>
@@ -311,8 +310,6 @@ public sealed class MainForm : Form
                 "Review" => BuildModulePanel(
                     new QuizReviewForm(quizzes, topics, questions, choices, answers), key),
                 "Topics" => BuildModulePanel(new TopicManageForm(topics, quizzes), key),
-                "QuizManagement" => BuildModulePanel(
-                    new QuizManageForm(quizzes, topics, questions, choices, attempts, answers), key),
                 _ => BuildPlaceholderPanel(key, moduleTitle, phaseNote),
             };
 
