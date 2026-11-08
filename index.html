@@ -8,12 +8,13 @@
 <meta property="og:title" content="CodeQuest — Learn. Get quizzed. Improve.">
 <meta property="og:description" content="Free Windows app: AI-generated programming & cybersecurity quizzes, instant scoring, answer review, and performance reports.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233A3A3C'/%3E%3Ctext x='16' y='22' font-family='Segoe UI' font-size='16' font-weight='700' fill='%23fff' text-anchor='middle'%3ECQ%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236C5CE7'/%3E%3Ctext x='16' y='22' font-family='Segoe UI' font-size='16' font-weight='700' fill='%23fff' text-anchor='middle'%3ECQ%3C/text%3E%3C/svg%3E">
 <style>
   :root{
     --bg:#F5F5F7; --surface:#FFFFFF; --text:#1D1D1F; --text-2:#6E6E73; --text-3:#98989D;
-    --accent:#3A3A3C; --accent-hover:#2C2C2E; --line:#E9E9EE; --success:#157A38;
-    --radius:16px; --radius-sm:10px;
+    --accent:#6C5CE7; --accent-hover:#5A4BD1; --accent-soft:#EAE6FB;
+    --red:#D63040; --blue:#2D6BE4; --amber:#C77700; --green:#1E8E4E;
+    --line:#E9E9EE; --radius:16px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html{scroll-behavior:smooth}
@@ -22,96 +23,155 @@
     background:var(--bg); color:var(--text); line-height:1.6;
     -webkit-font-smoothing:antialiased; overflow-x:hidden;
   }
-  ::selection{background:#d9d9de}
+  ::selection{background:#d9d2fb}
 
-  /* ---------- nav ---------- */
+  /* ============ keyframes ============ */
+  @keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes drift{
+    0%{transform:translate(0,0) scale(1)}
+    33%{transform:translate(40px,-30px) scale(1.08)}
+    66%{transform:translate(-30px,24px) scale(.94)}
+    100%{transform:translate(0,0) scale(1)}
+  }
+  @keyframes progressLoop{0%{width:8%}55%{width:86%}80%{width:86%}100%{width:8%}}
+  @keyframes popIn{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+  @keyframes bob{0%,100%{transform:rotate(-1.6deg) translateY(0)}50%{transform:rotate(-1.6deg) translateY(-7px)}}
+  @keyframes shine{0%{left:-70%}100%{left:130%}}
+  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @keyframes pulseDot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.6}}
+  @keyframes gradientShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+
+  /* ============ nav ============ */
   nav{
     position:fixed; top:0; left:0; right:0; z-index:50;
     display:flex; align-items:center; justify-content:space-between;
     padding:14px clamp(20px,6vw,72px);
     background:rgba(245,245,247,.72); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
-    border-bottom:1px solid rgba(0,0,0,.05);
+    border-bottom:1px solid transparent;
+    transition:box-shadow .3s ease, border-color .3s ease, padding .3s ease;
   }
+  nav.scrolled{border-bottom-color:rgba(0,0,0,.07); box-shadow:0 8px 30px rgba(29,29,31,.07); padding-top:10px; padding-bottom:10px}
   .brand{display:flex; align-items:center; gap:10px; font-weight:700; font-size:17px; letter-spacing:-.01em}
-  .brand .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+  .brand .mark{
+    width:30px;height:30px;border-radius:8px;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700;
+    background:linear-gradient(135deg,var(--accent),#9B8CFA);
+    box-shadow:0 4px 14px rgba(108,92,231,.4);
+  }
   .nav-links{display:flex; gap:26px; font-size:14px; color:var(--text-2)}
   .nav-links a{color:inherit; text-decoration:none; transition:color .2s}
   .nav-links a:hover{color:var(--text)}
-  .nav-cta{background:var(--accent); color:#fff !important; padding:8px 18px; border-radius:99px; font-weight:600}
-  .nav-cta:hover{background:var(--accent-hover)}
+  .nav-cta{background:var(--accent); color:#fff !important; padding:8px 18px; border-radius:99px; font-weight:600; box-shadow:0 4px 14px rgba(108,92,231,.35)}
+  .nav-cta:hover{background:var(--accent-hover); transform:translateY(-1px)}
   @media(max-width:720px){.nav-links a:not(.nav-cta){display:none}}
 
-  /* ---------- hero ---------- */
+  /* ============ hero ============ */
   .hero{
+    position:relative;
     max-width:1160px; margin:0 auto; padding:150px clamp(20px,6vw,72px) 40px;
     display:grid; grid-template-columns:1.05fr .95fr; gap:56px; align-items:center;
+    overflow:visible;
   }
   @media(max-width:920px){.hero{grid-template-columns:1fr; padding-top:120px}}
+
+  /* the floating palette blobs */
+  .blob{position:absolute; border-radius:50%; filter:blur(70px); opacity:.35; pointer-events:none; z-index:0}
+  .blob-1{width:340px;height:340px;background:#6C5CE7;top:-60px;right:-40px;animation:drift 16s ease-in-out infinite alternate}
+  .blob-2{width:260px;height:260px;background:#2D6BE4;bottom:-40px;left:-60px;animation:drift 20s ease-in-out infinite alternate-reverse}
+  .blob-3{width:200px;height:200px;background:#F5A623;top:40%;left:55%;opacity:.22;animation:drift 24s ease-in-out infinite alternate}
+
+  .hero-copy{position:relative; z-index:2}
   .pill{
     display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600;
     color:var(--text-2); background:var(--surface); border:1px solid var(--line);
     padding:6px 14px; border-radius:99px; margin-bottom:22px;
+    box-shadow:0 2px 10px rgba(29,29,31,.05);
   }
-  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulseDot 2.2s ease-in-out infinite}
   h1{
     font-size:clamp(38px,5.4vw,60px); line-height:1.06; letter-spacing:-.03em; font-weight:700;
     margin-bottom:20px;
   }
-  h1 em{font-style:normal; color:var(--text-3)}
+  h1 .grad{
+    background:linear-gradient(90deg,#6C5CE7,#2D6BE4,#D63040,#F5A623,#6C5CE7);
+    background-size:300% 100%;
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    animation:gradientShift 7s ease infinite;
+  }
   .hero p.lede{font-size:18px; color:var(--text-2); max-width:520px; margin-bottom:34px}
   .cta-row{display:flex; gap:14px; flex-wrap:wrap; align-items:center}
   .btn{
-    display:inline-flex; align-items:center; gap:10px; text-decoration:none; cursor:pointer;
-    font-weight:600; font-size:15.5px; border-radius:99px; padding:15px 30px;
+    position:relative; display:inline-flex; align-items:center; gap:10px; text-decoration:none; cursor:pointer;
+    font-weight:600; font-size:15.5px; border-radius:99px; padding:15px 30px; overflow:hidden;
     transition:transform .18s ease, box-shadow .18s ease, background .18s ease;
   }
-  .btn-primary{background:var(--accent); color:#fff; box-shadow:0 8px 24px rgba(29,29,31,.18)}
-  .btn-primary:hover{background:var(--accent-hover); transform:translateY(-2px); box-shadow:0 12px 30px rgba(29,29,31,.22)}
+  .btn-primary{background:var(--accent); color:#fff; box-shadow:0 8px 24px rgba(108,92,231,.35)}
+  .btn-primary::after{
+    content:""; position:absolute; top:0; left:-70%; width:50%; height:100%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);
+    transform:skewX(-20deg);
+  }
+  .btn-primary:hover{background:var(--accent-hover); transform:translateY(-2px); box-shadow:0 12px 30px rgba(108,92,231,.45)}
+  .btn-primary:hover::after{animation:shine .8s ease}
   .btn-ghost{color:var(--text); background:var(--surface); border:1px solid var(--line)}
   .btn-ghost:hover{transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.06)}
   .meta-line{margin-top:18px; font-size:13px; color:var(--text-3)}
   .meta-line b{color:var(--text-2); font-weight:600}
 
-  /* ---------- app mock ---------- */
-  .mock-wrap{display:flex; justify-content:center}
+  /* entrance choreography */
+  .enter{animation:fadeUp .8s cubic-bezier(.2,.8,.2,1) both}
+  .d1{animation-delay:.05s}.d2{animation-delay:.16s}.d3{animation-delay:.27s}.d4{animation-delay:.38s}.d5{animation-delay:.52s}
+
+  /* ---------- app mock (alive) ---------- */
+  .mock-wrap{position:relative; display:flex; justify-content:center; z-index:2; perspective:1100px}
   .mock{
     width:100%; max-width:470px; background:var(--surface); border-radius:22px;
-    box-shadow:0 30px 80px rgba(29,29,31,.14), 0 2px 8px rgba(29,29,31,.05);
+    box-shadow:0 30px 80px rgba(29,29,31,.16), 0 2px 8px rgba(29,29,31,.05);
     border:1px solid rgba(0,0,0,.05); overflow:hidden;
-    transform:rotate(1.2deg); transition:transform .5s cubic-bezier(.2,.8,.2,1);
+    transform:rotate(1.2deg);
+    transition:transform .25s ease;
+    will-change:transform;
   }
-  .mock:hover{transform:rotate(0deg) scale(1.015)}
   .mock-bar{display:flex; gap:6px; padding:13px 16px; border-bottom:1px solid var(--line)}
   .mock-bar i{width:11px;height:11px;border-radius:50%;background:#E9E9EE;display:block}
   .mock-bar i:first-child{background:#d9d9de}
   .mock-body{padding:26px 26px 30px}
   .mock-kicker{font-size:11px; font-weight:600; color:var(--text-3); letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px}
   .mock-q{font-size:16.5px; font-weight:600; letter-spacing:-.01em; margin-bottom:6px}
-  .mock-progress{height:6px; border-radius:99px; background:var(--line); margin:14px 0 22px; overflow:hidden}
-  .mock-progress i{display:block; height:100%; width:40%; border-radius:99px; background:var(--accent)}
+  .mock-progress{height:8px; border-radius:99px; background:var(--line); margin:14px 0 22px; overflow:hidden}
+  .mock-progress i{display:block; height:100%; border-radius:99px;
+    background:linear-gradient(90deg,#6C5CE7,#9B8CFA); animation:progressLoop 4.5s cubic-bezier(.4,0,.2,1) infinite}
   .choice{
     display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:11px;
-    border:1px solid var(--line); margin-bottom:9px; font-size:14px; color:var(--text);
+    margin-bottom:9px; font-size:14px; font-weight:600; color:#fff;
+    opacity:0; animation:popIn .45s cubic-bezier(.2,.8,.2,1) both;
   }
-  .choice .ring{width:17px;height:17px;border-radius:50%;border:1.5px solid #C7C7CC;flex-shrink:0}
-  .choice.sel{background:#E0E0E5; border-color:transparent}
-  .choice.sel .ring{background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 3.5px #fff}
-  .choice .tag{margin-left:auto; font-size:10.5px; font-weight:700; color:var(--text-2); letter-spacing:.04em; text-transform:uppercase}
+  .choice .ring{width:17px;height:17px;border-radius:5px;background:rgba(255,255,255,.28);display:grid;place-items:center;
+    font-size:10.5px; flex-shrink:0}
+  .choice .shape{width:9px;height:9px;display:block}
+  .choice.c1{background:var(--red); animation-delay:.65s}
+  .choice.c2{background:var(--blue); animation-delay:.78s; box-shadow:0 0 0 2.5px #fff, 0 0 0 4.5px var(--blue)}
+  .choice.c3{background:var(--amber); animation-delay:.91s}
+  .choice.c4{background:var(--green); animation-delay:1.04s}
+  .choice .tag{margin-left:auto; font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; opacity:.9}
   .mock-foot{display:flex; justify-content:space-between; align-items:center; margin-top:18px}
-  .mock-foot .score{font-size:12px; color:var(--text-2)}
-  .mock-foot .next{background:var(--accent); color:#fff; font-size:13px; font-weight:600; padding:9px 22px; border-radius:99px}
+  .mock-foot .score{font-size:12px; color:var(--text-2); opacity:0; animation:fadeIn .5s 1.3s both}
+  .mock-foot .next{background:var(--accent); color:#fff; font-size:13px; font-weight:600; padding:9px 22px; border-radius:99px;
+    opacity:0; animation:popIn .45s 1.2s cubic-bezier(.2,.8,.2,1) both}
   .mock-ai{
     position:absolute; margin:-64px 0 0 42px; background:var(--surface); border-radius:14px;
-    box-shadow:0 16px 40px rgba(29,29,31,.16); padding:12px 16px; font-size:12.5px;
-    display:flex; gap:10px; align-items:center; transform:rotate(-1.6deg);
+    box-shadow:0 16px 40px rgba(29,29,31,.18); padding:12px 16px; font-size:12.5px;
+    display:flex; gap:10px; align-items:center;
+    animation:bob 5s ease-in-out infinite;
   }
-  .mock-ai .spark{color:#B3241F; font-weight:700}
+  .mock-ai .spark{color:var(--accent); font-weight:700; font-size:15px}
   .mock-ai b{display:block; font-size:12.5px}
   .mock-ai span{color:var(--text-2); font-size:11.5px}
 
-  /* ---------- sections ---------- */
-  section{max-width:1160px; margin:0 auto; padding:70px clamp(20px,6vw,72px)}
-  .kicker{font-size:12.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text-3); margin-bottom:12px}
+  /* ============ sections ============ */
+  section{max-width:1160px; margin:0 auto; padding:70px clamp(20px,6vw,72px); position:relative; z-index:2}
+  .kicker{font-size:12.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); margin-bottom:12px}
   h2{font-size:clamp(26px,3.2vw,36px); letter-spacing:-.02em; line-height:1.15; margin-bottom:14px}
   .section-sub{color:var(--text-2); font-size:16.5px; max-width:560px}
 
@@ -120,46 +180,69 @@
   @media(max-width:620px){.grid{grid-template-columns:1fr}}
   .card{
     background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
-    padding:26px; transition:transform .25s ease, box-shadow .25s ease;
+    padding:26px; transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease;
   }
-  .card:hover{transform:translateY(-4px); box-shadow:0 16px 40px rgba(29,29,31,.08)}
+  .card:hover{transform:translateY(-6px); box-shadow:0 18px 44px rgba(29,29,31,.1); border-color:#d5cff5}
   .card .icon{
-    width:42px; height:42px; border-radius:11px; background:var(--bg); border:1px solid var(--line);
-    display:grid; place-items:center; margin-bottom:16px;
+    width:42px; height:42px; border-radius:11px; display:grid; place-items:center; margin-bottom:16px;
+    background:var(--accent-soft); color:var(--accent);
   }
-  .card .icon svg{width:20px; height:20px; stroke:var(--text); fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
+  .card .icon svg{width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
   .card h3{font-size:16px; letter-spacing:-.01em; margin-bottom:7px}
   .card p{font-size:14px; color:var(--text-2)}
 
   /* steps */
   .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:44px}
   @media(max-width:920px){.steps{grid-template-columns:1fr}}
-  .step{position:relative; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:28px}
+  .step{position:relative; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:28px;
+    transition:transform .25s ease, box-shadow .25s ease}
+  .step:hover{transform:translateY(-4px); box-shadow:0 14px 36px rgba(29,29,31,.08)}
   .step .num{
-    font-size:13px; font-weight:700; color:var(--text-2); width:34px; height:34px; border-radius:50%;
-    background:var(--bg); border:1px solid var(--line); display:grid; place-items:center; margin-bottom:16px;
+    font-size:13px; font-weight:700; color:#fff; width:34px; height:34px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),#9B8CFA); display:grid; place-items:center; margin-bottom:16px;
+    box-shadow:0 4px 12px rgba(108,92,231,.35);
   }
   .step h3{font-size:16px; margin-bottom:7px}
   .step p{font-size:14px; color:var(--text-2)}
   .step code{font-size:12.5px; background:var(--bg); border:1px solid var(--line); padding:2px 7px; border-radius:6px}
 
-  /* tech strip */
-  .chips{display:flex; flex-wrap:wrap; gap:10px; margin-top:30px}
-  .chip{
-    font-size:13px; font-weight:600; color:var(--text-2); background:var(--surface);
-    border:1px solid var(--line); border-radius:99px; padding:8px 17px;
+  /* tech marquee */
+  .marquee{
+    overflow:hidden; margin-top:34px; position:relative;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
+    mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
   }
+  .marquee-track{display:flex; gap:12px; width:max-content; animation:marquee 26s linear infinite}
+  .marquee:hover .marquee-track{animation-play-state:paused}
+  .mchip{
+    display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+    font-size:13.5px; font-weight:600; color:var(--text-2); background:var(--surface);
+    border:1px solid var(--line); border-radius:99px; padding:9px 18px;
+    box-shadow:0 2px 8px rgba(29,29,31,.04);
+  }
+  .mchip .cdot{width:8px;height:8px;border-radius:50%;display:block}
 
   /* cta band */
   .band{
-    background:var(--accent); border-radius:24px; color:#fff; text-align:center;
+    position:relative; overflow:hidden;
+    border-radius:24px; color:#fff; text-align:center;
     padding:clamp(44px,6vw,72px) clamp(24px,6vw,72px); margin:30px clamp(20px,6vw,72px);
+    background:linear-gradient(120deg,#6C5CE7,#2D6BE4,#6C5CE7); background-size:200% 200%;
+    animation:gradientShift 9s ease infinite;
+    box-shadow:0 24px 60px rgba(108,92,231,.35);
   }
+  .band::before,.band::after{
+    content:""; position:absolute; border-radius:50%; background:rgba(255,255,255,.12);
+    animation:floatY 7s ease-in-out infinite;
+  }
+  .band::before{width:180px;height:180px;top:-60px;right:-40px}
+  .band::after{width:120px;height:120px;bottom:-50px;left:8%;animation-delay:1.6s}
   .band h2{color:#fff; margin-bottom:10px}
-  .band p{color:rgba(255,255,255,.72); margin-bottom:30px}
+  .band p{color:rgba(255,255,255,.78); margin-bottom:30px}
   .band .btn{background:#fff; color:var(--text)}
   .band .btn:hover{transform:translateY(-2px); box-shadow:0 12px 30px rgba(0,0,0,.25)}
-  .band .fine{font-size:12.5px; color:rgba(255,255,255,.55); margin-top:18px}
+  .band .fine{font-size:12.5px; color:rgba(255,255,255,.6); margin-top:18px}
+  .band > *{position:relative; z-index:1}
 
   footer{
     max-width:1160px; margin:0 auto; padding:40px clamp(20px,6vw,72px) 60px;
@@ -169,18 +252,22 @@
   footer a{color:var(--text-2); text-decoration:none}
   footer a:hover{color:var(--text)}
 
-  /* reveal */
-  .reveal{opacity:0; transform:translateY(26px); transition:opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1)}
+  /* scroll reveals */
+  .reveal{opacity:0; transform:translateY(30px); transition:opacity .75s ease, transform .75s cubic-bezier(.2,.8,.2,1)}
   .reveal.in{opacity:1; transform:none}
+
   @media(prefers-reduced-motion:reduce){
-    .reveal{opacity:1; transform:none; transition:none}
+    *,*::before,*::after{animation:none !important; transition:none !important}
+    .reveal{opacity:1; transform:none}
     html{scroll-behavior:auto}
+    .choice{opacity:1}
+    .mock-foot .score,.mock-foot .next{opacity:1}
   }
 </style>
 </head>
 <body>
 
-<nav>
+<nav id="nav">
   <div class="brand"><span class="mark">CQ</span> CodeQuest</div>
   <div class="nav-links">
     <a href="#features">Features</a>
@@ -191,35 +278,39 @@
 </nav>
 
 <header class="hero">
-  <div>
-    <span class="pill"><span class="dot"></span> Version 1.0.3 · free · Windows 10 / 11</span>
-    <h1>AI-built quizzes for <em>programming</em> & cybersecurity.</h1>
-    <p class="lede">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <div class="hero-copy">
+    <span class="pill enter d1"><span class="dot"></span> Version 1.0.3 · free · Windows 10 / 11</span>
+    <h1 class="enter d2">AI-built quizzes for <span class="grad">programming</span> & cybersecurity.</h1>
+    <p class="lede enter d3">
       Pick a topic, a difficulty, and a length — CodeQuest generates the quiz, scores it
       instantly, explains every answer, and shows you exactly what to practice next.
     </p>
-    <div class="cta-row">
+    <div class="cta-row enter d4">
       <a class="btn btn-primary" href="https://github.com/Shuash11/codequest/releases/latest/download/CodeQuest-Setup.exe">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download installer for Windows
+        Download for Windows
       </a>
       <a class="btn btn-ghost" href="#how">How it works</a>
     </div>
-    <p class="meta-line"><b>35 MB</b> · no installer — extract & run · works offline · AI key included for evaluation</p>
+    <p class="meta-line enter d5"><b>35 MB</b> installer · no admin rights · works offline · AI key included for evaluation</p>
   </div>
 
-  <div class="mock-wrap">
+  <div class="mock-wrap enter d3">
     <div style="position:relative">
-      <div class="mock">
+      <div class="mock" id="mock">
         <div class="mock-bar"><i></i><i></i><i></i></div>
         <div class="mock-body">
           <div class="mock-kicker">C# · Question 2 of 5</div>
           <div class="mock-q">Which C# collection guarantees unique keys and offers fast lookup by key?</div>
           <div class="mock-progress"><i></i></div>
-          <div class="choice"><span class="ring"></span> List<T></div>
-          <div class="choice sel"><span class="ring"></span> Dictionary<TKey, TValue> <span class="tag">Selected</span></div>
-          <div class="choice"><span class="ring"></span> Queue<T></div>
-          <div class="choice"><span class="ring"></span> Array</div>
+          <div class="choice c1"><span class="ring"><span class="shape">▲</span></span> List<T></div>
+          <div class="choice c2"><span class="ring"><span class="shape">●</span></span> Dictionary<TKey, TValue> <span class="tag">Picked</span></div>
+          <div class="choice c3"><span class="ring"><span class="shape">◆</span></span> Queue<T></div>
+          <div class="choice c4"><span class="ring"><span class="shape">■</span></span> Array</div>
           <div class="mock-foot">
             <span class="score">Answered 2 of 5</span>
             <span class="next">Next</span>
@@ -272,17 +363,17 @@
 <section id="how">
   <div class="kicker reveal">How it works</div>
   <h2 class="reveal">Three steps, zero setup.</h2>
-  <p class="section-sub reveal">No installer, no dependencies, no account. The download carries everything — app, database and configuration.</p>
+  <p class="section-sub reveal">No installer account, no dependencies, no friction. The download carries everything — app, database and configuration.</p>
   <div class="steps">
     <div class="step reveal">
       <div class="num">1</div>
-      <h3>Download & extract</h3>
-      <p>Grab the ZIP below and extract it anywhere. Inside: the app, the seeded database, and the ready configuration.</p>
+      <h3>Download & install</h3>
+      <p>Run the setup once — it installs into your own folder without admin rights and adds the shortcuts.</p>
     </div>
     <div class="step reveal">
       <div class="num">2</div>
       <h3>Run <code>CodeQuest.exe</code></h3>
-      <p>Double-click to launch. Sign in with a name — that's the whole login. Your attempts are saved locally from the first session.</p>
+      <p>Sign in with a name — that's the whole login. Your attempts are saved locally from the first session.</p>
     </div>
     <div class="step reveal">
       <div class="num">3</div>
@@ -296,15 +387,17 @@
   <div class="kicker reveal">Under the hood</div>
   <h2 class="reveal">Built like a real product, scaled to a course project.</h2>
   <p class="section-sub reveal">A normalized relational schema, a layered object-oriented design, and a tested provider chain — the same patterns production teams use, sized honestly.</p>
-  <div class="chips reveal">
-    <span class="chip">C# · .NET 10</span>
-    <span class="chip">Windows Forms</span>
-    <span class="chip">SQLite · 3NF schema</span>
-    <span class="chip">ADO.NET · parameterized SQL</span>
-    <span class="chip">AI provider chain — NVIDIA + OpenRouter</span>
-    <span class="chip">xUnit test suite</span>
-    <span class="chip">CI build & release</span>
-    <span class="chip">WCAG-conscious UI tokens</span>
+  <div class="marquee reveal">
+    <div class="marquee-track" id="mtrack">
+      <span class="mchip"><span class="cdot" style="background:#6C5CE7"></span>C# · .NET 10</span>
+      <span class="mchip"><span class="cdot" style="background:#2D6BE4"></span>Windows Forms</span>
+      <span class="mchip"><span class="cdot" style="background:#1E8E4E"></span>SQLite · 3NF schema</span>
+      <span class="mchip"><span class="cdot" style="background:#D63040"></span>ADO.NET · parameterized SQL</span>
+      <span class="mchip"><span class="cdot" style="background:#6C5CE7"></span>AI provider chain — NVIDIA + OpenRouter</span>
+      <span class="mchip"><span class="cdot" style="background:#C77700"></span>xUnit test suite</span>
+      <span class="mchip"><span class="cdot" style="background:#2D6BE4"></span>CI build & release</span>
+      <span class="mchip"><span class="cdot" style="background:#1E8E4E"></span>WCAG-conscious UI tokens</span>
+    </div>
   </div>
 </section>
 
@@ -315,7 +408,7 @@
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
     Download CodeQuest — free
   </a>
-  <p class="fine">Windows 10 / 11 · 35 MB · the AI evaluation key is included in the package</p>
+  <p class="fine">Windows 10 / 11 · 35 MB installer · the AI evaluation key is included in the package</p>
 </div>
 
 <footer>
@@ -324,12 +417,39 @@
 </footer>
 
 <script>
+  // nav shadow on scroll
+  const nav = document.getElementById('nav');
+  addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 12), {passive:true});
+
+  // staggered scroll reveals
   const io = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) { entry.target.classList.add('in'); io.unobserve(entry.target); }
     });
   }, { threshold: 0.12 });
-  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+  document.querySelectorAll('.reveal').forEach((el, i) => {
+    el.style.transitionDelay = (i % 3) * 90 + 'ms';
+    io.observe(el);
+  });
+
+  // seamless tech marquee: duplicate the track content once
+  const track = document.getElementById('mtrack');
+  if (track && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    track.innerHTML += track.innerHTML;
+  }
+
+  // subtle 3D tilt on the app mock
+  const mock = document.getElementById('mock');
+  const wrap = mock ? mock.parentElement : null;
+  if (mock && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    wrap.addEventListener('mousemove', (e) => {
+      const r = wrap.getBoundingClientRect();
+      const dx = (e.clientX - r.left) / r.width - 0.5;
+      const dy = (e.clientY - r.top) / r.height - 0.5;
+      mock.style.transform = `rotate(1.2deg) rotateY(${dx * 8}deg) rotateX(${-dy * 6}deg)`;
+    });
+    wrap.addEventListener('mouseleave', () => { mock.style.transform = 'rotate(1.2deg)'; });
+  }
 </script>
 </body>
 </html>
