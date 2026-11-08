@@ -29,6 +29,7 @@ public sealed class ReportsForm : ModulePanel
     private const string EmptyCaption = "Take a quiz and your results will appear here.";
     private const string AllTopicsLabel = "All topics";
     private const string AllDifficultiesLabel = "All difficulties";
+    private const string NoMatchTitle = "No topics match your filters.";
     private const string WeakListHeader = "Topics that need more practice";
     private const string WeakListEmpty = "No topic needs practice right now.";
 
@@ -73,7 +74,7 @@ public sealed class ReportsForm : ModulePanel
         {
             if (sender is ThemedComboBox combo && combo.FindAncestor<ReportsForm>() is { } form)
             {
-                ApplyFilter();
+                form.ApplyFilter();
             }
         };
 
@@ -88,7 +89,7 @@ public sealed class ReportsForm : ModulePanel
         {
             if (sender is ThemedComboBox combo && combo.FindAncestor<ReportsForm>() is { } form)
             {
-                ApplyFilter();
+                form.ApplyFilter();
             }
         };
 

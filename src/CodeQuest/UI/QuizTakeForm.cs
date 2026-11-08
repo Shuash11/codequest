@@ -46,26 +46,30 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private readonly IScoringService _scoring;
     private readonly UserAccount _user;
 
-    private readonly FlowLayoutPanel _cardFlow = null!;
-    private readonly Panel _emptyView = null!;
-    private readonly Panel _runView = null!;
-    private readonly Label _runTitle = null!;
-    private readonly Label _runProgressLabel = null!;
-    private readonly ProgressTrack _runProgress = null!;
-    private readonly Label _questionText = null!;
-    private readonly Label _feedback = null!;
-    private readonly Panel _choiceStack = null!;
-    private readonly FlatButton _previousButton = null!;
-    private readonly FlatButton _nextButton = null!;
-    private readonly Panel _resultView = null!;
-    private readonly Label _resultScore = null!;
-    private readonly Label _resultPercent = null!;
-    private readonly Label _resultMessage = null!;
-    private readonly Panel _resultListCard = null!;
-    private readonly Panel _resultActions = null!;
-    private readonly FlatButton _viewAnswersButton = null!;
-    private readonly FlatButton _retakeButton = null!;
-    private readonly FlatButton _doneButton = null!;
+    // The run/result controls are assigned in builder methods — readonly
+    // fields cannot be assigned from a method, so these are plain fields
+    // (each assigned exactly once, during construction).
+    private FlowLayoutPanel _cardFlow = null!;
+    private Panel _emptyView = null!;
+    private Panel _runView = null!;
+    private Label _runTitle = null!;
+    private Label _runProgressLabel = null!;
+    private ProgressTrack _runProgress = null!;
+    private Label _questionText = null!;
+    private Label _feedback = null!;
+    private Panel _choiceStack = null!;
+    private FlatButton _previousButton = null!;
+    private FlatButton _nextButton = null!;
+    private Panel _resultView = null!;
+    private Label _resultScore = null!;
+    private Label _resultPercent = null!;
+    private Label _resultMessage = null!;
+    private Label _resultContext = null!;
+    private Panel _resultListCard = null!;
+    private Panel _resultActions = null!;
+    private FlatButton _viewAnswersButton = null!;
+    private FlatButton _retakeButton = null!;
+    private FlatButton _doneButton = null!;
     private AttemptReviewForm? _reviewPanel; // the §5.9 drill-in state, created on first open
 
     private Dictionary<int, string> _topicNames = new();
@@ -518,7 +522,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
         _choiceStack.ResumeLayout();
 
-        if (revealed && picked is not null)
+        if (_revealed[_runIndex] && picked is not null)
         {
             ShowFeedback(question.IsCorrectChoice(picked));
         }

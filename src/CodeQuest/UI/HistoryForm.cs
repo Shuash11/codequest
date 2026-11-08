@@ -83,7 +83,7 @@ public sealed class HistoryForm : ModulePanel
         {
             if (sender is InputField field && field.FindAncestor<HistoryForm>() is { } form)
             {
-                ApplyFilter();
+                form.ApplyFilter();
             }
         };
 
@@ -98,7 +98,7 @@ public sealed class HistoryForm : ModulePanel
         {
             if (sender is ThemedComboBox combo && combo.FindAncestor<HistoryForm>() is { } form)
             {
-                ApplyFilter();
+                form.ApplyFilter();
             }
         };
 
@@ -113,7 +113,7 @@ public sealed class HistoryForm : ModulePanel
         {
             if (sender is ThemedComboBox combo && combo.FindAncestor<HistoryForm>() is { } form)
             {
-                ApplyFilter();
+                form.ApplyFilter();
             }
         };
         _scoreFilter.Items.Add(AnyScoreLabel);
