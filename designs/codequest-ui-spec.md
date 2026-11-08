@@ -30,6 +30,17 @@ The palette, type scale, spacing, radii, and separators below are the tokens P7 
 
 ### 2.1 Color tokens
 
+> **Fun-UI amendment (2026-11-08, owner direction: "this is not a fun quiz style ui").**
+> The LEARNER surfaces (quiz cards, answer tiles, score bars, result screen)
+> add a vivid quiz palette on top of the neutral base: `FunPrimary #6C5CE7`,
+> answer tiles Red `#D63040` / Blue `#2D6BE4` / Amber `#C77700` / Green
+> `#1E8E4E` (white bold text — large-text contrast ≥ 3:1), and difficulty
+> colors green/amber/red. The management screens (Topics, Quiz management,
+> Review — where the graded CRUD tables live) keep the D3 neutral palette.
+> The grey accent stays the system base; the fun colors are learner-surface
+> tokens (`FunPrimary`, `TileRed/Blue/Amber/Green`, `LevelEasy/Medium/Hard`,
+> `CorrectWash`, `WrongWash`) in `UITheme.cs` — same single-source rule.
+
 > **D3 re-issue (2026-11-08, owner directive "grey and modern theme").** The blue
 > accent is replaced by a grey accent, and the four contrast findings from the
 > P8 accessibility review are fixed at the token level (F3: SuccessText /
