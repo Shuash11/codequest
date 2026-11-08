@@ -54,7 +54,6 @@ public sealed class MainForm : Form
         ("History", "History", "\uE823", ""),
         ("Reports", "Reports", "\uE9D9", ""),
         ("GenerateQuiz", "Generate quiz", "\uE710", ""),
-        ("Review", "Review", "\uE73E", ""),
         ("Topics", "Topics", "\uE8EC", ""),
     };
 
@@ -345,8 +344,6 @@ public sealed class MainForm : Form
                 "History" => BuildModulePanel(new HistoryForm(_user, attempts, quizzes, topics, answers), key),
                 "Reports" => BuildModulePanel(new ReportsForm(_user, reports), key),
                 "GenerateQuiz" => BuildModulePanel(new GenerateQuizForm(quizzes, topics, generation, _user), key),
-                "Review" => BuildModulePanel(
-                    new QuizReviewForm(quizzes, topics, questions, choices, answers), key),
                 "Topics" => BuildModulePanel(new TopicManageForm(topics, quizzes), key),
                 _ => BuildPlaceholderPanel(key, moduleTitle, phaseNote),
             };
@@ -491,16 +488,16 @@ public sealed class MainForm : Form
     internal void NavigateToModule(string key) => ShowModule(key);
 
     /// <summary>
-    /// The §5.11 "Review now" deep-link: the Review module with one freshly
-    /// generated draft already open in its review view.
+    /// The generation screen's "Play now" deep-link: the Take-quiz module with
+    /// the freshly generated quiz already running.
     /// </summary>
-    internal void NavigateToReview(int quizId)
+    internal void NavigateToNewQuiz(int quizId)
     {
-        ShowModule("Review");
+        ShowModule("TakeQuiz");
 
-        if (_modulePanels.TryGetValue("Review", out Control? panel) && panel is QuizReviewForm review)
+        if (_modulePanels.TryGetValue("TakeQuiz", out Control? panel) && panel is QuizTakeForm takeQuiz)
         {
-            review.OpenQuiz(quizId);
+            takeQuiz.StartNewQuiz(quizId);
         }
     }
 

@@ -433,6 +433,9 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
     }
 
+    /// <summary>The generation screen's deep-link: the Take-quiz module with the freshly generated quiz already running.</summary>
+    internal void StartNewQuiz(int quizId) => StartQuiz(quizId);
+
     /// <summary>Loads the quiz and enters the run (used by PLAY and Retake).</summary>
     private void StartQuiz(int quizId)
     {
