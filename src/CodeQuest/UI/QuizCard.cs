@@ -1,21 +1,24 @@
 // =============================================================================
-// CodeQuest — The fun quiz UI: one QUIZ CARD on the home screen. A takeable
-// quiz is not a table row — it is a big, colorful card with the difficulty
-// color as its header band, the quiz title in bold, topic + question-count
-// metadata, and a wide PLAY pill. Draft quizzes render as locked cards
-// ("Pending review", no play) — visible but not startable.
-// Accessibility: the PLAY pill carries the accessible name "Play {title}" so
-// screen readers announce the target; the card exposes a readable name too.
+// CodeQuest — The quiz card on the home screen, MODERN AND ELEGANT: a clean
+// white card with a hairline border and generous padding — no color bands.
+// The hierarchy is typographic: the quiz title (semibold), a quiet metadata
+// line (topic · question count), and a small soft-tinted difficulty chip
+// (green/amber/red text on its matching tint — color + word, never color
+// alone). The action is one dark PLAY pill, bottom-right. Draft quizzes show
+// a neutral "Pending review" chip and a LOCKED pill — visible, not startable.
+// Accessibility: the PLAY pill carries the accessible name "Play {title}";
+// the card exposes a readable name too.
 // =============================================================================
 
 using CodeQuest.Models;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
 /// <summary>
-/// One colorful quiz card on the take-quiz home (the fun-UI redesign).
+/// One quiz card on the take-quiz home: clean, typographic, elegant.
 /// </summary>
 public sealed class QuizCard : Panel
 {
@@ -24,7 +27,7 @@ public sealed class QuizCard : Panel
 
     private readonly Label _title = new();
     private readonly Label _meta = new();
-    private readonly Label _status = new();
+    private readonly Label _chip = new();
     private readonly FlatButton _play = new();
     private readonly int _quizId;
     private readonly bool _approved;
@@ -39,20 +42,25 @@ public sealed class QuizCard : Panel
         _approved = quiz.Status == QuizStatus.Approved;
 
         DoubleBuffered = true;
-        Size = new Size(UITheme.Scaled(this, 320), UITheme.Scaled(this, 168));
+        Size = new Size(UITheme.Scaled(this, 330), UITheme.Scaled(this, 150));
         Margin = new Padding(0, 0, UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16));
         BackColor = UITheme.Surface;
 
-        Color bandColor = _approved ? LevelColor(quiz.Difficulty) : UITheme.TextTertiary;
-
-        // The difficulty color band across the card's top edge.
-        var band = new Panel
+        // The hairline border of the elegant card (painted, not a band).
+        Paint += static (sender, e) =>
         {
-            Name = "QuizCardBand",
-            Dock = DockStyle.Top,
-            Height = UITheme.Scaled(this, 6),
-            BackColor = bandColor,
+            if (sender is Panel panel)
+            {
+                using var pen = new Pen(UITheme.SeparatorHairline);
+                using GraphicsPath path = UITheme.RoundedPath(
+                    new Rectangle(0, 0, panel.Width - 1, panel.Height - 1), UITheme.Scaled(panel, 14));
+                e.Graphics.DrawPath(pen, path);
+            }
         };
+
+        (string chipText, Color chipTextColor, Color chipBack) = _approved
+            ? (quiz.Difficulty.ToString(), LevelTextColor(quiz.Difficulty), LevelTint(quiz.Difficulty))
+            : ("Pending review", UITheme.TextTertiary, UITheme.Fill);
 
         _title = new Label
         {
@@ -64,7 +72,7 @@ public sealed class QuizCard : Panel
             AutoSize = false,
             AutoEllipsis = true,
             Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16)),
-            Size = new Size(Width - UITheme.Scaled(this, UITheme.Spacing32), UITheme.Scaled(this, 40)),
+            Size = new Size(Width - UITheme.Scaled(this, UITheme.Spacing32), UITheme.Scaled(this, 24)),
         };
 
         _meta = new Label
@@ -75,32 +83,22 @@ public sealed class QuizCard : Panel
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Surface,
             AutoSize = false,
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, 60)),
+            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16) + UITheme.Scaled(this, 28)),
             Size = new Size(Width - UITheme.Scaled(this, UITheme.Spacing32), UITheme.Scaled(this, 18)),
         };
 
-        var difficulty = new Label
+        // The soft-tinted difficulty chip: quiet, small, elegant.
+        _chip = new Label
         {
-            Name = "QuizCardDifficulty",
-            Text = quiz.Difficulty.ToString(),
+            Name = "QuizCardChip",
+            Text = chipText,
             Font = UITheme.CaptionSemibold,
-            ForeColor = _approved ? bandColor : UITheme.TextTertiary,
-            BackColor = UITheme.Surface,
+            ForeColor = chipTextColor,
+            BackColor = chipBack,
             AutoSize = false,
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, 84)),
-            Size = new Size(UITheme.Scaled(this, 140), UITheme.Scaled(this, 18)),
-        };
-
-        _status = new Label
-        {
-            Name = "QuizCardStatus",
-            Text = _approved ? string.Empty : "Pending review",
-            Font = UITheme.Caption,
-            ForeColor = UITheme.TextTertiary,
-            BackColor = UITheme.Surface,
-            AutoSize = false,
-            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, 108)),
-            Size = new Size(Width - UITheme.Scaled(this, UITheme.Spacing32), UITheme.Scaled(this, 18)),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, 56)),
+            Size = new Size(UITheme.Scaled(this, 110), UITheme.Scaled(this, 22)),
         };
 
         _play = new FlatButton
@@ -110,9 +108,9 @@ public sealed class QuizCard : Panel
             AccessibleName = _approved ? "Play " + quiz.Title : quiz.Title + " is pending review",
             Enabled = _approved,
             Variant = _approved ? UITheme.FlatButtonVariant.Primary : UITheme.FlatButtonVariant.Secondary,
-            Location = new Point(Width - UITheme.Scaled(this, 130), Height - UITheme.Scaled(this, 46)),
+            Location = new Point(Width - UITheme.Scaled(this, 124), Height - UITheme.Scaled(this, 46)),
             Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
-            Size = new Size(UITheme.Scaled(this, 114), UITheme.Scaled(this, 32)),
+            Size = new Size(UITheme.Scaled(this, 108), UITheme.Scaled(this, 32)),
         };
         _play.Click += static (sender, e) =>
         {
@@ -124,21 +122,27 @@ public sealed class QuizCard : Panel
 
         Controls.Add(_title);
         Controls.Add(_meta);
-        Controls.Add(difficulty);
-        Controls.Add(_status);
+        Controls.Add(_chip);
         Controls.Add(_play);
-        Controls.Add(band);
 
         AccessibleName = _approved
             ? quiz.Title + ", " + quiz.Difficulty + ", " + questionCount + " questions"
             : quiz.Title + ", pending review";
     }
 
-    /// <summary>The difficulty's fun color (green/amber/red — E/M/H).</summary>
-    private static Color LevelColor(Difficulty difficulty) => difficulty switch
+    /// <summary>The difficulty chip's text color (the fun palette, quiet usage).</summary>
+    private static Color LevelTextColor(Difficulty difficulty) => difficulty switch
     {
         Difficulty.Easy => UITheme.LevelEasy,
         Difficulty.Medium => UITheme.LevelMedium,
         _ => UITheme.LevelHard,
+    };
+
+    /// <summary>The difficulty chip's soft tint background.</summary>
+    private static Color LevelTint(Difficulty difficulty) => difficulty switch
+    {
+        Difficulty.Easy => UITheme.SuccessTint,
+        Difficulty.Medium => UITheme.WarningTint,
+        _ => UITheme.DangerTint,
     };
 }
