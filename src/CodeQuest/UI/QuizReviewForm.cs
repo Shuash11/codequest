@@ -354,7 +354,9 @@ public sealed class QuizReviewForm : ModulePanel
         // The H1 fix: a Dock=Fill container is laid out only once visible, so
         // the cards build at the pre-layout width first; the width-driven
         // rebuild below corrects them the moment the real size arrives.
-        _reviewView.Resize += static (sender, e) =>
+        // NOTE: wire the LOCAL — the `_reviewView` field is still null until
+        // this method returns (the crash the instructor's build hit).
+        review.Resize += static (sender, e) =>
         {
             if (sender is Panel view && view.Visible && view.FindAncestor<QuizReviewForm>() is { } form)
             {
