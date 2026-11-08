@@ -78,6 +78,12 @@ sitting at the machine), and never turn a failure into a crash or a leak.
   `%LOCALAPPDATA%\CodeQuest\error.log`. No key material can appear there
   (keys never enter exception messages); the log write is best-effort and
   can never itself crash the app.
+- **Update check (I6+):** once per launch the app contacts GitHub's public
+  releases API (`api.github.com/repos/Shuash11/codequest/releases/latest`,
+  unauthenticated, 8-second timeout, no data sent beyond a User-Agent
+  header) to detect a newer version. Every failure is silent. No other
+  network calls exist besides the AI generation the user explicitly
+  triggers.
 - Grep for empty catch blocks: **clean** (the only swallow-by-design catch is
   the error-log write itself, commented as such).
 

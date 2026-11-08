@@ -508,5 +508,36 @@ public sealed class MainForm : Form
     {
         base.OnShown(e);
         ShowModule("TakeQuiz");
+        StartUpdateCheck();
+    }
+
+    /// <summary>
+    /// The version check (once per launch, off the UI thread): a newer public
+    /// release raises the "update required" dialog with the release notes.
+    /// Every failure is silent — the check never disturbs a study session.
+    /// </summary>
+    private void StartUpdateCheck()
+    {
+        Task.Run(() => UpdateCheckService.CheckAsync())
+            .ContinueWith(
+                task => MaybeShowUpdateDialog(task.Result),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
+    /// <summary>Shows the update dialog only for a verified newer release.</summary>
+    private void MaybeShowUpdateDialog(UpdateCheckResult? result)
+    {
+        if (result is not { IsNewer: true })
+        {
+            return; // current build, offline, or a failed check — stay silent
+        }
+
+        using var dialog = new UpdateDialog(result);
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            Close(); // "Download update" — the browser has the new build; this session ends
+        }
     }
 }
