@@ -125,10 +125,12 @@ internal static class Program
     }
 
     /// <summary>
-    /// Appends one exception line to %LOCALAPPDATA%\CodeQuest\error.log — the
-    /// I5 logging hook (file-based, no key material: the key travels only in
-    /// request headers, never in exception messages). A logging failure is
-    /// swallowed: logging must never turn a handled failure into a crash.
+    /// Appends one exception report to %LOCALAPPDATA%\CodeQuest\error.log —
+    /// the I5 logging hook. The full exception text (type, message, stack,
+    /// inner exceptions) is what turns a one-line mystery into a fixable
+    /// bug report; the key never appears in any of it (the key travels only
+    /// in request headers). A logging failure is swallowed: logging must
+    /// never turn a handled failure into a crash.
     /// </summary>
     private static void AppendErrorLog(Exception exception)
     {
@@ -140,7 +142,7 @@ internal static class Program
             Directory.CreateDirectory(directory);
             File.AppendAllText(
                 Path.Combine(directory, "error.log"),
-                $"{DateTimeOffset.UtcNow:yyyy-MM-dd'T'HH:mm:ss'Z'}\t{exception.GetType().Name}\t{exception.Message}{Environment.NewLine}");
+                $"===== {DateTimeOffset.UtcNow:yyyy-MM-dd'T'HH:mm:ss'Z'} ====={Environment.NewLine}{exception}{Environment.NewLine}{Environment.NewLine}");
         }
         catch
         {
