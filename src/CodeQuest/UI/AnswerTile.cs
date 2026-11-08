@@ -48,15 +48,18 @@ public sealed class AnswerTile : Control
     }
 
     /// <summary>The choice text this tile represents.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string ChoiceText { get => Text; set { Text = value; Invalidate(); } }
 
     /// <summary>The shape mark drawn in the tile's left badge (▲ ● ◆ ■).</summary>
     public string ShapeGlyph { get; }
 
     /// <summary>The choice id this tile maps to (set by the run, read by the click handler).</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public int ChoiceId { get; set; }
 
     /// <summary>Whether the tile is the picked answer before the reveal.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public bool IsSelected
     {
         get => _selected;
@@ -64,6 +67,7 @@ public sealed class AnswerTile : Control
     }
 
     /// <summary>Whether the question is revealed — tiles lock and show the verdict.</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public bool IsRevealed
     {
         get => _revealed;
@@ -71,6 +75,7 @@ public sealed class AnswerTile : Control
     }
 
     /// <summary>Whether this tile is the answer key (draws the green wash on reveal).</summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public bool IsCorrectTile
     {
         get => _isCorrectTile;
