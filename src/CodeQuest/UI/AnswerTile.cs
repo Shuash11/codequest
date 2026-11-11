@@ -14,6 +14,7 @@ public sealed class AnswerTile : Control
     private const string CrossGlyph = "\u2717";
 
     private readonly Color _baseColor;
+    private bool _hovered;
     private bool _selected;
     private bool _revealed;
     private bool _isCorrectTile;
@@ -24,11 +25,11 @@ public sealed class AnswerTile : Control
         SetStyle(ControlStyles.ResizeRedraw, true);
         SetStyle(ControlStyles.Selectable, true);
         _baseColor = baseColor;
-        ShapeGlyph = ShapeGlyphs[positionIndex % ShapeGlyphs.Length];
+        BadgeLetter = ((char)('A' + (positionIndex % 26))).ToString();
         BackColor = baseColor;
         Font = UITheme.BodySemibold;
         Text = choiceText;
-        Height = UITheme.Scaled(this, 54);
+        Height = UITheme.Scaled(this, 56);
         Cursor = Cursors.Hand;
     }
 
@@ -40,7 +41,9 @@ public sealed class AnswerTile : Control
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string ChoiceText { get => Text; set { Text = value; Invalidate(); } }
 
-    public string ShapeGlyph { get; }
+    public string BadgeLetter { get; }
+
+    public string ShapeGlyph => ShapeGlyphs[0];
 
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public int ChoiceId { get; set; }
@@ -56,7 +59,24 @@ public sealed class AnswerTile : Control
     public bool IsRevealed
     {
         get => _revealed;
-        set { if (_revealed != value) { _revealed = value; Invalidate(); } }
+        set
+        {
+            if (_revealed == value)
+            {
+                return;
+            }
+
+            _revealed = value;
+            // A revealed tile must stop LOOKING interactive (design spec
+            // R2.3): no hand cursor, no hover fill.
+            Cursor = _revealed ? Cursors.Default : Cursors.Hand;
+            if (!_revealed)
+            {
+                _hovered = false;
+            }
+
+            Invalidate();
+        }
     }
 
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
@@ -70,6 +90,8 @@ public sealed class AnswerTile : Control
     {
         get => _revealed && _selected && !_isCorrectTile;
     }
+
+    private Font VerdictGlyphFont => UITheme.UsesGameIconFont ? UITheme.GameGlyph : UITheme.NavGlyph;
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -85,7 +107,7 @@ public sealed class AnswerTile : Control
         {
             fill = UITheme.WrongWash;
         }
-        else if (_selected || ClientRectangle.Contains(PointToClient(Cursor.Position)))
+        else if (_selected || (_hovered && !_revealed))
         {
             fill = UITheme.TileHover(_baseColor);
         }
@@ -96,7 +118,9 @@ public sealed class AnswerTile : Control
             e.Graphics.FillPath(fillBrush, path);
         }
 
-        if (Focused && !_revealed)
+        // The selected tile carries its own ring; keyboard focus shows the
+        // ring in EVERY state — including revealed (design spec R2.3).
+        if (Focused || (_selected && !_revealed))
         {
             using var ringPen = new Pen(UITheme.TextOnAccent, UITheme.Scaled(this, 2));
             using GraphicsPath ringPath = UITheme.RoundedPath(
@@ -108,20 +132,53 @@ public sealed class AnswerTile : Control
         int badge = UITheme.Scaled(this, 30);
         var badgeRect = new Rectangle(inset, (Height - badge) / 2, badge, badge);
 
-        using (var badgeBrush = new SolidBrush(Color.FromArgb(52, UITheme.TextOnAccent)))
+        // The badge tells the state at a glance: letter for resting/hover/
+        // selected, verdict glyph at reveal (design spec R2.3).
+        string badgeText;
+        Font badgeFont;
+        Color badgeFill;
+        Color badgeInk;
+        if (_revealed && _isCorrectTile)
+        {
+            badgeText = UITheme.GlyphCheckCircle;
+            badgeFont = VerdictGlyphFont;
+            badgeFill = UITheme.TextOnAccent;
+            badgeInk = UITheme.CorrectWash;
+        }
+        else if (IsWrongPick)
+        {
+            badgeText = UITheme.GlyphDismissCircle;
+            badgeFont = VerdictGlyphFont;
+            badgeFill = UITheme.TextOnAccent;
+            badgeInk = UITheme.WrongWash;
+        }
+        else if (_selected)
+        {
+            badgeText = BadgeLetter;
+            badgeFont = UITheme.BodySemibold;
+            badgeFill = UITheme.TextOnAccent;
+            badgeInk = _baseColor;
+        }
+        else
+        {
+            int alpha = _revealed ? 30 : _hovered ? 96 : 52;
+            badgeText = BadgeLetter;
+            badgeFont = UITheme.BodySemibold;
+            badgeFill = Color.FromArgb(alpha, UITheme.TextOnAccent);
+            badgeInk = UITheme.TextOnAccent;
+        }
+
+        using (var badgeBrush = new SolidBrush(badgeFill))
         {
             e.Graphics.FillEllipse(badgeBrush, badgeRect);
         }
 
-        string verdictMark = _revealed
-            ? (_isCorrectTile ? CheckGlyph : IsWrongPick ? CrossGlyph : string.Empty)
-            : ShapeGlyph;
         TextRenderer.DrawText(
             e.Graphics,
-            verdictMark,
-            UITheme.NavGlyph,
+            badgeText,
+            badgeFont,
             badgeRect,
-            UITheme.TextOnAccent,
+            badgeInk,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
 
         int textX = inset + badge + UITheme.Scaled(this, UITheme.Spacing12);
@@ -152,12 +209,13 @@ public sealed class AnswerTile : Control
     protected override void OnMouseEnter(EventArgs e)
     {
         base.OnMouseEnter(e);
-        if (!_revealed) { Invalidate(); }
+        _hovered = true;
+        Invalidate();
     }
 
     protected override void OnMouseLeave(EventArgs e)
     {
-        base.OnMouseLeave(e);
+        _hovered = false;
         Invalidate();
     }
 

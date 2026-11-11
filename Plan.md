@@ -145,10 +145,17 @@ downloading assets from GitHub for the redesign.
 
 | WP | Scope | Owner | State |
 |---|---|---|---|
-| T4-WP1 | Designer spec: game-like take-quiz screen + random-mix entry + result celebration | UX/UI Designer | 🔄 in flight |
-| T4-WP2 | Random mix: data (special topic/quiz, draw+shuffle service), Take-quiz entry, attempt recording | Implementer/Lead | pending WP1 |
-| T4-WP3 | Quiz screen redesign + Fluent icon integration | Implementer/Lead | pending WP1 |
-| T4-WP4 | Integration: build, tests, visual walk-through | Lead | pending |
+| T4-WP1 | Designer spec: game-like take-quiz screen + random-mix entry + result celebration | UX/UI Designer | ✅ spec delivered; Lead rulings: "Mix" chip approved; levelGained = pre-submit level read at StartQuiz; [Option] polish omitted |
+| T4-WP2 | Random mix: service (draw/shuffle/copy, collision-safe title, dedicated topic) + Take-quiz banner entry + attempt flow | Lead | ✅ 8/8 service tests |
+| T4-WP3 | Game redesign: Fluent icon font (embedded), token additions (StreakFlame/PerfectGold/QuestionHeadline/GameGlyph*), AnswerTile 5-state table, segmented progress, streak cue + single 180ms pulse, verdict bands + level-up band, result-row glyphs | Lead | ✅ code complete; visual walk-through pending (no renderer) |
+| T4-WP4 | Integration: build, tests, review, visual walk-through | Lead | 🔄 build 0/0 + 187/187 (Debug+Release); QA/review next |
+
+## Integration notes (task 4)
+
+- The Fluent font ships EMBEDDED in the exe (no loose file, no installer
+  change); missing-font fallback = the pre-T4 Segoe glyphs.
+- The owner's installed app gets the new build by direct exe swap; the
+  official installer for Downloads comes from the background CI download.
 
 ---
 
@@ -214,16 +221,22 @@ remembered name (explicit sign-out asks again next launch).
 | T2-WP3 | Update progress dialog + dialog wiring | `UpdateProgressDialog.cs` (new), `UpdateDialog.cs`, `MainForm.cs` | ✅ |
 | T2-WP4 | Remembered name | `SessionStore.cs` (new), `SessionStoreTests.cs` (new), `Program.cs`, `LoginForm.cs` | ✅ 8/8 (camelCase fix applied) |
 | T2-WP5 | Docs + integration | `docs/release-process.md`, `docs/security-notes.md`, `docs/user-guide.md` | ✅ |
-| T2-WP6 | Independent review (download-and-execute path) | — | ⚠️ Reviewer + Security Reviewer never returned (session ids ses_e35760721ffe02HS5fBIdp7Lfo, ses_e35760720ffeRdCcCsxUn4mPXV); the owner directed to proceed; the Lead self-reviewed instead — **independent review reported incomplete** |
+| T2-WP6 | Independent review (download-and-execute path) | — | ✅ Both reviewers returned. Security: findings F1–F7/P1–P8 fixed in `a470018`/`55fe240` (trusted-host allowlist, size cap, malformed-digest abort, Wait-Process on real exit, dialog-close cancels, timeout≠cancel, broad startup catch, https fallback, CodeQuest-Setup asset prefix); accepted risks recorded in docs/security-notes.md (unsigned installer, same-user temp tampering, shared-seat identity). Code review: M1 broad catch ✓, m1 cancel+exit-code gate ✓, m2 Start() check ✓, m3 asset-parse robustness ✓; end-to-end silent install still needs the owner's manual walk-through on a real update. |
 
 ## Integration status (2026-11-11)
 
-- Debug + Release builds: 0 errors; full suite 175/175 (was 156 before task 2).
-- Task 2 + task 3 committed; pushed on the owner's explicit instruction.
-- Not done (owner-authorized only): version bump, tag, GitHub release.
-- Manual (owner): GUI walk-through on an installed build — B1 end-to-end
-  silent update + relaunch, B4 remembered name, and the visual state of the
-  two dialogs (no rendered previews were available).
+- Debug + Release builds: 0 errors; full suite 179/179 (was 156 before task 2).
+- Task 2 + task 3 + hardening committed; pushed on the owner's explicit
+  instruction.
+- The owner's installed app was upgraded directly to `1.2.0+55fe240`
+  (exe swap; config now OpenRouter-only) — CI artifact download kept
+  stalling, so the installer copy for Downloads comes from the resumed
+  background download of run 55fe240's artifact.
+- Generation-banner defect found via the owner's screenshot: a skipped tier
+  (nvidia, empty key) masked openrouter's real result — DescribeFailure now
+  describes the first REAL failure; configs carry openrouter only.
+- Not done (owner-authorized only): version bump beyond 1.2.0, tag, GitHub
+  release.
 
 ## Task 3 status (one-line comments): DONE
 

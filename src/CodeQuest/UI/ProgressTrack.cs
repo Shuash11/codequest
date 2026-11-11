@@ -92,6 +92,29 @@ public sealed class ProgressTrack : Control
         }
     }
 
+    private int _segments;
+
+    /// <summary>
+    /// When greater than 1, thin separators divide the track into N equal
+    /// segments (one per question) — progress becomes countable. 0 = plain.
+    /// Marquee mode ignores segments.
+    /// </summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    public int Segments
+    {
+        get => _segments;
+        set
+        {
+            if (_segments == value)
+            {
+                return;
+            }
+
+            _segments = value;
+            Invalidate();
+        }
+    }
+
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         e.Graphics.Clear(UITheme.ContainerSurface(this));
@@ -128,6 +151,24 @@ public sealed class ProgressTrack : Control
             Rectangle fill = new(0, 0, fillWidth, Height);
             using var fillBrush = new SolidBrush(UITheme.Accent);
             DrawPill(e.Graphics, fillBrush, fill);
+        }
+
+        if (_segments > 1)
+        {
+            // The countable variant (design spec R2.1): separators cut the
+            // pill into one segment per question, in the container's surface
+            // color so they read through both track and fill.
+            e.Graphics.SetClip(track);
+            using var separatorBrush = new SolidBrush(UITheme.ContainerSurface(this));
+            int separatorWidth = UITheme.Scaled(this, 2);
+            double step = (double)Width / _segments;
+            for (int i = 1; i < _segments; i++)
+            {
+                int x = (int)Math.Round(i * step) - separatorWidth / 2;
+                e.Graphics.FillRectangle(separatorBrush, x, 0, separatorWidth, Height);
+            }
+
+            e.Graphics.ResetClip();
         }
     }
 

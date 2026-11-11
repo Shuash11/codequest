@@ -32,10 +32,30 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private readonly UserAccount _user;
     private readonly IGamificationRepository _gamification;
     private readonly IAchievementEvaluator _achievements;
+    private readonly IRandomMixService _randomMix;
 
     private FlowLayoutPanel _cardFlow = null!;
     private Panel _emptyView = null!;
     private Panel _runView = null!;
+    private Panel _mixBanner = null!;
+    private Label _mixGlyph = null!;
+    private Label _mixTitle = null!;
+    private Label _mixCaption = null!;
+    private FlatButton _mixPlay = null!;
+    private Label _questionBadge = null!;
+    private Label _questionTopic = null!;
+    private Label _feedbackGlyph = null!;
+    private Label _streakFlame = null!;
+    private Label _streakCount = null!;
+    private Label _resultTrophy = null!;
+    private Label _resultXpGlyph = null!;
+    private Panel _resultLevelUp = null!;
+    private Label _resultLevelUpText = null!;
+    private Label _resultLevelUpCaption = null!;
+    private System.Windows.Forms.Timer _streakPulseTimer = null!;
+    private int _streakPulseTicks;
+    private int _streak;
+    private int _levelBeforeRun;
     private Label _runTitle = null!;
     private Label _runProgressLabel = null!;
     private ProgressTrack _runProgress = null!;
@@ -111,6 +131,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _user = user;
         _gamification = gamification;
         _achievements = achievements;
+        _randomMix = new RandomMixService(quizzes, questions, topics);
 
         Dock = DockStyle.Fill;
         BackColor = UITheme.Background;
@@ -164,11 +185,20 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
         _runView = BuildRunView();
         _resultView = BuildResultView();
+        _mixBanner = BuildMixBanner();
 
         Controls.Add(_cardFlow);
         Controls.Add(_runView);
         Controls.Add(_resultView);
         Controls.Add(_emptyView);
+
+        _cardFlow.Resize += static (sender, e) =>
+        {
+            if (sender is FlowLayoutPanel flow && flow.FindAncestor<QuizTakeForm>() is { } form)
+            {
+                form.SyncMixBannerWidth();
+            }
+        };
 
         _runView.Resize += static (sender, e) =>
         {
@@ -217,6 +247,12 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _cardFlow.SuspendLayout();
         _cardFlow.Controls.Clear();
 
+        // The random-mix banner leads the list (design spec R1): full width,
+        // enabled only when enough approved questions exist to draw from.
+        SyncMixBannerWidth();
+        SetMixBannerState(_randomMix.CountDrawableQuestions() >= _randomMix.MinimumQuestions);
+        _cardFlow.Controls.Add(_mixBanner);
+
         foreach (Quiz quiz in quizzes)
         {
             string topicName = _topicNames.TryGetValue(quiz.TopicId, out string? name) ? name : string.Empty;
@@ -241,6 +277,142 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         bool empty = quizzes.Count == 0;
         _emptyView.Visible = empty;
         _cardFlow.Visible = !empty;
+    }
+
+    private Panel BuildMixBanner()
+    {
+        var banner = new Panel
+        {
+            Name = "MixBanner",
+            Height = UITheme.Scaled(this, 96),
+            BackColor = UITheme.Background,
+            Margin = new Padding(0, 0, UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16)),
+        };
+        banner.Paint += static (sender, e) =>
+        {
+            if (sender is Panel panel)
+            {
+                using var path = UITheme.RoundedPath(
+                    new Rectangle(0, 0, panel.Width - 1, panel.Height - 1), UITheme.Scaled(panel, UITheme.RadiusCard));
+                using var brush = new SolidBrush(panel.Enabled ? UITheme.AccentTint : UITheme.Fill);
+                e.Graphics.FillPath(brush, path);
+            }
+        };
+
+        _mixGlyph = new Label
+        {
+            Name = "MixGlyph",
+            Text = UITheme.GlyphShuffle,
+            Font = UITheme.GameGlyphLarge,
+            ForeColor = UITheme.AccentText,
+            BackColor = UITheme.AccentTint,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleCenter,
+        };
+
+        _mixTitle = new Label
+        {
+            Name = "MixTitle",
+            Text = "Random mix",
+            Font = UITheme.BodySemibold,
+            ForeColor = UITheme.TextPrimary,
+            BackColor = UITheme.AccentTint,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+        };
+
+        _mixCaption = new Label
+        {
+            Name = "MixCaption",
+            Text = "A fresh quiz drawn from every topic \u2014 every take is different.",
+            Font = UITheme.Caption,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.AccentTint,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+        };
+
+        _mixPlay = new FlatButton
+        {
+            Name = "MixPlayButton",
+            Text = "Play",
+            AccessibleName = "Play random mix",
+        };
+        _mixPlay.Click += static (sender, e) =>
+        {
+            if (sender is FlatButton button && button.FindAncestor<QuizTakeForm>() is { } form)
+            {
+                form.HandleMixPlay();
+            }
+        };
+
+        banner.Controls.Add(_mixGlyph);
+        banner.Controls.Add(_mixTitle);
+        banner.Controls.Add(_mixCaption);
+        banner.Controls.Add(_mixPlay);
+        banner.Resize += static (sender, e) =>
+        {
+            if (sender is Panel panel)
+            {
+                panel.Invalidate();
+            }
+        };
+
+        return banner;
+    }
+
+    private void SyncMixBannerWidth()
+    {
+        _mixBanner.Width = Math.Max(UITheme.Scaled(this, 200), _cardFlow.ClientSize.Width - UITheme.Scaled(this, UITheme.Spacing16));
+        int inset = UITheme.Scaled(this, UITheme.Spacing16);
+        int height = _mixBanner.Height;
+        int glyphSize = UITheme.Scaled(this, 32);
+        _mixGlyph.SetBounds(inset, (height - glyphSize) / 2, glyphSize, glyphSize);
+
+        int textX = inset + glyphSize + UITheme.Scaled(this, UITheme.Spacing12);
+        int buttonWidth = UITheme.Scaled(this, 120);
+        int textWidth = _mixBanner.Width - textX - buttonWidth - inset * 2;
+        _mixTitle.SetBounds(textX, inset + UITheme.Scaled(this, 4), Math.Max(textWidth, 100), UITheme.Scaled(this, 22));
+        _mixCaption.SetBounds(textX, inset + UITheme.Scaled(this, 4) + UITheme.Scaled(this, 24), Math.Max(textWidth, 100), UITheme.Scaled(this, 18));
+
+        int buttonHeight = UITheme.Scaled(this, 32);
+        _mixPlay.SetBounds(
+            _mixBanner.Width - inset - buttonWidth,
+            (height - buttonHeight) / 2,
+            buttonWidth,
+            buttonHeight);
+    }
+
+    private void SetMixBannerState(bool enabled)
+    {
+        _mixBanner.Enabled = enabled;
+        _mixGlyph.ForeColor = enabled ? UITheme.AccentText : UITheme.TextTertiary;
+        _mixGlyph.BackColor = enabled ? UITheme.AccentTint : UITheme.Fill;
+        _mixTitle.ForeColor = enabled ? UITheme.TextPrimary : UITheme.TextTertiary;
+        _mixTitle.BackColor = _mixGlyph.BackColor;
+        _mixCaption.BackColor = _mixGlyph.BackColor;
+        _mixCaption.Text = enabled
+            ? "A fresh quiz drawn from every topic \u2014 every take is different."
+            : "Needs at least 4 approved questions. Approve more quizzes to unlock Random mix.";
+        _mixPlay.Enabled = enabled;
+        _mixBanner.Invalidate();
+    }
+
+    private void HandleMixPlay()
+    {
+        try
+        {
+            int quizId = _randomMix.CreateMix();
+            StartQuiz(quizId);
+        }
+        catch (RandomMixException)
+        {
+            ReportStatus("Not enough approved questions for a random mix yet.", success: false);
+        }
+        catch (DataAccessException)
+        {
+            ReportStatus("The random mix could not be created. Please try again.", success: false);
+        }
     }
 
     private Panel BuildRunView()
@@ -308,6 +480,27 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             BackColor = UITheme.Background,
             AutoSize = false,
         };
+        _streakFlame = new Label
+        {
+            Name = "RunStreakFlame",
+            Text = UITheme.GlyphFlame,
+            Font = UITheme.GameGlyph,
+            ForeColor = UITheme.StreakFlame,
+            BackColor = UITheme.Background,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleRight,
+            Visible = false,
+        };
+        _streakCount = new Label
+        {
+            Name = "RunStreakCount",
+            Font = UITheme.BodySemibold,
+            ForeColor = UITheme.TextPrimary,
+            BackColor = UITheme.Background,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleRight,
+            Visible = false,
+        };
         _runProgress = new ProgressTrack { Name = "RunProgressTrack", Dock = DockStyle.Top };
 
         var header = new Panel
@@ -319,15 +512,54 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         };
         header.Controls.Add(_runTitle);
         header.Controls.Add(_runProgressLabel);
+        header.Controls.Add(_streakFlame);
+        header.Controls.Add(_streakCount);
 
         var card = new CardPanel { Name = "RunQuestionCard", Dock = DockStyle.Fill };
+        _questionBadge = new Label
+        {
+            Name = "RunQuestionBadge",
+            Font = UITheme.CaptionSemibold,
+            ForeColor = UITheme.LevelMedium,
+            BackColor = UITheme.WarningTint,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleCenter,
+        };
+        _questionBadge.Paint += static (sender, e) =>
+        {
+            if (sender is Label chip)
+            {
+                using var path = UITheme.RoundedPath(
+                    new Rectangle(0, 0, chip.Width - 1, chip.Height - 1), UITheme.Scaled(chip, UITheme.RadiusChip));
+                using var brush = new SolidBrush(chip.BackColor);
+                e.Graphics.FillPath(brush, path);
+            }
+        };
+        _questionTopic = new Label
+        {
+            Name = "RunQuestionTopic",
+            Font = UITheme.Caption,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.Surface,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+        };
         _questionText = new Label
         {
             Name = "RunQuestionText",
-            Font = UITheme.BodySemibold,
+            Font = UITheme.QuestionHeadline,
             ForeColor = UITheme.TextPrimary,
             BackColor = UITheme.Surface,
             AutoSize = false,
+        };
+        _feedbackGlyph = new Label
+        {
+            Name = "RunFeedbackGlyph",
+            Font = UITheme.UsesGameIconFont ? UITheme.GameGlyph : UITheme.NavGlyph,
+            BackColor = UITheme.Surface,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Visible = false,
         };
         _feedback = new Label
         {
@@ -339,7 +571,10 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             Visible = false,
         };
         _choiceStack = new Panel { Name = "RunChoiceStack", BackColor = UITheme.Surface };
+        card.Controls.Add(_questionBadge);
+        card.Controls.Add(_questionTopic);
         card.Controls.Add(_questionText);
+        card.Controls.Add(_feedbackGlyph);
         card.Controls.Add(_feedback);
         card.Controls.Add(_choiceStack);
 
@@ -358,10 +593,17 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
 
         int titleHeight = UITheme.Scaled(this, 22);
+        int streakWidth = UITheme.Scaled(this, 56);
         _runTitle.Location = new Point(0, 0);
         _runTitle.Size = new Size(header.Width, titleHeight);
         _runProgressLabel.Location = new Point(0, titleHeight + UITheme.Scaled(this, UITheme.Spacing4));
-        _runProgressLabel.Size = new Size(header.Width, UITheme.Scaled(this, 18));
+        _runProgressLabel.Size = new Size(header.Width - streakWidth, UITheme.Scaled(this, 18));
+
+        // The streak cue sits at the row's right edge (design spec R2.1).
+        _streakCount.Size = new Size(UITheme.Scaled(this, 26), UITheme.Scaled(this, 18));
+        _streakCount.Location = new Point(header.Width - _streakCount.Width, titleHeight + UITheme.Scaled(this, UITheme.Spacing4));
+        _streakFlame.Size = new Size(UITheme.Scaled(this, 20), UITheme.Scaled(this, 18));
+        _streakFlame.Location = new Point(_streakCount.Left - _streakFlame.Width, _streakCount.Top);
     }
 
     private void LayoutQuestionCard()
@@ -373,6 +615,16 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
         int inset = UITheme.Scaled(this, UITheme.Spacing16);
         int contentWidth = Math.Max(card.Width - inset * 2, 1);
+
+        // The badge row (design spec R2.2): difficulty/topic identity above
+        // the question headline.
+        Size badgeSize = TextRenderer.MeasureText(_questionBadge.Text, _questionBadge.Font);
+        _questionBadge.Location = new Point(inset, inset);
+        _questionBadge.Size = new Size(badgeSize.Width + UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, 20));
+        _questionTopic.Location = new Point(_questionBadge.Right + UITheme.Scaled(this, UITheme.Spacing8), inset);
+        _questionTopic.Size = new Size(Math.Max(contentWidth - _questionBadge.Width - UITheme.Scaled(this, UITheme.Spacing8), 1), UITheme.Scaled(this, 20));
+
+        int textTop = inset + UITheme.Scaled(this, 20) + UITheme.Scaled(this, UITheme.Spacing8);
         int textHeight = TextRenderer.MeasureText(
             _questionText.Text.Length == 0 ? " " : _questionText.Text,
             _questionText.Font,
@@ -380,15 +632,19 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             TextFormatFlags.WordBreak)
             .Height;
 
-        _questionText.Location = new Point(inset, inset);
+        _questionText.Location = new Point(inset, textTop);
         _questionText.Size = new Size(contentWidth, textHeight);
 
-        int top = inset + textHeight + UITheme.Scaled(this, UITheme.Spacing12);
+        int top = textTop + textHeight + UITheme.Scaled(this, UITheme.Spacing12);
 
         if (_feedback.Visible)
         {
-            _feedback.Location = new Point(inset, top);
-            _feedback.Size = new Size(contentWidth, UITheme.Scaled(this, 22));
+            Size glyphSize = TextRenderer.MeasureText(
+                _feedbackGlyph.Text.Length == 0 ? " " : _feedbackGlyph.Text, _feedbackGlyph.Font);
+            _feedbackGlyph.Location = new Point(inset, top);
+            _feedbackGlyph.Size = new Size(glyphSize.Width + UITheme.Scaled(this, 2), UITheme.Scaled(this, 22));
+            _feedback.Location = new Point(_feedbackGlyph.Right, top);
+            _feedback.Size = new Size(Math.Max(contentWidth - _feedbackGlyph.Width, 1), UITheme.Scaled(this, 22));
             top += UITheme.Scaled(this, 22) + UITheme.Scaled(this, UITheme.Spacing8);
         }
 
@@ -426,6 +682,27 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _selections = new int?[quiz.Questions.Count];
         _revealed = new bool[quiz.Questions.Count];
         _runIndex = 0;
+        _streak = 0;
+        StopStreakPulse();
+        UpdateStreakCue();
+        _levelBeforeRun = _gamification.GetUserProgress(_user.UserId).Level;
+
+        // The run's identity chip (design spec R2.2): "Mix" for random-mix
+        // runs, otherwise the difficulty with its level colors.
+        string topicName = _topicNames.TryGetValue(quiz.TopicId, out string? name) ? name : string.Empty;
+        bool isMix = topicName == RandomMixService.TopicName;
+        _questionBadge.Text = isMix ? "Mix" : quiz.Difficulty.ToString();
+        (_questionBadge.BackColor, _questionBadge.ForeColor) = isMix
+            ? (UITheme.AccentTint, UITheme.AccentText)
+            : quiz.Difficulty switch
+            {
+                Difficulty.Easy => (UITheme.SuccessTint, UITheme.LevelEasy),
+                Difficulty.Hard => (UITheme.DangerTint, UITheme.LevelHard),
+                _ => (UITheme.WarningTint, UITheme.LevelMedium),
+            };
+        _questionTopic.Text = topicName;
+
+        _runProgress.Segments = quiz.Questions.Count;
 
         _runTitle.Text = quiz.Title;
         ShowView(_runView);
@@ -438,6 +715,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _selections = Array.Empty<int?>();
         _revealed = Array.Empty<bool>();
         _runIndex = 0;
+        _streak = 0;
+        StopStreakPulse();
         _tiles = new List<AnswerTile>();
         ShowList(announceCompletion: false);
     }
@@ -509,6 +788,9 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
     private void ShowFeedback(bool correct)
     {
+        _feedbackGlyph.Text = correct ? UITheme.GlyphCheck : UITheme.GlyphDismiss;
+        _feedbackGlyph.ForeColor = correct ? UITheme.SuccessText : UITheme.DangerText;
+        _feedbackGlyph.Visible = true;
         _feedback.Text = correct ? FeedbackCorrect : FeedbackWrong;
         _feedback.ForeColor = correct ? UITheme.SuccessText : UITheme.DangerText;
         _feedback.Visible = true;
@@ -547,9 +829,90 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             other.IsCorrectTile = other.ChoiceId == question.GetCorrectChoice()?.ChoiceId;
         }
 
+        // The streak is run-local: consecutive correct answers on reveal
+        // (design spec R2.1). A wrong answer simply hides the cue.
+        if (correct)
+        {
+            _streak++;
+            UpdateStreakCue();
+            if (_streak >= 2 && UITheme.MotionEnabled)
+            {
+                StartStreakPulse();
+            }
+        }
+        else
+        {
+            _streak = 0;
+            UpdateStreakCue();
+        }
+
         ShowFeedback(correct);
         UpdateRunProgress();
         LayoutQuestionCard();
+    }
+
+    private void UpdateStreakCue()
+    {
+        bool show = _streak >= 2;
+        _streakFlame.Visible = show && UITheme.GlyphFlame.Length > 0;
+        _streakCount.Visible = show;
+        _streakCount.Text = $"\u00d7{_streak}";
+        SetStreakCueInverted(false);
+        if (show)
+        {
+            LayoutRunHeader();
+        }
+    }
+
+    private void StartStreakPulse()
+    {
+        // The ONE allowed motion (design spec R7): a single 180ms invert
+        // blink on the increment, never looping, always ending at rest.
+        StopStreakPulse();
+        _streakPulseTicks = 0;
+        _streakPulseTimer = new System.Windows.Forms.Timer { Interval = 60 };
+        _streakPulseTimer.Tick += static (sender, e) =>
+        {
+            if (sender is System.Windows.Forms.Timer timer && timer.Tag is QuizTakeForm form)
+            {
+                form._streakPulseTicks++;
+                if (form._streakPulseTicks >= 3)
+                {
+                    form.SetStreakCueInverted(false);
+                    timer.Stop();
+                    timer.Dispose();
+                }
+                else
+                {
+                    form.SetStreakCueInverted(true);
+                }
+            }
+        };
+        _streakPulseTimer.Tag = this;
+        SetStreakCueInverted(true);
+        _streakPulseTimer.Start();
+    }
+
+    private void StopStreakPulse()
+    {
+        _streakPulseTimer?.Stop();
+        _streakPulseTimer?.Dispose();
+        _streakPulseTimer = null;
+        SetStreakCueInverted(false);
+    }
+
+    private void SetStreakCueInverted(bool inverted)
+    {
+        if (_streakFlame.Parent is null)
+        {
+            return;
+        }
+
+        Color fill = inverted ? UITheme.StreakFlame : UITheme.Background;
+        _streakFlame.BackColor = fill;
+        _streakCount.BackColor = fill;
+        _streakFlame.ForeColor = inverted ? UITheme.Background : UITheme.StreakFlame;
+        _streakCount.ForeColor = inverted ? UITheme.Background : UITheme.TextPrimary;
     }
 
     private void MoveQuestion(int delta)
@@ -726,13 +1089,23 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _resultMessage = new Label
         {
             Name = "ResultMessageLabel",
-            Font = UITheme.BodySemibold,
+            Font = UITheme.Title,
             ForeColor = UITheme.TextPrimary,
             BackColor = UITheme.Surface,
             AutoSize = true,
             Location = new Point(
                 UITheme.Scaled(this, UITheme.Spacing16),
                 UITheme.Scaled(this, UITheme.Spacing12) + UITheme.Scaled(this, 52)),
+        };
+        _resultTrophy = new Label
+        {
+            Name = "ResultTrophyGlyph",
+            Text = UITheme.GlyphTrophy,
+            Font = UITheme.GameGlyphLarge,
+            ForeColor = UITheme.PerfectGold,
+            BackColor = UITheme.Surface,
+            AutoSize = true,
+            Visible = false,
         };
         _resultContext = new Label
         {
@@ -748,6 +1121,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         hero.Controls.Add(_resultScore);
         hero.Controls.Add(_resultPercent);
         hero.Controls.Add(_resultMessage);
+        hero.Controls.Add(_resultTrophy);
         hero.Controls.Add(_resultContext);
 
         _resultReveal = new Panel
@@ -761,12 +1135,65 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _resultXpLine = new Label
         {
             Name = "ResultXpLine",
-            Font = UITheme.BodySemibold,
+            Font = UITheme.Title,
             ForeColor = UITheme.AccentText,
             BackColor = UITheme.Surface,
             AutoSize = true,
-            Location = new Point(0, 0),
+            Location = new Point(UITheme.Scaled(this, 22), 0),
         };
+
+        _resultXpGlyph = new Label
+        {
+            Name = "ResultXpGlyph",
+            Text = UITheme.GlyphFlash,
+            Font = UITheme.GameGlyph,
+            ForeColor = UITheme.AccentText,
+            BackColor = UITheme.Surface,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Size = new Size(UITheme.Scaled(this, 22), UITheme.Scaled(this, 22)),
+            Visible = UITheme.GlyphFlash.Length > 0,
+        };
+
+        _resultLevelUp = new Panel
+        {
+            Name = "ResultLevelUpBand",
+            BackColor = UITheme.AccentTint,
+            Size = new Size(Math.Max(cardWidth - UITheme.Scaled(this, UITheme.Spacing32), 1), UITheme.Scaled(this, 40)),
+            Visible = false,
+        };
+        _resultLevelUp.Paint += static (sender, e) =>
+        {
+            if (sender is Panel band)
+            {
+                using var path = UITheme.RoundedPath(
+                    new Rectangle(0, 0, band.Width - 1, band.Height - 1), UITheme.Scaled(band, UITheme.RadiusControl));
+                using var brush = new SolidBrush(UITheme.AccentTint);
+                e.Graphics.FillPath(brush, path);
+            }
+        };
+        _resultLevelUpText = new Label
+        {
+            Name = "ResultLevelUpText",
+            Text = string.Empty,
+            Font = UITheme.BodySemibold,
+            ForeColor = UITheme.AccentText,
+            BackColor = UITheme.AccentTint,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+        };
+        _resultLevelUpCaption = new Label
+        {
+            Name = "ResultLevelUpCaption",
+            Font = UITheme.Caption,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.AccentTint,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleRight,
+            Size = new Size(UITheme.Scaled(this, 120), UITheme.Scaled(this, 40)),
+        };
+        _resultLevelUp.Controls.Add(_resultLevelUpText);
+        _resultLevelUp.Controls.Add(_resultLevelUpCaption);
 
         _resultLevelChip = new LevelChip
         {
@@ -816,6 +1243,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         };
 
         _resultReveal.Controls.Add(_resultXpLine);
+        _resultReveal.Controls.Add(_resultXpGlyph);
+        _resultReveal.Controls.Add(_resultLevelUp);
         _resultReveal.Controls.Add(_resultLevelChip);
         _resultReveal.Controls.Add(_resultLevelBar);
         _resultReveal.Controls.Add(_resultLevelCaption);
@@ -905,23 +1334,38 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             : Math.Round(_resultCorrect * 100d / total, MidpointRounding.AwayFromZero);
         string topicName = _topicNames.TryGetValue(_resultQuiz.TopicId, out string? name) ? name : string.Empty;
 
+        // The verdict bands (design spec R3.1): word + ink + (at 100%) the
+        // trophy — the score inherits the verdict color, never color alone.
+        Color verdictInk;
+        string verdictWord;
+        if (percent >= 100d)
+        {
+            verdictWord = "Flawless run!";
+            verdictInk = UITheme.PerfectGold;
+        }
+        else if (percent >= 50d)
+        {
+            verdictWord = "Nice run \u2014 keep going!";
+            verdictInk = UITheme.SuccessText;
+        }
+        else
+        {
+            verdictWord = "Keep practicing \u2014 you'll get there!";
+            verdictInk = UITheme.DangerText;
+        }
+
         _resultScore.Text = $"{_resultCorrect} / {total}";
+        _resultScore.ForeColor = verdictInk;
         _resultPercent.Text = $"{percent:0}%";
         _resultPercent.Location = new Point(
             _resultScore.Right + UITheme.Scaled(this, UITheme.Spacing12),
             UITheme.Scaled(this, UITheme.Spacing12) + UITheme.Scaled(this, 18));
-        _resultMessage.Text = percent switch
-        {
-            >= 80d => "Excellent work!",
-            >= 50d => "Nice run \u2014 keep going!",
-            _ => "Keep practicing \u2014 you'll get there!",
-        };
-        _resultMessage.ForeColor = percent switch
-        {
-            >= 80d => UITheme.SuccessText,
-            >= 50d => UITheme.LevelMedium,
-            _ => UITheme.DangerText,
-        };
+        _resultMessage.Text = verdictWord;
+        _resultMessage.ForeColor = verdictInk;
+        _resultTrophy.Visible = percent >= 100d && UITheme.GlyphTrophy.Length > 0;
+        _resultTrophy.Location = new Point(
+            _resultMessage.Right + UITheme.Scaled(this, UITheme.Spacing12),
+            UITheme.Scaled(this, UITheme.Spacing12) + UITheme.Scaled(this, 52));
         _resultContext.Text = $"{topicName} \u2014 {_resultQuiz.Difficulty}";
 
         FillReveal();
@@ -933,6 +1377,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         BuildResultRows(_resultQuiz);
         _resultActions.Location = new Point(0, _resultListCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16));
         ShowView(_resultView);
+        StopStreakPulse(); // the run ended: the pulse never survives a view switch (spec R7)
 
         this.FindAncestor<MainForm>()?.UpdateSidebarLevel();
     }
@@ -958,7 +1403,21 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
 
         _resultReveal.Visible = true;
+        bool levelGained = _levelBeforeRun > 0 && progress.Level > _levelBeforeRun;
         _resultXpLine.Text = "+" + _resultXpEarned.ToString(System.Globalization.CultureInfo.InvariantCulture) + " XP";
+
+        // The level-up band replaces the quiet level row on the moment that
+        // matters (design spec R3.2); otherwise the chip/bar row renders.
+        _resultLevelUp.Visible = levelGained;
+        if (levelGained)
+        {
+            _resultLevelUpText.Text = $"Level {progress.Level} reached!";
+            _resultLevelUpCaption.Text = progress.XpForNextLevel == 0
+                ? "Max level"
+                : (progress.XpForNextLevel - progress.XpIntoLevel).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    + " XP to Lvl " + (progress.Level + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         _resultLevelChip.SetLevel(progress.Level);
         _resultLevelBar.Value = progress.ProgressFraction;
 
@@ -994,7 +1453,37 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         int rowGap = UITheme.Scaled(this, UITheme.Spacing8);
         int blockGap = UITheme.Scaled(this, UITheme.Spacing16);
 
-        _resultLevelChip.Location = new Point(0, _resultXpLine.Bottom + rowGap);
+        int top = 0;
+
+        // The XP line with its flash glyph (design spec R3.2).
+        _resultXpLine.Location = new Point(_resultXpGlyph.Visible ? _resultXpGlyph.Width : 0, top);
+        int xpRowBottom = Math.Max(_resultXpLine.Bottom, _resultXpGlyph.Visible ? _resultXpLine.Bottom : top);
+        if (_resultXpGlyph.Visible)
+        {
+            _resultXpGlyph.Location = new Point(0, top);
+            xpRowBottom = Math.Max(_resultXpLine.Bottom, _resultXpGlyph.Bottom);
+        }
+
+        top = xpRowBottom + rowGap;
+
+        if (_resultLevelUp.Visible)
+        {
+            // The level-up band spans the reveal and carries the progress
+            // caption on its right (design spec R3.2).
+            _resultLevelUp.Location = new Point(0, top);
+            _resultLevelUp.Width = revealWidth;
+            _resultLevelUpText.Location = new Point(UITheme.Scaled(this, UITheme.Spacing12), 0);
+            _resultLevelUpText.Size = new Size(
+                Math.Max(_resultLevelUp.Width - UITheme.Scaled(this, UITheme.Spacing24) - _resultLevelUpCaption.Width, 1),
+                _resultLevelUp.Height);
+            _resultLevelUpCaption.Location = new Point(_resultLevelUp.Width - _resultLevelUpCaption.Width - UITheme.Scaled(this, UITheme.Spacing8), 0);
+            top = _resultLevelUp.Bottom + blockGap;
+
+            _resultReveal.Height = top;
+            return;
+        }
+
+        _resultLevelChip.Location = new Point(0, top);
 
         Size captionSize = TextRenderer.MeasureText(_resultLevelCaption.Text, UITheme.Caption);
         _resultLevelCaption.Size = new Size(Math.Max(captionSize.Width, UITheme.Scaled(this, 40)), UITheme.Scaled(this, 16));
@@ -1124,8 +1613,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             var mark = new Label
             {
                 Name = $"ResultMark{i}",
-                Text = correct ? "\u2713" : "\u2717",
-                Font = UITheme.NavGlyph,
+                Text = correct ? UITheme.GlyphCheck : UITheme.GlyphDismiss,
+                Font = UITheme.UsesGameIconFont ? UITheme.GameGlyph : UITheme.NavGlyph,
                 ForeColor = verdictColor,
                 BackColor = UITheme.Surface,
                 AutoSize = false,

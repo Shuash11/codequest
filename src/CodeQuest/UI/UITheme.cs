@@ -2,6 +2,8 @@
 
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Text;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
@@ -111,6 +113,10 @@ public static class UITheme
 
     public static readonly Color LevelHard = ColorTranslator.FromHtml("#F07A72");
 
+    public static readonly Color StreakFlame = ColorTranslator.FromHtml("#F97316");
+
+    public static readonly Color PerfectGold = ColorTranslator.FromHtml("#F2C14E");
+
     public static readonly Font Title = new("Segoe UI Semibold", 16f);
 
     public static readonly Font Body = new("Segoe UI", 10f);
@@ -126,6 +132,92 @@ public static class UITheme
     public static readonly Font AchievementGlyph = new("Segoe MDL2 Assets", 16f);
 
     public static readonly Font Display = new("Segoe UI", 28f, FontStyle.Bold);
+
+    public static readonly Font QuestionHeadline = new("Segoe UI Semibold", 14f);
+
+    public static readonly Font GameGlyph = CreateGameGlyph(12f, NavGlyph);
+
+    public static readonly Font GameGlyphLarge = CreateGameGlyph(18f, AchievementGlyph);
+
+    public const bool MotionEnabled = true;
+
+    public static readonly string GlyphCheckCircle = GameIcon("\uF299", "\u2713");
+
+    public static readonly string GlyphDismissCircle = GameIcon("\uF36E", "\u2717");
+
+    public static readonly string GlyphCheck = GameIcon("\uF295", "\u2713");
+
+    public static readonly string GlyphDismiss = GameIcon("\uF36A", "\u2717");
+
+    public static readonly string GlyphShuffle = GameIcon("\uEF37", string.Empty);
+
+    public static readonly string GlyphPlay = GameIcon("\uF606", string.Empty);
+
+    public static readonly string GlyphFlame = GameIcon("\uEF6A", string.Empty);
+
+    public static readonly string GlyphTrophy = GameIcon("\uF837", string.Empty);
+
+    public static readonly string GlyphRocket = GameIcon("\uF678", string.Empty);
+
+    public static readonly string GlyphFlash = GameIcon("\uE619", string.Empty);
+
+    public static bool UsesGameIconFont { get; } = GameFontBytes is not null;
+
+    // The Fluent System Icons font, embedded once and pinned for the whole
+    // process (GDI+ reads the memory while any Font from it is alive).
+    private static readonly byte[]? GameFontBytes = LoadGameFontBytes();
+
+    private static readonly PrivateFontCollection GameFontCollection = LoadGameFontCollection();
+
+    private static Font CreateGameGlyph(float size, Font fallback)
+    {
+        if (GameFontBytes is null || GameFontCollection.Families.Length == 0)
+        {
+            return fallback;
+        }
+
+        return new Font(GameFontCollection.Families[0], size);
+    }
+
+    private static string GameIcon(string fluentCodepoint, string fallback)
+    {
+        return UsesGameIconFont ? fluentCodepoint : fallback;
+    }
+
+    private static byte[]? LoadGameFontBytes()
+    {
+        try
+        {
+            using Stream? stream = typeof(UITheme).Assembly.GetManifestResourceStream(
+                "CodeQuest.Assets.FluentSystemIcons-Regular.ttf");
+            if (stream is null)
+            {
+                return null;
+            }
+
+            using var memory = new MemoryStream();
+            stream.CopyTo(memory);
+            return memory.ToArray();
+        }
+        catch
+        {
+            return null; // a missing icon font degrades to the Segoe glyphs
+        }
+    }
+
+    private static PrivateFontCollection LoadGameFontCollection()
+    {
+        var collection = new PrivateFontCollection();
+        byte[]? bytes = GameFontBytes;
+        if (bytes is not null)
+        {
+            IntPtr buffer = Marshal.AllocHGlobal(bytes.Length);
+            Marshal.Copy(bytes, 0, buffer, bytes.Length);
+            collection.AddMemoryFont(buffer, bytes.Length); // the buffer stays allocated on purpose
+        }
+
+        return collection;
+    }
 
     public const int Spacing4 = 4;
 
