@@ -1,14 +1,4 @@
-// =============================================================================
-// CodeQuest — The quiz card on the home screen, MODERN AND ELEGANT: a clean
-// white card with a hairline border and generous padding — no color bands.
-// The hierarchy is typographic: the quiz title (semibold), a quiet metadata
-// line (topic · question count), and a small soft-tinted difficulty chip
-// (green/amber/red text on its matching tint — color + word, never color
-// alone). The action is one dark PLAY pill, bottom-right. Draft quizzes show
-// a neutral "Pending review" chip and a LOCKED pill — visible, not startable.
-// Accessibility: the PLAY pill carries the accessible name "Play {title}";
-// the card exposes a readable name too.
-// =============================================================================
+// The quiz card on the home screen.
 
 using CodeQuest.Models;
 using System.Drawing;
@@ -17,9 +7,6 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// One quiz card on the take-quiz home: clean, typographic, elegant.
-/// </summary>
 public sealed class QuizCard : Panel
 {
     private const string PlayGlyph = "\u25B6";
@@ -32,10 +19,8 @@ public sealed class QuizCard : Panel
     private readonly int _quizId;
     private readonly bool _approved;
 
-    /// <summary>Raised when the user presses PLAY on an approved quiz.</summary>
     public event EventHandler<int>? PlayClicked;
 
-    /// <summary>Creates one quiz card (approved = playable, draft = locked).</summary>
     public QuizCard(Quiz quiz, string topicName, int questionCount)
     {
         _quizId = quiz.QuizId;
@@ -46,8 +31,6 @@ public sealed class QuizCard : Panel
         Margin = new Padding(0, 0, UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16));
         BackColor = UITheme.Surface;
 
-        // The hairline border of the elegant card (painted, not a band) — the
-        // D4 BorderHairline, the passive-container edge token (§2 card rule).
         Paint += static (sender, e) =>
         {
             if (sender is Panel panel)
@@ -88,7 +71,6 @@ public sealed class QuizCard : Panel
             Size = new Size(Width - UITheme.Scaled(this, UITheme.Spacing32), UITheme.Scaled(this, 18)),
         };
 
-        // The soft-tinted difficulty chip: quiet, small, elegant.
         _chip = new Label
         {
             Name = "QuizCardChip",
@@ -131,7 +113,6 @@ public sealed class QuizCard : Panel
             : quiz.Title + ", pending review";
     }
 
-    /// <summary>The difficulty chip's text color (the fun palette, quiet usage).</summary>
     private static Color LevelTextColor(Difficulty difficulty) => difficulty switch
     {
         Difficulty.Easy => UITheme.LevelEasy,
@@ -139,7 +120,6 @@ public sealed class QuizCard : Panel
         _ => UITheme.LevelHard,
     };
 
-    /// <summary>The difficulty chip's soft tint background.</summary>
     private static Color LevelTint(Difficulty difficulty) => difficulty switch
     {
         Difficulty.Easy => UITheme.SuccessTint,

@@ -1,11 +1,4 @@
-// =============================================================================
-// CodeQuest — Quiz Taking (P9): the determinate progress track of recipe 4.13
-// (spec 5.6 moment 2). Track: 8px tall, Fill fill, 4px radius (pill); the fill
-// segment is Accent with the value answered ÷ total. Unlike the generation
-// busy bar (P13's indeterminate marquee) this progress is genuinely known:
-// the run counts its own answered questions.
-// Look at: OnPaint — the owner-drawn pill; Value (0..1) is the only state.
-// =============================================================================
+// The progress bar.
 
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -13,10 +6,6 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The determinate progress track of recipe 4.13 as spec 5.6's run progress:
-/// an 8px pill whose Accent segment shows the answered fraction.
-/// </summary>
 public sealed class ProgressTrack : Control
 {
     private double _value;
@@ -24,20 +13,14 @@ public sealed class ProgressTrack : Control
     private int _marqueeX;
     private readonly System.Windows.Forms.Timer _marqueeTimer = new() { Interval = 60 };
 
-    /// <summary>Creates the track at the recipe's 8px height.</summary>
     public ProgressTrack()
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
         SetStyle(ControlStyles.ResizeRedraw, true);
-        // The pill corners show the CONTAINER's surface, resolved at paint
-        // time (OnPaintBackground) — a track sits on module backgrounds AND
-        // inside cards (D4 audit rule #1; §5.7a puts one on a card).
         BackColor = UITheme.Background;
         Height = UITheme.Scaled(this, 8);
-        TabStop = false; // a read-only indicator is not a Tab stop
+        TabStop = false;
 
-        // The §4.13 marquee: an Accent segment sweeps the track while real
-        // work runs. No percent, no fake progress — the promise is activity.
         _marqueeTimer.Tick += static (sender, e) =>
         {
             if (sender is System.Windows.Forms.Timer timer && timer.Tag is ProgressTrack track)
@@ -55,7 +38,6 @@ public sealed class ProgressTrack : Control
         _marqueeTimer.Tag = this;
     }
 
-    /// <summary>Stops the marquee timer when the control is disposed.</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -67,10 +49,6 @@ public sealed class ProgressTrack : Control
         base.Dispose(disposing);
     }
 
-    /// <summary>
-    /// The §4.13 indeterminate mode: an Accent segment sweeps while a long
-    /// operation runs (generation's duration is unknowable — no percent).
-    /// </summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public bool Marquee
     {
@@ -97,12 +75,6 @@ public sealed class ProgressTrack : Control
         }
     }
 
-    /// <summary>
-    /// The answered fraction (0..1). Values outside the range are clamped —
-    /// the run computes the fraction from its own counts, so the clamp is a
-    /// display guarantee, never a data correction. The control is
-    /// owner-drawn, so a new value schedules its own repaint.
-    /// </summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public double Value
     {
@@ -116,20 +88,15 @@ public sealed class ProgressTrack : Control
             }
 
             _value = clamped;
-            Invalidate(); // the pill paints the fraction — a new value must repaint
+            Invalidate();
         }
     }
 
-    /// <summary>
-    /// The corner cutouts around the pill show the CONTAINER's surface, not a
-    /// fixed token (D4 audit rule #1) — the pill paints in OnPaint.
-    /// </summary>
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         e.Graphics.Clear(UITheme.ContainerSurface(this));
     }
 
-    /// <summary>Paints the Fill pill and the Accent segment (recipe 4.13).</summary>
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
@@ -147,8 +114,6 @@ public sealed class ProgressTrack : Control
 
         if (_marquee)
         {
-            // The sweeping segment (§4.13): activity, never a percent. The
-            // clip keeps the sweep inside the pill at both edges.
             e.Graphics.SetClip(track);
             Rectangle segment = new(_marqueeX, 0, UITheme.Scaled(this, 60), Height);
             using var segmentBrush = new SolidBrush(UITheme.Accent);
@@ -166,7 +131,6 @@ public sealed class ProgressTrack : Control
         }
     }
 
-    /// <summary>Draws one pill-shaped rectangle with the recipe's 4px radius.</summary>
     private void DrawPill(Graphics graphics, Brush brush, Rectangle bounds)
     {
         int radius = UITheme.Scaled(this, 4);
@@ -174,10 +138,8 @@ public sealed class ProgressTrack : Control
         graphics.FillPath(brush, path);
     }
 
-    /// <summary>The track is a read-only indicator: name it for UIA (§2.6).</summary>
     protected override AccessibleObject CreateAccessibilityInstance() => new ProgressTrackAccessibleObject(this);
 
-    /// <summary>Progress-bar role; the state lives in the run header's question count.</summary>
     private sealed class ProgressTrackAccessibleObject : Control.ControlAccessibleObject
     {
         public ProgressTrackAccessibleObject(ProgressTrack owner) : base(owner)

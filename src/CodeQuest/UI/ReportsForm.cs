@@ -1,15 +1,4 @@
-// =============================================================================
-// CodeQuest — Performance Reports (the fun-UI redesign): the reports screen
-// of spec 5.10, with visual score BARS instead of a data table.
-// Layout: filter row — topic filter, difficulty filter; summary card — three
-// stat groups (Attempts, Quizzes taken, Average score); per-topic BAR rows —
-// the topic name and a horizontal bar whose width and color carry the average
-// (green ≥80, amber 50–79, red <50, no bar for zero attempts — "—" instead of
-// zeros-as-data); needs-practice list card, weakest first.
-// States: empty (no attempts) — everything replaced by one friendly empty
-// state. The panel reloads from IReportService each time it becomes visible.
-// Read-only — no strip messages.
-// =============================================================================
+// The reports screen.
 
 using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
@@ -19,10 +8,6 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The reports module (the fun-UI redesign): summary stats, score bars, and
-/// the needs-practice list over the tested report service.
-/// </summary>
 public sealed class ReportsForm : ModulePanel
 {
     private const string EmptyTitle = "No quiz attempts yet";
@@ -44,11 +29,10 @@ public sealed class ReportsForm : ModulePanel
     private readonly Panel _barStack = null!;
     private readonly Panel _weakCard = null!;
     private readonly Panel _emptyView = null!;
-    private bool _rebuildingFilters; // guards the SelectedIndexChanged feedback loop
+    private bool _rebuildingFilters;
 
     private Dictionary<int, string> _topicNames = new();
 
-    /// <summary>Creates the reports module over the report service.</summary>
     public ReportsForm(UserAccount user, IReportService reports)
     {
         ArgumentNullException.ThrowIfNull(user);
@@ -95,7 +79,6 @@ public sealed class ReportsForm : ModulePanel
 
         int cardWidth = UITheme.Scaled(this, 640);
 
-        // The summary card: three stat groups (number in Display/Title, label in Caption).
         var summaryCard = new CardPanel
         {
             Name = "ReportsSummaryCard",
@@ -112,7 +95,6 @@ public sealed class ReportsForm : ModulePanel
         summaryCard.Controls.Add(StatCaption("ReportsQuizzesCaption", "Quizzes taken", 1));
         summaryCard.Controls.Add(StatCaption("ReportsAverageCaption", "Average score", 2));
 
-        // The per-topic score bars.
         _barStack = new Panel
         {
             Name = "ReportsBarStack",
@@ -121,7 +103,6 @@ public sealed class ReportsForm : ModulePanel
             BackColor = UITheme.Surface,
         };
 
-        // The needs-practice list card.
         _weakCard = new Panel
         {
             Name = "ReportsWeakCard",
@@ -130,7 +111,6 @@ public sealed class ReportsForm : ModulePanel
             BackColor = UITheme.Surface,
         };
 
-        // The empty view replaces every report element when no attempt exists.
         _emptyView = new Panel
         {
             Name = "ReportsEmptyView",
@@ -170,8 +150,6 @@ public sealed class ReportsForm : ModulePanel
         emptyCard.Controls.Add(emptyCaption);
         _emptyView.Controls.Add(emptyCard);
 
-        // The report elements are flow-positioned (the panel scrolls when the
-        // window is short); the empty view fills the whole module.
         Controls.Add(_weakCard);
         Controls.Add(_barStack);
         Controls.Add(summaryCard);
@@ -180,7 +158,6 @@ public sealed class ReportsForm : ModulePanel
         Controls.Add(_emptyView);
     }
 
-    /// <summary>One stat number of the summary card (Title font, column-positioned).</summary>
     private Label StatLabel(string name, int column)
     {
         return new Label
@@ -196,7 +173,6 @@ public sealed class ReportsForm : ModulePanel
         };
     }
 
-    /// <summary>One stat caption of the summary card (Caption font under its number).</summary>
     private Label StatCaption(string name, string text, int column)
     {
         return new Label
@@ -214,11 +190,8 @@ public sealed class ReportsForm : ModulePanel
         };
     }
 
-    /// <inheritdoc />
     public override void RefreshData()
     {
-        // The difficulty items never change (three members); the topic items
-        // follow the topic CRUD, rebuilt by NAME so the selection survives.
         if (_difficultyFilter.Items.Count == 0)
         {
             _difficultyFilter.Items.Add(AllDifficultiesLabel);
@@ -230,11 +203,6 @@ public sealed class ReportsForm : ModulePanel
         ApplyFilter(rebuildTopicItems: true);
     }
 
-    /// <summary>
-    /// Rebuilds the report with the current filters. The topic combo is
-    /// rebuilt from the report's own topic rows (name-preserved); the guard
-    /// stops the SelectedIndexChanged feedback loop while it does.
-    /// </summary>
     private void ApplyFilter(bool rebuildTopicItems = false)
     {
         if (_rebuildingFilters)
@@ -272,7 +240,6 @@ public sealed class ReportsForm : ModulePanel
 
         if (report.Overall.TotalAttempts == 0)
         {
-            // §5.10: zeros are never presented as data — one friendly empty state.
             foreach (Control child in Controls)
             {
                 child.Visible = child == _emptyView;
@@ -286,7 +253,6 @@ public sealed class ReportsForm : ModulePanel
             child.Visible = child != _emptyView;
         }
 
-        // The summary card.
         _summaryAttempts.Text = report.Overall.TotalAttempts.ToString();
         _summaryQuizzes.Text = report.Overall.QuizzesTaken.ToString();
         _summaryAverage.Text = $"{report.Overall.AveragePercent:0}%";
@@ -295,7 +261,6 @@ public sealed class ReportsForm : ModulePanel
         BuildWeakList(report);
     }
 
-    /// <summary>The color band of an average (the bar's fill and its caption).</summary>
     private static Color BandColor(double percent) => percent switch
     {
         >= 80d => UITheme.LevelEasy,
@@ -303,11 +268,6 @@ public sealed class ReportsForm : ModulePanel
         _ => UITheme.LevelHard,
     };
 
-    /// <summary>
-    /// Builds the per-topic score bars (the fun-UI redesign of the table): one
-    /// row per topic — name, a horizontal bar whose width and color carry the
-    /// average, and the numbers as caption text (never color alone).
-    /// </summary>
     private void BuildScoreBars(PracticeReport report, string? topicFilterName)
     {
         _barStack.SuspendLayout();
@@ -359,7 +319,6 @@ public sealed class ReportsForm : ModulePanel
             _barStack.Controls.Add(name);
             top += UITheme.Scaled(this, 20);
 
-            // The bar track + fill: the fill width carries the average.
             int trackWidth = Math.Max(_barStack.Width - inset * 2, 1);
             var track = new Panel
             {
@@ -406,7 +365,6 @@ public sealed class ReportsForm : ModulePanel
         _barStack.Height = top + inset;
     }
 
-    /// <summary>Builds the needs-practice list card's rows (§5.10, ascending by average).</summary>
     private void BuildWeakList(PracticeReport report)
     {
         _weakCard.SuspendLayout();

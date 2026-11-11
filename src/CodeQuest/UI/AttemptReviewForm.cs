@@ -1,27 +1,4 @@
-// =============================================================================
-// CodeQuest — Quiz History & Answer Review (P10): the attempt review of spec
-// 5.9, as a drill-in panel shared by its two hosts (the History module and the
-// quiz-taking result's "View answers"). Read-only by design.
-// Layout (§5.9): the header row — "Back" secondary (leading), the quiz title,
-// and the score line "8/10 · 80% · Nov 4, 2026" (Caption, TextSecondary) —
-// then one card per question:
-//   1. top line: "Question N" (Caption, TextSecondary) + the mark ("Correct"
-//      SuccessText / "Incorrect" DangerText — glyph + word, never color alone);
-//   2. the question text (Body);
-//   3. the answer rows — the chosen choice labeled "Your answer" (check in
-//      SuccessText when it was the correct choice, cross in DangerText when
-//      not); on incorrect or unanswered questions the correct choice row
-//      additionally carries the label "Correct answer" with the check, so
-//      chosen vs correct are always both visible (P10 acceptance);
-//   4. the explanation in a quiet inset box (Fill fill, 8px radius, 12px
-//      padding, "Explanation" CaptionSemibold) — always rendered; the empty
-//      string reads "(No explanation was provided.)" (R-2 #6).
-// Derived data (R-2 #1): correctness is computed live from the submitted
-// answers and the quiz's answer key — nothing is read from a stored column.
-// The score denominator is the quiz's own question count, so the display
-// stays honest even when a question was never answered (shown as
-// "Not answered"). The screen is fully local — the §5.8 offline note applies.
-// =============================================================================
+// Shows the answers of a finished attempt.
 
 using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
@@ -30,10 +7,6 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The attempt review of spec 5.9: one drill-in panel, hosted by the History
-/// module and by the quiz-taking result.
-/// </summary>
 public sealed class AttemptReviewForm : UserControl
 {
     private const string NoExplanationText = "(No explanation was provided.)";
@@ -49,14 +22,12 @@ public sealed class AttemptReviewForm : UserControl
     private readonly Label _reviewTitle = null!;
     private readonly Label _scoreLine = null!;
     private readonly Panel _body = null!;
-    private Quiz? _openQuiz; // the attempt being reviewed — rebuilt on width change (pre-layout widths)
+    private Quiz? _openQuiz;
     private IReadOnlyList<SubmittedAnswer> _openSubmitted = Array.Empty<SubmittedAnswer>();
-    private int _lastBodyWidth; // the width the cards were last built at (resize rebuild guard)
+    private int _lastBodyWidth;
 
-    /// <summary>Raised when the panel's "Back" is pressed; the host restores its list state.</summary>
     public event EventHandler? BackRequested;
 
-    /// <summary>Creates the review panel over the attempt data.</summary>
     public AttemptReviewForm(
         AttemptRepository attempts,
         QuizRepository quizzes,
@@ -132,26 +103,23 @@ public sealed class AttemptReviewForm : UserControl
         Controls.Add(header);
     }
 
-    /// <summary>Loads one attempt and renders its review (§5.9).</summary>
     public void Open(int attemptId)
     {
         QuizAttempt? attempt = _attempts.GetById(attemptId);
         if (attempt is null)
         {
-            return; // the host only opens existing attempts; a defensive guard
+            return;
         }
 
         Quiz? quiz = _quizzes.GetById(attempt.QuizId);
         if (quiz is null)
         {
-            // Unreachable while the schema blocks quiz deletion when attempts
-            // exist (the FK keeps the quiz alive); a defensive guard anyway.
             return;
         }
 
         IReadOnlyList<SubmittedAnswer> submitted = _answers.GetByAttempt(attemptId);
 
-        int total = quiz.Questions.Count; // the R-2 denominator: the quiz's own question count
+        int total = quiz.Questions.Count;
         double percent = total == 0
             ? 0d
             : Math.Round(attempt.Score * 100d / total, MidpointRounding.AwayFromZero);
@@ -164,12 +132,6 @@ public sealed class AttemptReviewForm : UserControl
         BuildQuestionCards(quiz, submitted);
     }
 
-    /// <summary>
-    /// Rebuilds the question cards when the panel's WIDTH changes (the layout
-    /// is width-driven): the panel may be laid out (Dock = Fill) only after it
-    /// becomes visible, so the card widths from the moment of Open() are not
-    /// final. Height-only resizes do not re-layout anything.
-    /// </summary>
     protected override void OnResize(EventArgs eventargs)
     {
         base.OnResize(eventargs);
@@ -182,7 +144,6 @@ public sealed class AttemptReviewForm : UserControl
         }
     }
 
-    /// <summary>Builds one §5.9 card per question, stacked in the scrolling body.</summary>
     private void BuildQuestionCards(Quiz quiz, IReadOnlyList<SubmittedAnswer> submitted)
     {
         _body.SuspendLayout();
@@ -221,7 +182,6 @@ public sealed class AttemptReviewForm : UserControl
         _body.ResumeLayout();
     }
 
-    /// <summary>Computes one card's height from its measured text blocks.</summary>
     private int MeasureCardHeight(Question question, int cardWidth, bool correct)
     {
         int inset = UITheme.Scaled(this, UITheme.Spacing16);
@@ -230,13 +190,12 @@ public sealed class AttemptReviewForm : UserControl
             question.QuestionText, UITheme.Body, new Size(contentWidth, int.MaxValue), TextFormatFlags.WordBreak).Height;
 
         int height = inset
-            + UITheme.Scaled(this, 18) // the "Question N" top line
+            + UITheme.Scaled(this, 18)
             + UITheme.Scaled(this, UITheme.Spacing8)
             + textHeight
             + UITheme.Scaled(this, UITheme.Spacing12)
-            + UITheme.Scaled(this, 22); // the chosen-answer row
+            + UITheme.Scaled(this, 22);
 
-        // The correct-answer row rides along on incorrect questions (§5.9).
         if (!correct && question.GetCorrectChoice() is not null)
         {
             height += UITheme.Scaled(this, 22) + UITheme.Scaled(this, UITheme.Spacing4);
@@ -249,13 +208,11 @@ public sealed class AttemptReviewForm : UserControl
             UITheme.Body,
             new Size(Math.Max(contentWidth - UITheme.Scaled(this, UITheme.Spacing12) * 2, 1), int.MaxValue),
             TextFormatFlags.WordBreak).Height;
-        // The inset box: 12px top padding + 16px caption + text + 12px bottom padding (L6).
         height += explanationHeight + UITheme.Scaled(this, 40) + inset;
 
         return height;
     }
 
-    /// <summary>Fills one question card per the §5.9 block order.</summary>
     private void FillQuestionCard(
         CardPanel card,
         int index,
@@ -325,8 +282,6 @@ public sealed class AttemptReviewForm : UserControl
         int top = inset + UITheme.Scaled(this, 18) + UITheme.Scaled(this, UITheme.Spacing8) + textHeight
             + UITheme.Scaled(this, UITheme.Spacing12);
 
-        // The chosen answer (§5.9 item 3): always labeled; "Not answered" is
-        // the honest rendering when the question carries no submitted answer.
         var chosenCaption = new Label
         {
             Name = $"ReviewChosenCaption{index}",
@@ -369,8 +324,6 @@ public sealed class AttemptReviewForm : UserControl
         card.Controls.Add(chosenMark);
         top += UITheme.Scaled(this, 22);
 
-        // The correct answer row rides along on incorrect or unanswered
-        // questions, so chosen vs correct are always both visible (§5.9).
         if (!correct && correctChoice is not null)
         {
             top += UITheme.Scaled(this, UITheme.Spacing4);
@@ -417,7 +370,6 @@ public sealed class AttemptReviewForm : UserControl
             top += UITheme.Scaled(this, 22);
         }
 
-        // The explanation inset (§5.9 item 4) — always rendered (R-2 #6).
         top += UITheme.Scaled(this, UITheme.Spacing12);
         string explanation = question.Explanation.Length == 0 ? NoExplanationText : question.Explanation;
         int explanationHeight = TextRenderer.MeasureText(
@@ -425,8 +377,6 @@ public sealed class AttemptReviewForm : UserControl
             UITheme.Body,
             new Size(Math.Max(contentWidth - UITheme.Scaled(this, UITheme.Spacing12) * 2, 1), int.MaxValue),
             TextFormatFlags.WordBreak).Height;
-        // 12px top padding + 16px caption + text + 12px bottom padding — the
-        // text sits at y = 28 inside the box, so 24px of padding clips it (L6).
         int boxHeight = explanationHeight + UITheme.Scaled(this, 40);
 
         var explanationBox = new Panel

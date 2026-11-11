@@ -1,6 +1,6 @@
 # Plan.md — CodeQuest: AI topic creation, gamification, dark theme
 
-**Status:** task 1 (1.1.0) shipped · **task 2 active** · **Owner:** Lead · **Created:** 2026-11-08
+**Status:** task 1 (1.1.0) shipped · **task 2 done (in-app update + remembered name)** · **task 3 done (one-line comments)** · **Owner:** Lead · **Created:** 2026-11-08
 
 ---
 
@@ -168,25 +168,36 @@ remembered name (explicit sign-out asks again next launch).
 
 ## Work packages (all Lead-direct: tightly coupled UI+Program changes, single writer)
 
-| WP | Scope | Files |
-|---|---|---|
-| T2-WP1 | Installer asset selection + tests | `UpdateCheckService.cs`, `UpdateCheckTests.cs` |
-| T2-WP2 | Download/verify/apply service + tests | `SelfUpdateService.cs` (new), `SelfUpdateServiceTests.cs` (new) |
-| T2-WP3 | Update progress dialog + dialog wiring | `UpdateProgressDialog.cs` (new), `UpdateDialog.cs`, `MainForm.cs` |
-| T2-WP4 | Remembered name | `SessionStore.cs` (new), `SessionStoreTests.cs` (new), `Program.cs`, `LoginForm.cs` |
-| T2-WP5 | Docs + integration: build, full suite, review of the download-and-execute path (security-sensitive) | `docs/release-process.md` |
+| WP | Scope | Files | State |
+|---|---|---|---|
+| T2-WP1 | Installer asset selection + tests | `UpdateCheckService.cs`, `UpdateCheckTests.cs` | ✅ 13/13 update tests |
+| T2-WP2 | Download/verify/apply service + tests | `SelfUpdateService.cs` (new), `SelfUpdateServiceTests.cs` (new) | ✅ 5/5 |
+| T2-WP3 | Update progress dialog + dialog wiring | `UpdateProgressDialog.cs` (new), `UpdateDialog.cs`, `MainForm.cs` | ✅ |
+| T2-WP4 | Remembered name | `SessionStore.cs` (new), `SessionStoreTests.cs` (new), `Program.cs`, `LoginForm.cs` | ✅ 8/8 (camelCase fix applied) |
+| T2-WP5 | Docs + integration | `docs/release-process.md`, `docs/security-notes.md`, `docs/user-guide.md` | ✅ |
+| T2-WP6 | Independent review (download-and-execute path) | — | ⚠️ Reviewer + Security Reviewer never returned (session ids ses_e35760721ffe02HS5fBIdp7Lfo, ses_e35760720ffeRdCcCsxUn4mPXV); the owner directed to proceed; the Lead self-reviewed instead — **independent review reported incomplete** |
 
-## Verification
+## Integration status (2026-11-11)
 
-- Unit: asset selection (exe preferred, setup preferred, zip fallback, digest
-  pass-through), session store (round-trip, clear, corrupt/missing file),
-  script/digest helpers.
-- `dotnet build` 0 warnings + full `dotnet test` green.
-- Independent review of the download-and-execute path (https-only, digest
-  check, no user input in the command line).
-- Manual (owner): GUI walk-through of B1/B2/B4 on an installed build — a
-  real end-to-end silent update and relaunch can only be confirmed by a human
-  on the distributed build.
+- Debug + Release builds: 0 errors; full suite 175/175 (was 156 before task 2).
+- Task 2 + task 3 committed; pushed on the owner's explicit instruction.
+- Not done (owner-authorized only): version bump, tag, GitHub release.
+- Manual (owner): GUI walk-through on an installed build — B1 end-to-end
+  silent update + relaunch, B4 remembered name, and the visual state of the
+  two dialogs (no rendered previews were available).
+
+## Task 3 status (one-line comments): DONE
+
+- 88 source files swept: one plain-language line per file (OOP pillar tags
+  only where a pillar lives), all banners/inline/`///` comments removed,
+  short CRUD lines in the repositories; tests untouched.
+- Verified: `///` count 0, banner count 0, first-line/blank-line structure
+  check clean across all 88 files, URLs in strings intact, Debug + Release
+  builds 0 errors, 175/175 tests.
+- Tooling: throwaway stripper at
+  `%TEMP%\opencode\comment-stripper` (string-aware mini-lexer; interpolated
+  raw-string handling added after the first run left two files unstripped —
+  caught by review greps, sources restored from git, re-run clean).
 
 ---
 

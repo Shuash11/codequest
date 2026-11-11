@@ -1,13 +1,4 @@
-// =============================================================================
-// CodeQuest — In-App Update (task 2): the "Updating CodeQuest" dialog.
-// UX contract (owner directive): clicking "Update now" must NOT hand the user
-// to GitHub — this dialog IS the update experience. It walks the three phases
-// of SelfUpdateService (Downloading with a percent, Verifying, Installing)
-// and closes the app when the installer is applying; the apply script
-// relaunches CodeQuest by itself. Failure is a friendly inline line in this
-// dialog with "Try again"/"Close" — never a raw error, never a browser.
-// "Cancel" aborts during the download and returns to the running session.
-// =============================================================================
+// The updating dialog.
 
 using CodeQuest.Services;
 using System.Drawing;
@@ -15,10 +6,6 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The "updating" dialog: download progress, verify, silent install — then
-/// this session ends and the new version starts itself.
-/// </summary>
 public sealed class UpdateProgressDialog : Form
 {
     private const string Title = "Updating CodeQuest";
@@ -38,7 +25,6 @@ public sealed class UpdateProgressDialog : Form
     private readonly FlatButton _close;
     private CancellationTokenSource? _cancellation;
 
-    /// <summary>Creates the updating dialog for one verified update.</summary>
     public UpdateProgressDialog(UpdateCheckResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -113,8 +99,6 @@ public sealed class UpdateProgressDialog : Form
         card.Controls.Add(_track);
         card.Controls.Add(note);
 
-        // The action row (UpdateDialog family: primary left, secondary right).
-        // "Try again"/"Close" exist only for the failure state.
         _retry = new FlatButton
         {
             Name = "UpdateRetryButton",
@@ -170,7 +154,7 @@ public sealed class UpdateProgressDialog : Form
         Controls.Add(_close);
         Controls.Add(card);
 
-        CancelButton = _cancel; // Esc during the download aborts the update
+        CancelButton = _cancel;
 
         Shown += static (sender, e) =>
         {
@@ -181,7 +165,6 @@ public sealed class UpdateProgressDialog : Form
         };
     }
 
-    /// <summary>Starts one download-verify-apply attempt in the background.</summary>
     private void BeginUpdate()
     {
         _cancellation?.Dispose();
@@ -197,7 +180,7 @@ public sealed class UpdateProgressDialog : Form
         _cancel.Enabled = true;
         CancelButton = _cancel;
 
-        var reporter = new Progress<SelfUpdateProgress>(ApplyProgress); // captures the UI context
+        var reporter = new Progress<SelfUpdateProgress>(ApplyProgress);
         CancellationTokenSource cancellation = _cancellation;
         string? installerUrl = _result.InstallerUrl;
 
@@ -209,7 +192,6 @@ public sealed class UpdateProgressDialog : Form
                 TaskScheduler.FromCurrentSynchronizationContext());
     }
 
-    /// <summary>Applies one progress report from the update engine.</summary>
     private void ApplyProgress(SelfUpdateProgress progress)
     {
         switch (progress.Phase)
@@ -220,7 +202,7 @@ public sealed class UpdateProgressDialog : Form
                 _status.Text = $"{DownloadingLabel} {(int)Math.Round(fraction * 100)}%";
                 break;
             case SelfUpdatePhase.Downloading:
-                _track.Marquee = true; // total size unknown: activity, never a fake percent
+                _track.Marquee = true;
                 _status.Text = DownloadingLabel;
                 break;
             case SelfUpdatePhase.Verifying:
@@ -232,13 +214,12 @@ public sealed class UpdateProgressDialog : Form
                 _track.Value = 0;
                 _track.Marquee = true;
                 _status.Text = InstallingLabel;
-                _cancel.Enabled = false; // the installer is launching; nothing left to cancel
+                _cancel.Enabled = false;
                 CancelButton = null;
                 break;
         }
     }
 
-    /// <summary>Ends one attempt: applied (exit for the install), cancelled, or failed.</summary>
     private void Finish(Task<SelfUpdateOutcome> task)
     {
         if (task.IsCanceled || (task.IsFaulted && task.Exception is not null))
@@ -251,11 +232,11 @@ public sealed class UpdateProgressDialog : Form
         switch (outcome.Status)
         {
             case SelfUpdateStatus.Applied:
-                DialogResult = DialogResult.OK; // the shell closes; the script installs and relaunches
+                DialogResult = DialogResult.OK;
                 Close();
                 break;
             case SelfUpdateStatus.Cancelled:
-                DialogResult = DialogResult.Cancel; // the session simply continues
+                DialogResult = DialogResult.Cancel;
                 Close();
                 break;
             case SelfUpdateStatus.Failed:
@@ -264,7 +245,6 @@ public sealed class UpdateProgressDialog : Form
         }
     }
 
-    /// <summary>The failure state: friendly message inline, retry/close instead of cancel.</summary>
     private void ShowFailure(string message)
     {
         _cancellation?.Dispose();
@@ -280,13 +260,11 @@ public sealed class UpdateProgressDialog : Form
         CancelButton = _close;
     }
 
-    /// <summary>The user cancelled the download; the engine reports the outcome.</summary>
     private void CancelUpdate()
     {
-        _cancel.Enabled = false; // one cancel is enough; the outcome closes the dialog
+        _cancel.Enabled = false;
         _cancellation?.Cancel();
     }
 
-    /// <summary>Another attempt after a failure.</summary>
     private void Retry() => BeginUpdate();
 }

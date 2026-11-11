@@ -1,45 +1,4 @@
-// =============================================================================
-// CodeQuest — Phase P8: Topic & Quiz Management (New-topic reworked by WP4)
-// The topic management screen of the design of record (spec 5.3), hosted as
-// the shell's "Topics" module panel (§5.2 — panels persist, the shell swaps).
-// Look at: the layout — an explaining caption over the toolbar ("Topics
-//          group your quizzes; every quiz belongs to one." — the same
-//          caption-over-list anatomy the Review module uses), then the
-//          toolbar row (8px gaps): the search box ("Search topics…", 240px)
-//          and the trailing "New topic" primary button (with its "+" mark —
-//          the PLAY-pill glyph language of the quiz card); 16px; one
-//          full-height grid card (recipe 4.6, accent column headers) with
-//          the columns Name · Category · Quizzes · Created and the trailing
-//          Edit/Delete text actions. The search filters live while typing
-//          (no submit button).
-// WP4 — the New-topic dialog is the §5.3a AI dialog: the user DESCRIBES the
-//          topic, "Generate with AI" walks the same provider chain as the
-//          quiz generation (off the UI thread, busy state, typed failure
-//          banner), and the result lands as an EDITABLE preview. Manual-first
-//          by construction: every field starts empty and enabled, and Save
-//          works without ever generating. The description the dialog carries
-//          now reaches the repository (the pre-WP4 form saved string.Empty).
-//          Two failure classes, two placements, never mixed (§5.3a): the
-//          describe range violation is the §4.4 inline DangerText line; the
-//          generation unavailability is the compact WarningTint banner. The
-//          busy state reuses the app's one §4.13 pattern verbatim (the call
-//          runs OFF the UI thread — R-5 #3; a frozen dialog is a review
-//          defect) and its Cancel discards the late result (§5.11 semantics).
-//          The Edit-topic flow is UNCHANGED and stays manual (Name + Category
-//          only, description preserved) — it uses EditTopicDialog below,
-//          which carries the pre-WP4 manual card verbatim.
-// Delete flow (the CORRECTED two-branch flow of spec 5.3): the schema keeps
-//          quizzes.topic_id ON DELETE RESTRICT, so the flow branches BEFORE
-//          any dialog — a topic with no quizzes gets the confirm dialog
-//          ("Delete this topic?" / "This topic will be removed. This cannot
-//          be undone.", Delete destructive + Cancel) and then "Topic
-//          deleted." in the strip; a topic WITH quizzes is blocked with the
-//          strip message and no dialog — never a raw SQLite error.
-// R-2 obligations carried here: #5 (duplicate topic name → the spec's exact
-//          friendly message, pre-checked inline AND caught as
-//          DuplicateEntityException — never raw), #7 (the two-value category
-//          dropdown), F8 (the empty-name guard runs before the DB).
-// =============================================================================
+// The topics screen.
 
 using CodeQuest.Data;
 using CodeQuest.Models;
@@ -50,15 +9,10 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The topic management screen (spec 5.3): search, list, create/edit/delete.
-/// </summary>
 public sealed class TopicManageForm : ModulePanel
 {
-    /// <summary>The two category values the schema allows (R-2 #7) — the dropdown's whole world.</summary>
     public static readonly string[] Categories = { "Programming", "Cybersecurity" };
 
-    // The design of record's exact copy (§4.11, §5.3 states and feedback).
     private const string EmptyTopicNameMessage = "Enter a topic name.";
     private const string DuplicateTopicMessage = "A topic with this name already exists.";
     private const string TopicHasQuizzesMessage = "This topic still has quizzes. Delete its quizzes first.";
@@ -85,7 +39,6 @@ public sealed class TopicManageForm : ModulePanel
     private readonly ListCardGrid _list;
     private Dictionary<int, int> _quizCounts = new();
 
-    /// <summary>Creates the screen for the topic and quiz repositories and the AI topic chain.</summary>
     public TopicManageForm(ITopicRepository topics, IQuizRepository quizzes, ITopicGenerationService topicGeneration)
     {
         ArgumentNullException.ThrowIfNull(topics);
@@ -115,7 +68,7 @@ public sealed class TopicManageForm : ModulePanel
         int toolbarHeight = UITheme.Scaled(this, 32);
         int toolbarTop = captionHeight + UITheme.Scaled(this, UITheme.Spacing16);
 
-        _search = new InputField(accessibleName: "Search topics…") // §4.4: name from the visible placeholder
+        _search = new InputField(accessibleName: "Search topics…")
         {
             Name = "TopicsSearchField",
             PlaceholderText = "Search topics…",
@@ -134,7 +87,7 @@ public sealed class TopicManageForm : ModulePanel
         {
             Name = "NewTopicButton",
             Text = NewTopicLabel,
-            AccessibleName = "New topic", // the "+" is the visual mark, not the name
+            AccessibleName = "New topic",
             Location = new Point(Width - UITheme.Scaled(this, 124), toolbarTop),
             Size = new Size(UITheme.Scaled(this, 124), toolbarHeight),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
@@ -173,7 +126,7 @@ public sealed class TopicManageForm : ModulePanel
         {
             if (sender is ListCardGrid card && card.Parent is TopicManageForm form)
             {
-                form._search.ClearText(); // "Clear search" resets the live filter
+                form._search.ClearText();
             }
         };
 
@@ -183,11 +136,8 @@ public sealed class TopicManageForm : ModulePanel
         Controls.Add(_listCaption);
     }
 
-    /// <inheritdoc />
     public override void RefreshData()
     {
-        // The quiz counts only change on CRUD, not per keystroke — one read
-        // per topic per refresh, then the live search reuses them.
         Dictionary<int, int> counts = new();
         foreach (Topic topic in _topics.GetAll())
         {
@@ -195,24 +145,22 @@ public sealed class TopicManageForm : ModulePanel
         }
 
         _quizCounts = counts;
-        _listCaption.Width = Math.Max(Width, 1); // the caption was built at the pre-layout width (M6)
+        _listCaption.Width = Math.Max(Width, 1);
         ApplyFilter();
     }
 
-    /// <summary>Keeps the list caption full-width as the module resizes (M6).</summary>
     protected override void OnResize(EventArgs eventargs)
     {
         base.OnResize(eventargs);
         _listCaption.Width = Math.Max(Width, 1);
     }
 
-    /// <summary>Applies the live search to the grid (spec 5.3: filter while typing).</summary>
     private void ApplyFilter()
     {
         string searchText = _search.Text;
         IReadOnlyList<Topic> topics = searchText.Length == 0
             ? _topics.GetAll()
-            : _topics.Search(searchText); // the P4 live search (name and description)
+            : _topics.Search(searchText);
 
         _list.Grid.SuspendLayout();
         _list.Grid.Rows.Clear();
@@ -232,7 +180,6 @@ public sealed class TopicManageForm : ModulePanel
 
         _list.Grid.ResumeLayout();
 
-        // The states of spec 5.3: the grid never renders its own message.
         if (_list.Grid.Rows.Count == 0)
         {
             if (searchText.Length == 0)
@@ -250,7 +197,6 @@ public sealed class TopicManageForm : ModulePanel
         }
     }
 
-    /// <summary>Routes a row action click to its handler.</summary>
     private void HandleRowAction(GridActionEventArgs e)
     {
         Topic? topic = _list.Grid.Rows[e.RowIndex].Tag as Topic;
@@ -269,10 +215,6 @@ public sealed class TopicManageForm : ModulePanel
         }
     }
 
-    /// <summary>
-    /// Opens the §5.3a "New topic" AI dialog and stores the topic on Save.
-    /// The dialog is manual-first: it can save without ever generating.
-    /// </summary>
     private void NewTopic()
     {
         using var dialog = new TopicFormDialog(_topicGeneration)
@@ -288,21 +230,13 @@ public sealed class TopicManageForm : ModulePanel
         PersistNewTopic(dialog);
     }
 
-    /// <summary>
-    /// The persisting phase of the New-topic flow (the seam the
-    /// TopicGenerationTests drive to verify the save path without the modal
-    /// loop): the dialog's name, category AND description reach the
-    /// repository — the pre-WP4 form saved an empty description. Returns
-    /// false when the save lost the duplicate race (R-2 #5): the strip
-    /// carries the friendly message instead of a raw SQLite error.
-    /// </summary>
     internal bool PersistNewTopic(TopicFormDialog dialog)
     {
         var topic = new Topic
         {
             Name = dialog.TopicName,
             Category = dialog.TopicCategory,
-            Description = dialog.TopicDescription, // the §5.3a preview's description is the stored one (WP4)
+            Description = dialog.TopicDescription,
             CreatedAt = DateTimeOffset.UtcNow,
         };
 
@@ -312,8 +246,6 @@ public sealed class TopicManageForm : ModulePanel
         }
         catch (DuplicateEntityException)
         {
-            // Lost the race against another window — the friendly duplicate
-            // message instead of a raw SQLite error (R-2 #5).
             ReportStatus(DuplicateTopicMessage, false);
             return false;
         }
@@ -323,7 +255,6 @@ public sealed class TopicManageForm : ModulePanel
         return true;
     }
 
-    /// <summary>Opens the "Edit topic" modal card and saves the changes on Save.</summary>
     private void EditTopic(Topic topic)
     {
         using var dialog = new EditTopicDialog("Edit topic")
@@ -338,9 +269,6 @@ public sealed class TopicManageForm : ModulePanel
             return;
         }
 
-        // The spec's form edits Name and Category only — the description and
-        // creation timestamp are preserved (the Edit-topic flow is unchanged
-        // by WP4: it stays manual and carries no AI affordances).
         var updated = new Topic
         {
             TopicId = topic.TopicId,
@@ -364,15 +292,10 @@ public sealed class TopicManageForm : ModulePanel
         ReportStatus(UpdatedMessage, true);
     }
 
-    /// <summary>
-    /// The CORRECTED two-branch delete flow of spec 5.3: branch on the quiz
-    /// count BEFORE any dialog, then confirm, then delete.
-    /// </summary>
     private void DeleteTopic(Topic topic)
     {
         if (_quizzes.GetByTopic(topic.TopicId).Count > 0)
         {
-            // Blocked: no dialog, the strip explains the block (§5.3).
             ReportStatus(TopicHasQuizzesMessage, false);
             return;
         }
@@ -391,15 +314,12 @@ public sealed class TopicManageForm : ModulePanel
         }
         catch (ReferentialIntegrityException)
         {
-            // The topic gained a quiz between the check and the delete — the
-            // same friendly block, never a raw SQLite error.
             ReportStatus(TopicHasQuizzesMessage, false);
         }
 
         RefreshData();
     }
 
-    /// <summary>The empty-name and duplicate guards of the topic form (F8: before the DB).</summary>
     private string? ValidateTopicName(string? name, int? ignoreTopicId)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -415,7 +335,6 @@ public sealed class TopicManageForm : ModulePanel
         return null;
     }
 
-    /// <summary>Shows a modal dialog over the window this panel lives in.</summary>
     private DialogResult ShowDialogOnOwner(Form dialog)
     {
         Form? owner = FindForm();
@@ -423,27 +342,17 @@ public sealed class TopicManageForm : ModulePanel
     }
 }
 
-/// <summary>
-/// The D4 dialog-card shell both topic dialogs share (§4.11 as amended by the
-/// D4 dark-theme re-issue): the one floating elevation level — SurfaceRaised
-/// fill, 12px radius, 1px BorderHairline edge, and the native CS_DROPSHADOW
-/// (the only shadow in the app, owner-mandated, platform-drawn). No dimmed
-/// backdrop. Subclasses build their content; the shell owns the card shape.
-/// </summary>
 public abstract class TopicDialogShell : Form
 {
-    /// <summary>Creates the borderless dialog card. <paramref name="title"/> is also the window caption (UIA reads it).</summary>
     protected TopicDialogShell(string title)
     {
         FormBorderStyle = FormBorderStyle.None;
         Text = title;
         StartPosition = FormStartPosition.CenterParent;
         ShowInTaskbar = false;
-        BackColor = UITheme.SurfaceRaised; // the floating elevation level (D4 §2)
+        BackColor = UITheme.SurfaceRaised;
         KeyPreview = true;
 
-        // The D4 hairline card border (the card treatment): BorderHairline
-        // keeps a crisp edge over the app window behind it.
         Paint += static (sender, e) =>
         {
             if (sender is Form form)
@@ -456,18 +365,16 @@ public abstract class TopicDialogShell : Form
         };
     }
 
-    /// <summary>The native drop shadow (D4 §2): CS_DROPSHADOW class style, platform-drawn — the one shadow in the app.</summary>
     protected override CreateParams CreateParams
     {
         get
         {
             CreateParams parameters = base.CreateParams;
-            parameters.ClassStyle |= 0x20000; // CS_DROPSHADOW
+            parameters.ClassStyle |= 0x20000;
             return parameters;
         }
     }
 
-    /// <summary>Rounds the card like the §4.11 dialog shape.</summary>
     protected override void OnLoad(EventArgs e)
     {
         base.OnLoad(e);
@@ -480,7 +387,6 @@ public abstract class TopicDialogShell : Form
         UpdateRegion();
     }
 
-    /// <summary>Clips the dialog to the recipe's rounded card shape.</summary>
     private void UpdateRegion()
     {
         if (Width <= 0 || Height <= 0)
@@ -495,14 +401,6 @@ public abstract class TopicDialogShell : Form
     }
 }
 
-/// <summary>
-/// The §5.3a AI "New topic" dialog (WP4): the user describes the topic,
-/// "Generate with AI" walks the topic provider chain off the UI thread, and
-/// the result lands as an editable preview (Name / Category / Description).
-/// Manual-first: every field starts empty and enabled and Save works without
-/// ever generating. All colors, fonts and spacing come from
-/// <see cref="UITheme"/> only.
-/// </summary>
 public sealed class TopicFormDialog : TopicDialogShell
 {
     private const string DialogTitle = "New topic";
@@ -518,9 +416,6 @@ public sealed class TopicFormDialog : TopicDialogShell
     private const string BannerTitleText = "Topic generation is unavailable right now.";
     private const string BannerManualLine = "You can still fill in the fields manually and save.";
 
-    // The typed-reason map of §5.11, same wording verbatim — a generation
-    // failure is never a raw reason string, never a provider detail that
-    // could leak configuration. The generic fallback is topic-worded.
     private const string NoProviderMessage = "No AI provider is configured.";
     private const string AuthMessage = "The AI provider rejected the request. Check the provider configuration.";
     private const string QuotaMessage = "The AI provider reached its request limit. Try again later.";
@@ -531,7 +426,7 @@ public sealed class TopicFormDialog : TopicDialogShell
 
     private const int ContentInset = UITheme.Spacing24;
     private const int MinDialogWidth = 480;
-    private const int DescribeAreaHeight = 90; // the §4.4 multi-line minimum (64px) + the 8px gap + the error-line slot
+    private const int DescribeAreaHeight = 90;
     private const int PreviewAreaHeight = 90;
     private const int BusyTrackWidth = 240;
 
@@ -560,25 +455,23 @@ public sealed class TopicFormDialog : TopicDialogShell
     private readonly FlatButton _cancel;
     private readonly System.Windows.Forms.Timer _elapsedTimer = new() { Interval = 1000 };
 
-    private bool _busy; // a generation is in flight (also the re-entrancy guard)
-    private int _generationId; // increments per start — a late or cancelled result is discarded (§5.11)
+    private bool _busy;
+    private int _generationId;
     private DateTimeOffset _startedAt;
 
-    /// <summary>Creates the AI New-topic dialog over the configured topic chain.</summary>
     public TopicFormDialog(ITopicGenerationService generation)
         : base(DialogTitle)
     {
         ArgumentNullException.ThrowIfNull(generation);
         _generation = generation;
 
-        // --- The describe field (§5.3a) ------------------------------------
         _titleLabel = new Label
         {
             Text = DialogTitle,
             Name = "TopicDialogTitle",
-            Font = UITheme.BodySemibold, // §5.3a pins the dialog title style
+            Font = UITheme.BodySemibold,
             ForeColor = UITheme.TextPrimary,
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             AutoSize = false,
         };
 
@@ -588,25 +481,21 @@ public sealed class TopicFormDialog : TopicDialogShell
             Name = "TopicDescribeField",
             PlaceholderText = DescribePlaceholder,
         };
-        _describe.LabeledBy = _describeLabel; // §4.4: the visible label is the accessible name's source (F2)
+        _describe.LabeledBy = _describeLabel;
         _describe.TextChanged += static (sender, e) =>
         {
             if (sender is InputArea area)
             {
-                area.ClearError(); // the error line persists until the value validates (§4.4)
+                area.ClearError();
             }
         };
 
-        // --- The generate row (§5.3a) --------------------------------------
         _generate = new FlatButton
         {
             Name = "TopicGenerateButton",
             Text = GenerateButtonLabel,
             Variant = UITheme.FlatButtonVariant.Primary,
         };
-        // No AccessibleName here on purpose: §5.3a announces the busy state
-        // through the button's accessible name becoming "Generating…" — with
-        // no override the name follows the label.
         _generate.Click += static (sender, e) =>
         {
             if (sender is FlatButton button && button.FindAncestor<TopicFormDialog>() is { } dialog)
@@ -621,17 +510,14 @@ public sealed class TopicFormDialog : TopicDialogShell
             Text = ConnectionNote,
             Font = UITheme.Caption,
             ForeColor = UITheme.TextSecondary,
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             AutoSize = false,
         };
 
-        // The busy block (§4.13, the app's one busy pattern, reused verbatim):
-        // the marquee track with the "Cancel" secondary beside it, and the
-        // status line with the live elapsed counter beneath.
         _busyBlock = new Panel
         {
             Name = "TopicBusyBlock",
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             Visible = false,
         };
         _busyTrack = new ProgressTrack
@@ -644,7 +530,7 @@ public sealed class TopicFormDialog : TopicDialogShell
             Text = GeneratingStatus,
             Font = UITheme.Caption,
             ForeColor = UITheme.TextSecondary,
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             AutoSize = false,
         };
         _busyCancel = new FlatButton
@@ -664,7 +550,6 @@ public sealed class TopicFormDialog : TopicDialogShell
         _busyBlock.Controls.Add(_busyStatus);
         _busyBlock.Controls.Add(_busyCancel);
 
-        // --- The typed-failure banner (§5.3a) -------------------------------
         _banner = new Panel
         {
             Name = "TopicFailureBanner",
@@ -687,7 +572,7 @@ public sealed class TopicFormDialog : TopicDialogShell
             Text = BannerTitleText,
             Font = UITheme.BodySemibold,
             ForeColor = UITheme.WarningText,
-            BackColor = UITheme.WarningTint, // every label matches its wash (D4 audit #9)
+            BackColor = UITheme.WarningTint,
             AutoSize = false,
         };
         _bannerReason = new Label
@@ -711,16 +596,15 @@ public sealed class TopicFormDialog : TopicDialogShell
         _banner.Controls.Add(_bannerReason);
         _banner.Controls.Add(_bannerManual);
 
-        // --- The preview group (§5.3a) — manual-first -----------------------
         _previewHeader = new Label
         {
             Name = "TopicPreviewHeader",
             Text = PreviewHeaderText,
             Font = UITheme.Caption,
             ForeColor = UITheme.TextSecondary,
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             AutoSize = false,
-            Visible = false, // appears with the first successful generate
+            Visible = false,
         };
 
         _nameLabel = MakeFieldLabel("Name", "TopicNameLabel");
@@ -734,7 +618,7 @@ public sealed class TopicFormDialog : TopicDialogShell
         {
             if (sender is InputField field)
             {
-                field.ClearError(); // the error line persists until the value validates (§4.4)
+                field.ClearError();
             }
         };
 
@@ -748,7 +632,7 @@ public sealed class TopicFormDialog : TopicDialogShell
         {
             _category.Items.Add(category);
         }
-        _category.SelectedIndex = 0; // a fresh topic defaults to the first category
+        _category.SelectedIndex = 0;
 
         _descriptionLabel = MakeFieldLabel("Description", "TopicDescriptionLabel");
         _description = new InputArea(accessibleName: "Topic description")
@@ -758,7 +642,6 @@ public sealed class TopicFormDialog : TopicDialogShell
         };
         _description.LabeledBy = _descriptionLabel;
 
-        // --- The commit row (§4.11) -----------------------------------------
         _save = new FlatButton { Name = "SaveTopicButton", Text = "Save", Variant = UITheme.FlatButtonVariant.Primary };
         _save.Click += static (sender, e) =>
         {
@@ -796,8 +679,6 @@ public sealed class TopicFormDialog : TopicDialogShell
         AcceptButton = _save;
         CancelButton = _cancel;
 
-        // The elapsed-seconds counter ticks on the UI timer (§4.13) while the
-        // chain call runs off the UI thread.
         _elapsedTimer.Tick += static (sender, e) =>
         {
             if (sender is System.Windows.Forms.Timer timer && timer.Tag is TopicFormDialog dialog)
@@ -811,7 +692,6 @@ public sealed class TopicFormDialog : TopicDialogShell
         LayoutDialog();
     }
 
-    /// <summary>Stops the elapsed timer when the dialog is disposed (L1).</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -823,11 +703,9 @@ public sealed class TopicFormDialog : TopicDialogShell
         base.Dispose(disposing);
     }
 
-    /// <summary>Runs before the dialog closes; returns the inline error message or null.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public Func<string?, string?>? ValidateInput { get; init; }
 
-    /// <summary>The entered (trimmed) topic name — the Save target, prefilled from the AI draft.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string TopicName
     {
@@ -835,7 +713,6 @@ public sealed class TopicFormDialog : TopicDialogShell
         set => _name.Text = value;
     }
 
-    /// <summary>The selected category — one of <see cref="TopicManageForm.Categories"/> by construction.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string TopicCategory
     {
@@ -847,10 +724,6 @@ public sealed class TopicFormDialog : TopicDialogShell
         }
     }
 
-    /// <summary>
-    /// The (trimmed) topic description of the preview group — the value the
-    /// New-topic flow persists (the pre-WP4 form saved string.Empty).
-    /// </summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string TopicDescription
     {
@@ -858,10 +731,8 @@ public sealed class TopicFormDialog : TopicDialogShell
         set => _description.Text = value;
     }
 
-    /// <summary>True while the AI chain call is in flight (the §5.3a busy state).</summary>
     public bool IsBusy => _busy;
 
-    /// <summary>Save runs the caller's validation; an error keeps the dialog open, inline.</summary>
     private void HandleSave()
     {
         string? error = ValidateInput?.Invoke(_name.Text);
@@ -875,13 +746,6 @@ public sealed class TopicFormDialog : TopicDialogShell
         DialogResult = DialogResult.OK;
     }
 
-    /// <summary>
-    /// Starts one generation: validates the describe range FIRST (§5.3a — the
-    /// violation is the §4.4 inline line, never the banner), disables the
-    /// busy-state controls, and runs the blocking chain call off the UI
-    /// thread. The preview fields stay enabled (manual editing is always
-    /// possible, FR1).
-    /// </summary>
     private void StartGeneration()
     {
         if (_busy)
@@ -898,23 +762,19 @@ public sealed class TopicFormDialog : TopicDialogShell
             return;
         }
 
-        // The request's own guard agrees with the range above, so building it
-        // here cannot throw.
         var request = new TopicGenerationRequest(describeText);
 
         _busy = true;
         _generationId++;
-        int generationId = _generationId; // this request's token (the §5.11 cancellation rule)
+        int generationId = _generationId;
         _startedAt = DateTimeOffset.UtcNow;
 
         SetBusyState(busy: true);
-        _busyTrack.Marquee = true; // armed per run — never left over (M1)
+        _busyTrack.Marquee = true;
         _busyBlock.BringToFront();
         _elapsedTimer.Start();
-        Refresh(); // paint the busy state before the (off-thread) call starts
+        Refresh();
 
-        // The chain call is synchronous and can block for a minute — it runs
-        // off the UI thread so the marquee animates (the binding R-5 #3 rule).
         Task.Run(() => _generation.GenerateTopic(request))
             .ContinueWith(
                 task => HandleOutcome(task.Result, generationId),
@@ -923,16 +783,11 @@ public sealed class TopicFormDialog : TopicDialogShell
                 TaskScheduler.FromCurrentSynchronizationContext());
     }
 
-    /// <summary>
-    /// The UI-thread continuation: prefill the preview, or show the typed
-    /// failure banner. A result whose token no longer matches — cancelled, or
-    /// the dialog already closed — is discarded; nothing is ever half-saved.
-    /// </summary>
     private void HandleOutcome(TopicGenerationOutcome outcome, int generationId)
     {
         if (IsDisposed || generationId != _generationId)
         {
-            return; // the §5.11 cancellation rule: the late result is discarded
+            return;
         }
 
         _elapsedTimer.Stop();
@@ -942,7 +797,6 @@ public sealed class TopicFormDialog : TopicDialogShell
 
         if (outcome.IsSuccess && outcome.Draft is not null)
         {
-            // The banner persists until a SUCCESSFUL generate (§5.3a).
             _banner.Visible = false;
             _previewHeader.Visible = true;
 
@@ -955,16 +809,11 @@ public sealed class TopicFormDialog : TopicDialogShell
         }
 
         _bannerReason.Text = DescribeFailure(outcome.ProviderReasons);
-        _banner.AccessibleName = $"{BannerTitleText} {_bannerReason.Text} {BannerManualLine}"; // StaticText semantics
+        _banner.AccessibleName = $"{BannerTitleText} {_bannerReason.Text} {BannerManualLine}";
         _banner.Visible = true;
         LayoutDialog();
     }
 
-    /// <summary>
-    /// The §5.11 Cancel: the dialog returns to its ready state immediately;
-    /// the in-flight call cannot be aborted through the client, so its token
-    /// is invalidated — the late result is discarded (never half-saved).
-    /// </summary>
     private void CancelGeneration()
     {
         if (!_busy)
@@ -972,19 +821,13 @@ public sealed class TopicFormDialog : TopicDialogShell
             return;
         }
 
-        _generationId++; // invalidate the in-flight request's completion (§5.11: the late result is discarded)
+        _generationId++;
         _elapsedTimer.Stop();
         _busyTrack.Marquee = false;
         _busy = false;
         SetBusyState(busy: false);
     }
 
-    /// <summary>
-    /// Enters or leaves the §5.3a busy state: the generate button disabled
-    /// with the "Generating…" label, the describe field disabled (§4.4
-    /// disabled recipe), Save disabled, and the note replaced by the §4.13
-    /// busy block. The preview fields stay enabled throughout (FR1).
-    /// </summary>
     private void SetBusyState(bool busy)
     {
         _generate.Enabled = !busy;
@@ -1000,14 +843,6 @@ public sealed class TopicFormDialog : TopicDialogShell
         }
     }
 
-    /// <summary>
-    /// Maps the typed reason strings to the §5.11 plain-language lines — never
-    /// a raw reason, never a provider detail that could leak configuration.
-    /// The chain-level class (contract 7.6 — a fresh clone has no config file)
-    /// maps to the no-provider message. Same classification and wording as the
-    /// generation screen's map; the third banner line is this dialog's own
-    /// manual-fallback pointer (not the take-a-quiz offline pointer).
-    /// </summary>
     private static string DescribeFailure(IReadOnlyList<string> reasons)
     {
         string first = reasons.Count > 0 ? reasons[0] : string.Empty;
@@ -1021,7 +856,6 @@ public sealed class TopicFormDialog : TopicDialogShell
             : GenericFailureMessage;
     }
 
-    /// <summary>Creates one §4.4 field label (BodySemibold on the dialog fill).</summary>
     private Label MakeFieldLabel(string text, string name)
     {
         return new Label
@@ -1030,16 +864,11 @@ public sealed class TopicFormDialog : TopicDialogShell
             Name = name,
             Font = UITheme.BodySemibold,
             ForeColor = UITheme.TextPrimary,
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             AutoSize = false,
         };
     }
 
-    /// <summary>
-    /// Sizes the card and places its content (§5.3a anatomy). Called again
-    /// whenever the banner or the preview header changes visibility — the
-    /// dialog grows downward, never overlaying content.
-    /// </summary>
     private void LayoutDialog()
     {
         int inset = UITheme.Scaled(this, ContentInset);
@@ -1057,7 +886,7 @@ public sealed class TopicFormDialog : TopicDialogShell
         int gap24 = UITheme.Scaled(this, UITheme.Spacing24);
 
         int generateWidth = TextRenderer.MeasureText(GeneratingButtonLabel, UITheme.Body).Width
-            + UITheme.Scaled(this, UITheme.Spacing16) * 2; // sized for the longer busy label
+            + UITheme.Scaled(this, UITheme.Spacing16) * 2;
         int busyCancelWidth = TextRenderer.MeasureText(CancelLabel, UITheme.Body).Width
             + UITheme.Scaled(this, UITheme.Spacing16) * 2;
         int saveWidth = TextRenderer.MeasureText(_save.Text, UITheme.Body).Width
@@ -1068,18 +897,14 @@ public sealed class TopicFormDialog : TopicDialogShell
         int x = inset;
         int y = inset;
 
-        // Title (§5.3a: BodySemibold), 16px above the describe label.
         _titleLabel.SetBounds(x, y, contentWidth, titleHeight);
         y += titleHeight + gap16;
 
-        // The describe field: label, 4px, the multi-line area (min 64px).
         _describeLabel.SetBounds(x, y, contentWidth, labelHeight);
         y += labelHeight + UITheme.Scaled(this, UITheme.Spacing4);
         _describe.SetBounds(x, y, contentWidth, DescribeAreaHeight);
         y += DescribeAreaHeight + gap12;
 
-        // The generate row: the primary button leading, the note 8px below —
-        // replaced in place by the §4.13 busy block while a run is in flight.
         _generate.SetBounds(x, y, generateWidth, buttonHeight);
         y += buttonHeight + gap8;
 
@@ -1098,8 +923,6 @@ public sealed class TopicFormDialog : TopicDialogShell
             y += captionHeight;
         }
 
-        // The banner sits between the generate row and the preview group with
-        // 8px gaps (§5.3a); without it the section gap is 24.
         if (_banner.Visible)
         {
             int bannerHeight = LayoutBanner(contentWidth);
@@ -1111,8 +934,6 @@ public sealed class TopicFormDialog : TopicDialogShell
             y += gap24;
         }
 
-        // The preview group: quiet header, then Name / Category / Description
-        // (16px field↔field, §5.3a).
         if (_previewHeader.Visible)
         {
             _previewHeader.SetBounds(x, y, contentWidth, captionHeight);
@@ -1122,11 +943,11 @@ public sealed class TopicFormDialog : TopicDialogShell
         _nameLabel.SetBounds(x, y, contentWidth, labelHeight);
         y += labelHeight + UITheme.Scaled(this, UITheme.Spacing4);
         _name.SetBounds(x, y, contentWidth, UITheme.Scaled(this, 56));
-        y += _name.Height + gap16; // the field settles at its own reserved height (32px field + error slot)
+        y += _name.Height + gap16;
 
         _categoryLabel.SetBounds(x, y, contentWidth, labelHeight);
         y += labelHeight + UITheme.Scaled(this, UITheme.Spacing4);
-        _category.SetBounds(x, y, contentWidth, comboSlot); // the combo's height follows its font (native flat chrome)
+        _category.SetBounds(x, y, contentWidth, comboSlot);
         y += comboSlot + gap16;
 
         _descriptionLabel.SetBounds(x, y, contentWidth, labelHeight);
@@ -1134,8 +955,6 @@ public sealed class TopicFormDialog : TopicDialogShell
         _description.SetBounds(x, y, contentWidth, PreviewAreaHeight);
         y += PreviewAreaHeight + gap24;
 
-        // The commit row: Save primary trailing (the default), Cancel
-        // secondary 8px to its left (§4.11 / §5.3a).
         _save.SetBounds(width - inset - saveWidth, y, saveWidth, buttonHeight);
         _cancel.SetBounds(width - inset - saveWidth - gap8 - cancelWidth, y, cancelWidth, buttonHeight);
         y += buttonHeight;
@@ -1143,11 +962,6 @@ public sealed class TopicFormDialog : TopicDialogShell
         ClientSize = new Size(width, y + inset);
     }
 
-    /// <summary>
-    /// Lays out the three banner lines inside the wash (12px padding; the
-    /// reason line is measured, since the mapped sentences wrap at this
-    /// width) and returns the banner's total height.
-    /// </summary>
     private int LayoutBanner(int contentWidth)
     {
         int padding = UITheme.Scaled(this, UITheme.Spacing12);
@@ -1172,15 +986,6 @@ public sealed class TopicFormDialog : TopicDialogShell
     }
 }
 
-/// <summary>
-/// The manual topic modal card of spec 5.3 — the Edit-topic form (carried
-/// verbatim from the pre-WP4 dialog): Name input + the two-value category
-/// dropdown (R-2 #7), Save primary / Cancel secondary. All validation runs
-/// through <see cref="ValidateInput"/> before the dialog closes, so the
-/// inline error line of recipe 4.4 carries the failure. The Edit-topic flow
-/// is unchanged by WP4 (§5.3a reworks only the New-topic form); the
-/// description is not part of this form and is preserved by the caller.
-/// </summary>
 public sealed class EditTopicDialog : TopicDialogShell
 {
     private const int ContentInset = UITheme.Spacing24;
@@ -1192,7 +997,6 @@ public sealed class EditTopicDialog : TopicDialogShell
     private readonly FlatButton _save;
     private readonly FlatButton _cancel;
 
-    /// <summary>Creates the dialog. <paramref name="title"/> is "Edit topic".</summary>
     public EditTopicDialog(string title)
         : base(title)
     {
@@ -1201,7 +1005,7 @@ public sealed class EditTopicDialog : TopicDialogShell
             Text = title,
             Font = UITheme.Title,
             ForeColor = UITheme.TextPrimary,
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             AutoSize = false,
             Name = "TopicDialogTitle",
         };
@@ -1211,7 +1015,7 @@ public sealed class EditTopicDialog : TopicDialogShell
             Text = "Name",
             Font = UITheme.BodySemibold,
             ForeColor = UITheme.TextPrimary,
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             AutoSize = false,
             Name = "TopicNameLabel",
         };
@@ -1221,12 +1025,12 @@ public sealed class EditTopicDialog : TopicDialogShell
             Name = "TopicNameField",
             PlaceholderText = "Topic name",
         };
-        _name.LabeledBy = nameLabel; // §4.4: the visible label is the name's source (F2)
+        _name.LabeledBy = nameLabel;
         _name.TextChanged += static (sender, e) =>
         {
             if (sender is InputField field)
             {
-                field.ClearError(); // the error line persists until the value validates (§4.4)
+                field.ClearError();
             }
         };
 
@@ -1235,7 +1039,7 @@ public sealed class EditTopicDialog : TopicDialogShell
             Text = "Category",
             Font = UITheme.BodySemibold,
             ForeColor = UITheme.TextPrimary,
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             AutoSize = false,
             Name = "TopicCategoryLabel",
         };
@@ -1249,7 +1053,7 @@ public sealed class EditTopicDialog : TopicDialogShell
         {
             _category.Items.Add(category);
         }
-        _category.SelectedIndex = 0; // a fresh topic defaults to the first category
+        _category.SelectedIndex = 0;
 
         _save = new FlatButton { Name = "SaveTopicButton", Text = "Save", Variant = UITheme.FlatButtonVariant.Primary };
         _save.Click += static (sender, e) =>
@@ -1282,11 +1086,9 @@ public sealed class EditTopicDialog : TopicDialogShell
         LayoutDialog(titleLabel, nameLabel, categoryLabel);
     }
 
-    /// <summary>Runs before the dialog closes; returns the inline error message or null.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public Func<string?, string?>? ValidateInput { get; init; }
 
-    /// <summary>The entered (trimmed) topic name; the preset for the edit case.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string TopicName
     {
@@ -1294,7 +1096,6 @@ public sealed class EditTopicDialog : TopicDialogShell
         set => _name.Text = value;
     }
 
-    /// <summary>The selected category — one of <see cref="TopicManageForm.Categories"/> by construction.</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string TopicCategory
     {
@@ -1306,7 +1107,6 @@ public sealed class EditTopicDialog : TopicDialogShell
         }
     }
 
-    /// <summary>Save runs the caller's validation; an error keeps the dialog open, inline.</summary>
     private void HandleSave()
     {
         string? error = ValidateInput?.Invoke(_name.Text);
@@ -1320,13 +1120,12 @@ public sealed class EditTopicDialog : TopicDialogShell
         DialogResult = DialogResult.OK;
     }
 
-    /// <summary>Sizes the card and places its content (§4.11 dialog anatomy).</summary>
     private void LayoutDialog(Control titleLabel, Control nameLabel, Control categoryLabel)
     {
-        int titleHeight = UITheme.Scaled(this, 30); // the Title-font header line
+        int titleHeight = UITheme.Scaled(this, 30);
         int labelHeight = UITheme.Scaled(this, 18);
         int buttonHeight = UITheme.Scaled(this, 32);
-        int fieldHeight = UITheme.Scaled(this, 52); // the 32px field + the reserved error slot
+        int fieldHeight = UITheme.Scaled(this, 52);
         int comboSlot = UITheme.Scaled(this, 32);
         int width = UITheme.Scaled(this, 440);
         int inset = UITheme.Scaled(this, ContentInset);
@@ -1356,7 +1155,7 @@ public sealed class EditTopicDialog : TopicDialogShell
         categoryLabel.Size = new Size(contentWidth, labelHeight);
 
         _category.Location = new Point(inset, categoryFieldTop);
-        _category.Width = contentWidth; // the combo's height follows its font (native flat chrome)
+        _category.Width = contentWidth;
 
         _save.Size = new Size(saveWidth, buttonHeight);
         _save.Location = new Point(width - inset - saveWidth, buttonsTop);

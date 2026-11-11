@@ -1,17 +1,4 @@
-// =============================================================================
-// CodeQuest — The fun quiz UI: TAKE QUIZ (home, run, result).
-// HOME — quiz CARDS, not a table: every quiz renders as a colorful card with
-//   a difficulty color band and a PLAY pill; drafts show as locked cards.
-// RUN — Kahoot-style: four big colored ANSWER TILES (▲ ● ◆ ■), tap = the
-//   answer reveals INSTANTLY (correct = green wash, wrong = red wash + the
-//   key tile glows green), the question locks (one honest shot), then Next.
-//   The old "table of quiet grey rows" is gone.
-// RESULT — a huge score, a verdict message ("Excellent work!" / "Nice run!" /
-//   "Keep practicing!"), and colorful per-question verdict cards.
-// The data rules are unchanged (R-2 #1): one atomic AddWithAnswers write, the
-// stored score is the correct count, the display denominator is the quiz's
-// own question count, and the double-submit guard stays.
-// =============================================================================
+// The quiz-taking screen.
 
 using CodeQuest.Data;
 using CodeQuest.Data.Repositories;
@@ -23,10 +10,6 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The quiz-taking module (the fun-UI redesign): quiz cards, the tile run,
-/// and the result screen in one shell-hosted panel.
-/// </summary>
 public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 {
     private static readonly Color[] TileColors =
@@ -47,12 +30,9 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private readonly SubmittedAnswerRepository _answers;
     private readonly IScoringService _scoring;
     private readonly UserAccount _user;
-    private readonly IGamificationRepository _gamification; // the §5.7a reveal's derived progress + unlock records
-    private readonly IAchievementEvaluator _achievements;   // the achievement catalog + rules (plan FR4)
+    private readonly IGamificationRepository _gamification;
+    private readonly IAchievementEvaluator _achievements;
 
-    // The run/result controls are assigned in builder methods — readonly
-    // fields cannot be assigned from a method, so these are plain fields
-    // (each assigned exactly once, during construction).
     private FlowLayoutPanel _cardFlow = null!;
     private Panel _emptyView = null!;
     private Panel _runView = null!;
@@ -71,15 +51,12 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private Label _resultContext = null!;
     private Panel _resultListCard = null!;
     private Panel _resultActions = null!;
-    private Panel _heroCard = null!; // the §5.7 hero card — its height follows the §5.7a reveal
+    private Panel _heroCard = null!;
     private FlatButton _viewAnswersButton = null!;
     private FlatButton _retakeButton = null!;
     private FlatButton _doneButton = null!;
-    private AttemptReviewForm? _reviewPanel; // the §5.9 drill-in state, created on first open
+    private AttemptReviewForm? _reviewPanel;
 
-    // The §5.7a reveal (WP5): the XP line, the level row and the achievement
-    // chips, inside the hero card below the context line. Built once in
-    // BuildResultView; each attempt fills and sizes them.
     private Panel _resultReveal = null!;
     private Label _resultXpLine = null!;
     private LevelChip _resultLevelChip = null!;
@@ -90,8 +67,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
     private Dictionary<int, string> _topicNames = new();
 
-    // The run state: the quiz being taken, the picked choice per question,
-    // which questions are revealed (locked), and the submit guard.
     private Quiz? _runQuiz;
     private int?[] _selections = Array.Empty<int?>();
     private bool[] _revealed = Array.Empty<bool>();
@@ -99,16 +74,14 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private bool _submitting;
     private List<AnswerTile> _tiles = new();
 
-    // The result state: what the last completed attempt produced.
     private int _resultAttemptId;
     private Quiz? _resultQuiz;
     private int _resultCorrect;
     private bool _awaitingSavedAnnouncement;
-    private long _resultXpEarned;                            // §5.7a: the attempt's derived XP
-    private UserProgress? _resultProgress;                    // §5.7a: the post-submit level state (null = recording failed)
-    private IReadOnlyList<AchievementDefinition> _resultNewlyUnlocked = Array.Empty<AchievementDefinition>(); // §5.7a
+    private long _resultXpEarned;
+    private UserProgress? _resultProgress;
+    private IReadOnlyList<AchievementDefinition> _resultNewlyUnlocked = Array.Empty<AchievementDefinition>();
 
-    /// <summary>Creates the quiz-taking module over the data layer.</summary>
     public QuizTakeForm(
         QuizRepository quizzes,
         QuestionRepository questions,
@@ -197,8 +170,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         Controls.Add(_resultView);
         Controls.Add(_emptyView);
 
-        // The run view resizes with the module host (Dock = Fill), so its
-        // internal layouts recompute on every resize.
         _runView.Resize += static (sender, e) =>
         {
             if (sender is Panel run && run.Visible && run.FindAncestor<QuizTakeForm>() is { } form)
@@ -211,7 +182,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         RefreshData();
     }
 
-    /// <inheritdoc />
     public override void RefreshData()
     {
         Dictionary<int, string> names = new();
@@ -224,32 +194,22 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         LoadQuizCards();
     }
 
-    /// <summary>
-    /// The §5.6 mid-run guard: navigation away is confirmed with the §4.11
-    /// dialog; Leave discards the run cleanly (no attempt row) and allows the
-    /// switch, Stay cancels it.
-    /// </summary>
     public bool ConfirmLeave()
     {
         if (_runQuiz is null || _submitting)
         {
-            return true; // no run in progress — leaving needs no confirmation
+            return true;
         }
 
         if (!DialogForm.ShowConfirm(LeaveTitle, LeaveMessage, LeaveConfirmText, secondaryText: "Stay"))
         {
-            return false; // Stay: the run continues, the switch is cancelled
+            return false;
         }
 
         DiscardRun();
         return true;
     }
 
-    // -------------------------------------------------------------------------
-    // Home — quiz cards (the fun-UI redesign: no tables)
-    // -------------------------------------------------------------------------
-
-    /// <summary>Rebuilds the quiz card grid from the database.</summary>
     private void LoadQuizCards()
     {
         IReadOnlyList<Quiz> quizzes = _quizzes.GetAll();
@@ -278,18 +238,11 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
         _cardFlow.ResumeLayout();
 
-        // The §5.6 empty state: no quizzes at all. Drafts render as locked
-        // cards — the cards themselves explain the pending review.
         bool empty = quizzes.Count == 0;
         _emptyView.Visible = empty;
         _cardFlow.Visible = !empty;
     }
 
-    // -------------------------------------------------------------------------
-    // Run — the Kahoot-style tile flow (§5.6 moment 2, fun-UI redesign)
-    // -------------------------------------------------------------------------
-
-    /// <summary>Builds the run view's controls once; each run fills them per question.</summary>
     private Panel BuildRunView()
     {
         var run = new Panel
@@ -390,9 +343,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         card.Controls.Add(_feedback);
         card.Controls.Add(_choiceStack);
 
-        // Dock layout processes the LAST control first: the footer claims the
-        // bottom strip, the header the top, the progress track the next top
-        // strip, and the question card fills the rest between them.
         run.Controls.Add(card);
         run.Controls.Add(_runProgress);
         run.Controls.Add(header);
@@ -400,7 +350,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         return run;
     }
 
-    /// <summary>Lays out the run header's two labels (title leading, count under it).</summary>
     private void LayoutRunHeader()
     {
         if (_runTitle.Parent is not Panel header)
@@ -415,7 +364,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _runProgressLabel.Size = new Size(header.Width, UITheme.Scaled(this, 18));
     }
 
-    /// <summary>Lays out the question card's text, feedback, and answer tiles.</summary>
     private void LayoutQuestionCard()
     {
         if (_questionText.Parent is not CardPanel card)
@@ -452,22 +400,20 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         int tileGap = UITheme.Scaled(this, UITheme.Spacing8);
         foreach (AnswerTile tile in _tiles)
         {
-            tile.Location = new Point(0, top2); // stack-relative — the stack clips at the card's content edge
+            tile.Location = new Point(0, top2);
             tile.Size = new Size(_choiceStack.Width, tileHeight);
             top2 += tileHeight + tileGap;
         }
     }
 
-    /// <summary>The generation screen's deep-link: the Take-quiz module with the freshly generated quiz already running.</summary>
     internal void StartNewQuiz(int quizId) => StartQuiz(quizId);
 
-    /// <summary>Loads the quiz and enters the run (used by PLAY and Retake).</summary>
     private void StartQuiz(int quizId)
     {
         Quiz? quiz = _quizzes.GetById(quizId);
         if (quiz is null || quiz.Status != QuizStatus.Approved)
         {
-            return; // unreachable from the UI (only Approved cards play); a defensive guard
+            return;
         }
 
         if (quiz.Questions.Count == 0)
@@ -486,7 +432,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         RenderQuestion();
     }
 
-    /// <summary>Discards the run state (the §5.6 Leave path — no attempt row is written).</summary>
     private void DiscardRun()
     {
         _runQuiz = null;
@@ -497,7 +442,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         ShowList(announceCompletion: false);
     }
 
-    /// <summary>Renders the current question: header, progress, text, tiles, buttons.</summary>
     private void RenderQuestion()
     {
         if (_runQuiz is null)
@@ -557,13 +501,12 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
         LayoutQuestionCard();
 
-        _previousButton.Enabled = _runIndex > 0; // §5.6: disabled on question 1
+        _previousButton.Enabled = _runIndex > 0;
         bool last = _runIndex == _runQuiz.Questions.Count - 1;
         _nextButton.Text = last ? "Submit" : "Next";
         LayoutRunHeader();
     }
 
-    /// <summary>Shows the instant Correct!/Incorrect! feedback line (the fun moment).</summary>
     private void ShowFeedback(bool correct)
     {
         _feedback.Text = correct ? FeedbackCorrect : FeedbackWrong;
@@ -571,7 +514,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _feedback.Visible = true;
     }
 
-    /// <summary>Updates the determinate progress from the answered count (§5.6).</summary>
     private void UpdateRunProgress()
     {
         if (_runQuiz is null)
@@ -582,11 +524,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _runProgress.Value = _revealed.Count(revealed => revealed) / (double)_runQuiz.Questions.Count;
     }
 
-    /// <summary>
-    /// The fun moment: tapping a tile REVEALS the answer immediately — the
-    /// picked tile washes green (correct) or red (wrong) and the key tile
-    /// glows green. The question then locks: one honest shot per question.
-    /// </summary>
     private void HandleTileClick(AnswerTile tile)
     {
         if (_runQuiz is null || _submitting || _revealed[_runIndex])
@@ -594,10 +531,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             return;
         }
 
-        // The tile's choice id travels on the tile itself (RenderQuestion
-        // sets AnswerTile.ChoiceId). The old guard read tile.Tag, which was
-        // never assigned — a pre-existing defect that made every mouse click
-        // no-op (found in the WP3 audit, confirmed against HEAD; plan §7 log).
         int choiceId = tile.ChoiceId;
 
         _selections[_runIndex] = choiceId;
@@ -619,7 +552,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         LayoutQuestionCard();
     }
 
-    /// <summary>Previous/Next navigation; Next on the final question submits (§5.6).</summary>
     private void MoveQuestion(int delta)
     {
         if (_runQuiz is null || _submitting)
@@ -637,7 +569,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         RenderQuestion();
     }
 
-    /// <summary>Next on the final question is Submit (§5.6); otherwise it navigates.</summary>
     private void HandleNext()
     {
         if (_runQuiz is null || _submitting)
@@ -654,13 +585,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         Submit();
     }
 
-    /// <summary>
-    /// The one write of the run (§5.6): score the selections, store the attempt
-    /// and its answers in one transaction, and show the result (§5.7). The
-    /// buttons stay disabled for the write's duration, so a double submission
-    /// cannot create a second attempt; a database failure reports through the
-    /// strip (an unobserved continuation throw would vanish).
-    /// </summary>
     private void Submit()
     {
         if (_runQuiz is null || _submitting)
@@ -678,7 +602,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         {
             if (_selections[i] is not { } choiceId)
             {
-                continue; // an unanswered question contributes no answer row
+                continue;
             }
 
             answers.Add(new SubmittedAnswer
@@ -695,16 +619,11 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             {
                 QuizId = quiz.QuizId,
                 UserId = _user.UserId,
-                Score = score.CorrectCount, // R-2 #1: only the correct count is stored
+                Score = score.CorrectCount,
                 AttemptedAt = DateTimeOffset.UtcNow,
             };
             _attempts.AddWithAnswers(attempt, answers);
 
-            // The §5.7a reveal data (WP5): XP is DERIVED from the saved attempt
-            // (score × difficulty weight — plan A3, pure math, no extra read);
-            // the achievements are evaluated against the post-submit aggregates
-            // and RECORDED in user_achievements — only rows that were actually
-            // new come back, so a re-earned achievement never re-celebrates.
             _resultXpEarned = (long)score.CorrectCount * DifficultyXpWeights.For(quiz.Difficulty);
             (_resultProgress, _resultNewlyUnlocked) = RecordProgress();
 
@@ -712,7 +631,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             _resultQuiz = quiz;
             _resultCorrect = score.CorrectCount;
             _awaitingSavedAnnouncement = true;
-            _runQuiz = null; // the run is over — the leave guard no longer applies
+            _runQuiz = null;
             ShowResult();
         }
         catch (Exception)
@@ -729,21 +648,12 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
     }
 
-    /// <summary>Restores the footer after a failed write (the busy path's cleanup).</summary>
     private void EndBusyAfterFailure()
     {
         _previousButton.Enabled = _runIndex > 0;
         _nextButton.Enabled = true;
     }
 
-    /// <summary>
-    /// Evaluates and records what the just-saved attempt earned (plan A2/A5):
-    /// the derived post-submit progress, then the achievements that fired —
-    /// recorded through <c>AddAchievementsIfNew</c>, so the unlock date is the
-    /// FIRST earn and a repeat never duplicates. A storage failure here must
-    /// not fail the saved attempt (it is already committed): the reveal hides
-    /// gracefully and the strip explains the block (§4.11 semantics).
-    /// </summary>
     private (UserProgress? Progress, IReadOnlyList<AchievementDefinition> NewlyUnlocked) RecordProgress()
     {
         try
@@ -764,7 +674,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
             if (recorded.Count == 0)
             {
-                return (progress, Array.Empty<AchievementDefinition>()); // all already on record
+                return (progress, Array.Empty<AchievementDefinition>());
             }
 
             HashSet<string> recordedKeys = recorded.Select(unlocked => unlocked.Key).ToHashSet();
@@ -777,11 +687,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Result — the fun summary (§5.7)
-    // -------------------------------------------------------------------------
-
-    /// <summary>Builds the result view's controls once; each attempt fills them.</summary>
     private Panel BuildResultView()
     {
         var result = new Panel
@@ -805,7 +710,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         {
             Name = "ResultScoreLabel",
             Font = UITheme.Display,
-            ForeColor = UITheme.AccentText, // the accent as ink on dark (§2.1 D4 rule; Accent is a fill only)
+            ForeColor = UITheme.AccentText,
             BackColor = UITheme.Surface,
             AutoSize = true,
             Location = new Point(UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing12)),
@@ -845,11 +750,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         hero.Controls.Add(_resultMessage);
         hero.Controls.Add(_resultContext);
 
-        // The §5.7a reveal (WP5): the XP line, the level row and — only when
-        // the submit unlocked something — the achievement chips, inside the
-        // hero card below the context line. Built once; ShowResult fills and
-        // sizes them, and grows the hero card to fit (no fade — the Lead's
-        // stillness ruling; the reveal is an instant paint change).
         _resultReveal = new Panel
         {
             Name = "ResultReveal",
@@ -862,7 +762,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         {
             Name = "ResultXpLine",
             Font = UITheme.BodySemibold,
-            ForeColor = UITheme.AccentText, // accent as ink on dark (§2.1 D4; 7.18 on Surface)
+            ForeColor = UITheme.AccentText,
             BackColor = UITheme.Surface,
             AutoSize = true,
             Location = new Point(0, 0),
@@ -899,7 +799,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Surface,
             AutoSize = true,
-            Visible = false, // omission, not a "none" message (§5.7a restraint)
+            Visible = false,
         };
 
         _resultAchievementsFlow = new FlowLayoutPanel
@@ -992,7 +892,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         return result;
     }
 
-    /// <summary>Fills the result view from the completed attempt (§5.7, fun-UI).</summary>
     private void ShowResult()
     {
         if (_resultQuiz is null)
@@ -1000,7 +899,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             return;
         }
 
-        int total = _resultQuiz.Questions.Count; // the R-2 denominator: the quiz's own question count
+        int total = _resultQuiz.Questions.Count;
         double percent = total == 0
             ? 0d
             : Math.Round(_resultCorrect * 100d / total, MidpointRounding.AwayFromZero);
@@ -1025,9 +924,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         };
         _resultContext.Text = $"{topicName} \u2014 {_resultQuiz.Difficulty}";
 
-        // The §5.7a reveal: XP earned, the post-submit level row, and only the
-        // achievements this attempt newly unlocked (omission when none — §5.7a
-        // restraint). The hero card grows to fit; the rows and actions follow.
         FillReveal();
         LayoutReveal();
         SizeHeroForResult();
@@ -1038,12 +934,9 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _resultActions.Location = new Point(0, _resultListCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16));
         ShowView(_resultView);
 
-        // §4.14: the sidebar level block repaints right after an attempt (the
-        // module-switch refresh covers every other path).
         this.FindAncestor<MainForm>()?.UpdateSidebarLevel();
     }
 
-    /// <summary>The hero card of the result view — its height follows the reveal.</summary>
     private void SizeHeroForResult()
     {
         if (_resultReveal.Visible)
@@ -1052,16 +945,15 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
         else
         {
-            _heroCard.Height = UITheme.Scaled(this, 150); // the §5.7 base height without the reveal
+            _heroCard.Height = UITheme.Scaled(this, 150);
         }
     }
 
-    /// <summary>Fills the §5.7a reveal from the post-submit state (no DB read — Submit captured it).</summary>
     private void FillReveal()
     {
         if (_resultProgress is not { } progress)
         {
-            _resultReveal.Visible = false; // the recording failed — the strip already explained
+            _resultReveal.Visible = false;
             return;
         }
 
@@ -1070,8 +962,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _resultLevelChip.SetLevel(progress.Level);
         _resultLevelBar.Value = progress.ProgressFraction;
 
-        // The §4.14 caption: the XP still missing for the next level ("70 XP
-        // to Lvl 5"); at the top of the level range the caption says so.
         _resultLevelCaption.Text = progress.XpForNextLevel == 0
             ? "Max level"
             : (progress.XpForNextLevel - progress.XpIntoLevel).ToString(System.Globalization.CultureInfo.InvariantCulture)
@@ -1093,11 +983,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
     }
 
-    /// <summary>
-    /// Lays the §5.7a reveal out: the XP line; 8px; the level row (chip + the
-    /// 8px progress track + the remaining-XP caption right-aligned); 16px; the
-    /// achievement group label and its wrapping chip row (only when unlocked).
-    /// </summary>
     private void LayoutReveal()
     {
         if (!_resultReveal.Visible)
@@ -1129,8 +1014,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
         if (_resultAchievementsCaption.Visible)
         {
-            // The flow wraps its chips, so its width must be pinned BEFORE its
-            // AutoSize height is read (wrapping changes the height).
             _resultAchievementsFlow.Width = Math.Max(revealWidth, 1);
             _resultAchievementsCaption.Location = new Point(0, rowBottom + blockGap);
             _resultAchievementsFlow.Location = new Point(0, _resultAchievementsCaption.Bottom + rowGap);
@@ -1142,16 +1025,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
     }
 
-    /// <summary>
-    /// One §5.7a achievement chip: the §4.14 chip shape (RadiusChip pill,
-    /// AccentTint fill) carrying the achievement's own MDL2 glyph in
-    /// AccentText and its title in CaptionSemibold TextPrimary (5.83 on the
-    /// tint ✓). Display-only: no hover, no focus, no tab stop. The corner
-    /// cutouts resolve the hero card's Surface at paint time (D4 audit #1).
-    /// </summary>
     private sealed class AchievementChipPanel : Panel
     {
-        /// <summary>The chip is 28px tall with 8px horizontal padding (§5.7a).</summary>
         private const int ChipHeight = 28;
 
         private readonly string _glyph;
@@ -1173,17 +1048,15 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             int titleWidth = TextRenderer.MeasureText(_title, UITheme.CaptionSemibold).Width;
             Width = inset + glyphWidth + UITheme.Scaled(this, UITheme.Spacing4) + titleWidth + inset;
             Height = UITheme.Scaled(this, ChipHeight);
-            Margin = new Padding(0, 0, UITheme.Scaled(this, UITheme.Spacing8), 0); // 8px chip↔chip
-            AccessibleName = _title; // the chip speaks the achievement's name (§2.6)
+            Margin = new Padding(0, 0, UITheme.Scaled(this, UITheme.Spacing8), 0);
+            AccessibleName = _title;
         }
 
-        /// <summary>The corner cutouts show the hero card's Surface, never the chip fill.</summary>
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             e.Graphics.Clear(UITheme.ContainerSurface(this));
         }
 
-        /// <summary>Paints the AccentTint pill, then glyph + title side by side.</summary>
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
@@ -1219,7 +1092,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         }
     }
 
-    /// <summary>Builds the §5.7 per-question verdict rows (glyph + word, never color alone).</summary>
     private void BuildResultRows(Quiz quiz)
     {
         _resultListCard.SuspendLayout();
@@ -1312,7 +1184,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _resultListCard.Height = top + inset;
     }
 
-    /// <summary>Opens the §5.9 review drill-in for the completed attempt.</summary>
     private void OpenReview()
     {
         if (_resultAttemptId == 0)
@@ -1345,13 +1216,11 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _reviewPanel.BringToFront();
     }
 
-    /// <summary>Returns from the review drill-in to the result view (state intact).</summary>
     private void ShowResultFromReview()
     {
         ShowView(_resultView);
     }
 
-    /// <summary>Restarts the run with the same quiz (§5.7's "Retake").</summary>
     private void Retake()
     {
         if (_resultQuiz is null)
@@ -1362,14 +1231,6 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         StartQuiz(_resultQuiz.QuizId);
     }
 
-    // -------------------------------------------------------------------------
-    // Shared state switching
-    // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// Returns to the quiz cards (home). After a completed attempt the strip
-    /// carries the spec's "Result saved." line (§5.6 moment 1 feedback).
-    /// </summary>
     private void ShowList(bool announceCompletion)
     {
         bool announce = announceCompletion && _awaitingSavedAnnouncement;
@@ -1377,26 +1238,24 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
         if (announce)
         {
-            _awaitingSavedAnnouncement = false; // consumed — the completion's strip was shown
+            _awaitingSavedAnnouncement = false;
             ReportStatus(ResultSavedMessage, success: true);
         }
 
         ShowView(_cardFlow);
     }
 
-    /// <summary>Shows exactly one of the panel's states (cards, run, result).</summary>
     private void ShowView(Control view)
     {
         foreach (Control child in Controls)
         {
-            if (child is not AttemptReviewForm) // the review drill-in manages its own visibility
+            if (child is not AttemptReviewForm)
             {
                 child.Visible = child == view;
             }
         }
     }
 
-    /// <summary>Hides the three states while the review drill-in is open.</summary>
     private void ShowDrillIn(bool visible)
     {
         _cardFlow.Visible = visible;

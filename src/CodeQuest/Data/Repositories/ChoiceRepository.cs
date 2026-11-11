@@ -1,22 +1,10 @@
-// =============================================================================
-// CodeQuest — Phase P4: Data Access Layer
-// OOP rubric: ABSTRACTION — ChoiceRepository is the concrete implementation
-//              behind the IChoiceRepository contract of phase P3.
-// Look at: InsertChoice() below — the one place where an option row is written;
-//          the quiz repository and the question repository both use it, so an
-//          option is always written the same way.
-// Table:   choices (database/schema.sql)
-// =============================================================================
+// Reads and writes answer options. (Abstraction)
 
 using CodeQuest.Models;
 using Microsoft.Data.Sqlite;
 
 namespace CodeQuest.Data.Repositories;
 
-/// <summary>
-/// Reads and writes the answer options of a question (schema table
-/// <c>choices</c>).
-/// </summary>
 public sealed class ChoiceRepository : IChoiceRepository
 {
     private const string SelectByQuestionSql =
@@ -59,15 +47,13 @@ public sealed class ChoiceRepository : IChoiceRepository
 
     private readonly Db _db;
 
-    /// <summary>Creates the repository.</summary>
-    /// <param name="db">The connection factory of the database.</param>
     public ChoiceRepository(Db db)
     {
         ArgumentNullException.ThrowIfNull(db);
         _db = db;
     }
 
-    /// <inheritdoc />
+    // Reads the choices of one question.
     public IReadOnlyList<Choice> GetByQuestion(int questionId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -78,7 +64,7 @@ public sealed class ChoiceRepository : IChoiceRepository
         return ReadChoices(command);
     }
 
-    /// <inheritdoc />
+    // Reads one choice.
     public Choice? GetById(int choiceId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -90,7 +76,7 @@ public sealed class ChoiceRepository : IChoiceRepository
         return reader.Read() ? ReadChoice(reader) : null;
     }
 
-    /// <inheritdoc />
+    // Adds a new choice.
     public int Add(Choice choice)
     {
         ArgumentNullException.ThrowIfNull(choice);
@@ -109,7 +95,7 @@ public sealed class ChoiceRepository : IChoiceRepository
         }
     }
 
-    /// <inheritdoc />
+    // Updates a choice.
     public void Update(Choice choice)
     {
         ArgumentNullException.ThrowIfNull(choice);
@@ -138,7 +124,7 @@ public sealed class ChoiceRepository : IChoiceRepository
         }
     }
 
-    /// <inheritdoc />
+    // Deletes a choice.
     public bool Delete(int choiceId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -152,21 +138,10 @@ public sealed class ChoiceRepository : IChoiceRepository
         }
         catch (SqliteException exception)
         {
-            // An option that an answer of a finished attempt points at is
-            // protected by the database (ON DELETE RESTRICT).
             throw DataAccessException.FromSqlite(exception);
         }
     }
 
-    /// <summary>
-    /// Writes one option row. The caller decides whether the row belongs to a
-    /// transaction — a quiz with its questions and options is one unit of work,
-    /// a single option is not.
-    /// </summary>
-    /// <param name="connection">The connection of the write.</param>
-    /// <param name="transaction">The transaction of the write, or null.</param>
-    /// <param name="choice">The option to write.</param>
-    /// <returns>The id the database gave to the option.</returns>
     internal static int InsertChoice(SqliteConnection connection, SqliteTransaction? transaction, Choice choice)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -184,16 +159,6 @@ public sealed class ChoiceRepository : IChoiceRepository
         return ReadLastInsertRowId(connection, transaction);
     }
 
-    /// <summary>
-    /// Reads every option of one question from an open connection. The quiz
-    /// repository and the question repository use this helper when they load a
-    /// whole quiz, so the options of a question are always read with the same
-    /// query and in the same order.
-    /// </summary>
-    /// <param name="connection">The connection to read from.</param>
-    /// <param name="transaction">The transaction of the read, or null.</param>
-    /// <param name="questionId">The question whose options are read.</param>
-    /// <returns>The options of the question, in display order.</returns>
     internal static IReadOnlyList<Choice> ReadChoices(
         SqliteConnection connection,
         SqliteTransaction? transaction,
@@ -207,9 +172,6 @@ public sealed class ChoiceRepository : IChoiceRepository
         return ReadChoices(command);
     }
 
-    /// <summary>Reads one option from the current row.</summary>
-    /// <param name="reader">The reader on the current row.</param>
-    /// <returns>The option of the row.</returns>
     internal static Choice ReadChoice(SqliteDataReader reader) => new()
     {
         ChoiceId = reader.GetInt32(0),
@@ -219,7 +181,6 @@ public sealed class ChoiceRepository : IChoiceRepository
         Position = reader.GetInt32(4),
     };
 
-    /// <summary>Reads every option of an open command.</summary>
     private static IReadOnlyList<Choice> ReadChoices(SqliteCommand command)
     {
         List<Choice> choices = new();
@@ -233,10 +194,6 @@ public sealed class ChoiceRepository : IChoiceRepository
         return choices;
     }
 
-    /// <summary>
-    /// Reads the id the last insert produced. SQLite reports it through
-    /// last_insert_rowid() — the value belongs to the connection that inserted.
-    /// </summary>
     private static int ReadLastInsertRowId(SqliteConnection connection, SqliteTransaction? transaction)
     {
         using SqliteCommand command = connection.CreateCommand();

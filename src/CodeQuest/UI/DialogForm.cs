@@ -1,28 +1,4 @@
-// =============================================================================
-// CodeQuest — Phase P7: UI Shell & Navigation
-// Recipe 4.11 of the design of record: the custom modal dialog.
-// System.Windows.Forms.MessageBox is NOT used anywhere — it cannot be styled
-// (spec 4.11 bans it; all confirmations and blockers run through this form).
-// Look at: the layout — a SurfaceRaised card (12px radius, 1px BorderHairline
-//          border) centered over the owner window, no dimmed backdrop (flat
-//          modal); min width 400px. D4 §2: the dialog is the app's ONLY
-//          floating level — SurfaceRaised is elevation level 3 — and the one
-//          element with both a hairline and a shadow: the native CS_DROPSHADOW
-//          (CreateParams class style 0x20000), platform-drawn, owner-mandated;
-//          no GDI+ shadow painting. The alert anatomy:
-//          a centered soft-tinted mark circle (DangerTint for the unexpected
-//          error and the destructive confirms, WarningTint for the startup
-//          blocker — the glyph + tint are the situation, never color alone),
-//          the title in the Title font, the message in Body — both centered —
-//          then the buttons in a right-aligned (trailing) row, 8px apart.
-//          HIG alert rules (§3.4): the primary action is a specific verb on a
-//          filled button, default on the trailing side; a "Cancel"-style
-//          secondary is never the default; no "Error" titles, no exclamation
-//          marks. The three P7/P8 dialogs carry the spec's canonical copy:
-//          the startup blocker (database missing), the unexpected-error
-//          dialog (plain language + retry hint, never a stack trace) and the
-//          destructive confirmations.
-// =============================================================================
+// The app's message dialog. (Inheritance)
 
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -30,10 +6,6 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The styled modal dialog of recipe 4.11. Use the two Show helpers for the
-/// P7 dialogs; later phases reuse the form for their confirmations.
-/// </summary>
 public sealed class DialogForm : Form
 {
     private const int MinDialogWidth = 400;
@@ -42,11 +14,8 @@ public sealed class DialogForm : Form
     private const int ButtonHeight = 32;
     private const int MarkSize = 40;
 
-    /// <summary>The centered mark of the alert anatomy: tint circle + status glyph.</summary>
     private sealed record DialogMark(Color Circle, Color GlyphColor, string Glyph);
 
-    // The three marks: the tinted circle carries the situation at a glance —
-    // red for errors and destructive confirms, amber for the startup blocker.
     private static readonly DialogMark UnexpectedErrorMark = new(UITheme.DangerTint, UITheme.DangerText, "\uE783");
     private static readonly DialogMark DestructiveConfirmMark = new(UITheme.DangerTint, UITheme.DangerText, "\uE7BA");
     private static readonly DialogMark StartupBlockerMark = new(UITheme.WarningTint, UITheme.WarningText, "\uE7BA");
@@ -54,26 +23,19 @@ public sealed class DialogForm : Form
     private DialogForm(string title)
     {
         FormBorderStyle = FormBorderStyle.None;
-        // The title also becomes the window caption (UIA/window lists read it,
-        // even though the borderless card draws no title bar).
         Text = title;
         StartPosition = FormStartPosition.CenterParent;
         ShowInTaskbar = false;
-        BackColor = UITheme.SurfaceRaised; // the one floating elevation level (D4 §2)
+        BackColor = UITheme.SurfaceRaised;
         KeyPreview = true;
     }
 
-    /// <summary>
-    /// The dialog's native drop shadow (D4 §2, owner-mandated): the
-    /// CS_DROPSHADOW class style (0x20000), drawn by the platform — the only
-    /// shadow in the app, and the only chrome this form adds.
-    /// </summary>
     protected override CreateParams CreateParams
     {
         get
         {
             CreateParams parameters = base.CreateParams;
-            parameters.ClassStyle |= 0x20000; // CS_DROPSHADOW
+            parameters.ClassStyle |= 0x20000;
             return parameters;
         }
     }
@@ -90,7 +52,6 @@ public sealed class DialogForm : Form
         UpdateRegion();
     }
 
-    /// <summary>Clips the dialog to the recipe's rounded card shape.</summary>
     private void UpdateRegion()
     {
         if (Width <= 0 || Height <= 0)
@@ -104,11 +65,6 @@ public sealed class DialogForm : Form
         oldRegion?.Dispose();
     }
 
-    /// <summary>
-    /// The startup blocker of spec 4.11: the database file is missing, the app
-    /// cannot proceed — the one startup dialog, with the spec's exact copy and
-    /// a single "Close" button.
-    /// </summary>
     public static void ShowStartupBlocker()
     {
         Show(
@@ -120,12 +76,6 @@ public sealed class DialogForm : Form
             mark: StartupBlockerMark);
     }
 
-    /// <summary>
-    /// The unexpected-exception dialog of spec 4.11: plain language plus a
-    /// hint to retry — never a stack trace, never raw exception text.
-    /// Returns true when the user chose "Try again" (the caller may continue),
-    /// false for "Close".
-    /// </summary>
     public static bool ShowUnexpectedError()
     {
         DialogResult result = Show(
@@ -139,17 +89,6 @@ public sealed class DialogForm : Form
         return result == DialogResult.No;
     }
 
-    /// <summary>
-    /// The confirmation dialog of spec 4.11 (used by the P8 management
-    /// screens): a title that names the situation, one sentence of
-    /// consequence, the confirmed action as a specific verb on the filled
-    /// (destructive) button and a "Cancel" secondary that is never the
-    /// default. Returns true when the user confirmed.
-    /// </summary>
-    /// <param name="title">The situation in one line ("Delete this topic?").</param>
-    /// <param name="message">The consequence sentence ("This topic will be removed. This cannot be undone.").</param>
-    /// <param name="confirmText">The specific verb ("Delete").</param>
-    /// <param name="secondaryText">The dismiss verb ("Cancel"; spec 5.6's leave confirmation says "Stay").</param>
     public static bool ShowConfirm(string title, string message, string confirmText, string secondaryText = "Cancel")
     {
         DialogResult result = Show(
@@ -164,16 +103,6 @@ public sealed class DialogForm : Form
         return result == DialogResult.OK;
     }
 
-    /// <summary>
-    /// Builds and shows one dialog card with the alert anatomy: a centered
-    /// tinted mark, the title and message centered beneath it, and the button
-    /// row on the trailing side. The primary button is the filled, default
-    /// (trailing) one — the recipe's primary variant unless the caller passes
-    /// the destructive one (the confirmations of §4.11); the optional
-    /// secondary is a plain button to its left. The secondary answers with
-    /// DialogResult.No, the primary with OK, so the caller can tell the two
-    /// apart without comparing captions.
-    /// </summary>
     private static DialogResult Show(IWin32Window? owner, string title, string message, string primaryText, string? secondaryText, UITheme.FlatButtonVariant primaryVariant = UITheme.FlatButtonVariant.Primary, DialogMark? mark = null)
     {
         using var dialog = new DialogForm(title);
@@ -190,7 +119,6 @@ public sealed class DialogForm : Form
         int gap = UITheme.Scaled(dialog, ButtonGap);
         int buttonHeight = UITheme.Scaled(dialog, ButtonHeight);
 
-        // Measure the wrapped message and the button row, then size the card.
         int contentWidth = UITheme.Scaled(dialog, MinDialogWidth) - inset * 2;
         Size messageSize = TextRenderer.MeasureText(
             message,
@@ -206,7 +134,6 @@ public sealed class DialogForm : Form
             UITheme.Scaled(dialog, MinDialogWidth),
             buttonRowWidth + inset * 2);
 
-        // The alert stack: mark circle, title, message, buttons.
         int markSize = UITheme.Scaled(dialog, MarkSize);
         int markTop = inset;
         int titleTop = markTop + markSize + UITheme.Scaled(dialog, UITheme.Spacing16);
@@ -220,7 +147,7 @@ public sealed class DialogForm : Form
             Text = title,
             Font = UITheme.Title,
             ForeColor = UITheme.TextPrimary,
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             AutoSize = false,
             TextAlign = ContentAlignment.MiddleCenter,
             Location = new Point(inset, titleTop),
@@ -232,24 +159,20 @@ public sealed class DialogForm : Form
             Text = message,
             Font = UITheme.Body,
             ForeColor = UITheme.TextPrimary,
-            BackColor = UITheme.SurfaceRaised, // must equal the dialog fill (D4 audit #9)
+            BackColor = UITheme.SurfaceRaised,
             AutoSize = false,
             TextAlign = ContentAlignment.MiddleCenter,
             Location = new Point(inset, bodyTop),
             Size = new Size(width - inset * 2, messageSize.Height),
         };
 
-        // The card's chrome: the D4 hairline border (the card treatment —
-        // BorderHairline per §2, not a separator) and the centered mark — a
-        // soft-tinted circle with the status glyph, so the dialog's situation
-        // reads at a glance (mark + words, never color alone).
         DialogMark activeMark = mark ?? UnexpectedErrorMark;
         int markX = (width - markSize) / 2;
         dialog.Paint += (sender, e) =>
         {
             if (sender is Form form)
             {
-                using var borderPen = new Pen(UITheme.BorderHairline); // D4: the dialog edge is a hairline, not a separator
+                using var borderPen = new Pen(UITheme.BorderHairline);
                 using GraphicsPath borderPath = UITheme.RoundedPath(
                     new Rectangle(0, 0, form.Width - 1, form.Height - 1), UITheme.RadiusCard);
                 e.Graphics.DrawPath(borderPen, borderPath);
@@ -287,8 +210,6 @@ public sealed class DialogForm : Form
             return dialog.ShowDialog(owner);
         }
 
-        // No owner yet (the startup blocker runs before any window exists) —
-        // center on the screen instead of on a parent window.
         dialog.StartPosition = FormStartPosition.CenterScreen;
         return dialog.ShowDialog();
     }

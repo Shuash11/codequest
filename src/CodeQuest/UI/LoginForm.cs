@@ -1,27 +1,4 @@
-// =============================================================================
-// CodeQuest — UI Shell & Navigation (login, name-only)
-// The login screen, revised by owner directive D1 (queued 2026-11-04, folded
-// into the revised plan's I1): the user enters a NAME and the system records
-// who is using it — no password. This supersedes design-of-record spec 5.1's
-// password flow; the spec amendment rides the I5 designer pass.
-// Look at: the layout — centered fixed window (420×380) on Background; app
-//          name "CodeQuest" (Title), subtitle "Programming and cybersecurity
-//          practice quizzes" (Caption, TextSecondary), 32px, one card (§4.2)
-//          holding the Name field (with its inline error line, §4.4) and the
-//          full-width "Sign in" primary button (§4.1). Enter submits; the tab
-//          order is name → button.
-// States (§5.1 adapted): default → resolving (button disabled during the
-//          find-or-create) → success (the shell opens — no dialog) or the
-//          inline error "Enter your name to continue." (DangerText,
-//          non-blocking). The FIRST sign-in with a name creates the account
-//          (find-or-create on users.username); later sign-ins with the same
-//          name resolve to the same account, so attempts keep attributing to
-//          one user. The schema's password_hash column is left in place but
-//          unused (empty string) — the D1 disposition; PasswordHasher was
-//          removed with this directive. A database failure is not a login
-//          failure: it surfaces through the application's §4.11 unexpected
-//          dialog (wired in Program), never as an inline credential error.
-// =============================================================================
+// The name screen. (Inheritance)
 
 using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
@@ -30,10 +7,6 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The login screen (spec 5.1, name-only per directive D1). Program shows it
-/// modally; DialogResult.OK carries the resolved account to the shell.
-/// </summary>
 public sealed class LoginForm : Form
 {
     private const string EmptyNameMessage = "Enter your name to continue.";
@@ -43,12 +16,6 @@ public sealed class LoginForm : Form
     private readonly FlatButton _signIn;
     private bool _signingIn;
 
-    /// <summary>
-    /// Creates the login screen for the user repository to resolve against.
-    /// <paramref name="rememberedName"/> prefills the name field — the screen
-    /// asks for the name only once per account (task 2): on the first start,
-    /// after a log out, or when the remembered account no longer exists.
-    /// </summary>
     public LoginForm(UserRepository users, string? rememberedName = null)
     {
         ArgumentNullException.ThrowIfNull(users);
@@ -62,7 +29,6 @@ public sealed class LoginForm : Form
         BackColor = UITheme.Background;
         ClientSize = new Size(UITheme.Scaled(this, 420), UITheme.Scaled(this, 380));
 
-        // Vertical block: logo chip + 12 + title + 8 + subtitle + 32 + card, centered.
         int chipSize = UITheme.Scaled(this, 44);
         int titleHeight = UITheme.Scaled(this, 32);
         int subtitleHeight = UITheme.Scaled(this, 18);
@@ -72,12 +38,6 @@ public sealed class LoginForm : Form
         int blockTop = (ClientSize.Height - blockHeight) / 2;
         int chipX = (ClientSize.Width - chipSize) / 2;
 
-        // The brand mark: the same "CQ" chip the website and the taskbar icon
-        // use — a small dose of the fun identity on the login screen. The
-        // panel's BackColor is the TRUE parent surface (the form's
-        // Background): the rounded chip's corner cutouts show it, not the
-        // accent — a square Accent corner on the dark window background is a
-        // high-contrast artifact (D4 audit rule #1).
         var logo = new Panel
         {
             Name = "LoginLogoChip",
@@ -130,7 +90,7 @@ public sealed class LoginForm : Form
         int cardWidth = ClientSize.Width - UITheme.Scaled(this, UITheme.Spacing24) * 2;
         int inset = UITheme.Scaled(this, UITheme.Spacing16);
         int fieldWidth = cardWidth - inset * 2;
-        int fieldHeight = UITheme.Scaled(this, 58); // 32px field + reserved 8px gap + caption line (§4.4)
+        int fieldHeight = UITheme.Scaled(this, 58);
         int buttonHeight = UITheme.Scaled(this, 32);
 
         var card = new CardPanel
@@ -153,7 +113,7 @@ public sealed class LoginForm : Form
 
         if (!string.IsNullOrWhiteSpace(rememberedName))
         {
-            _name.Text = rememberedName.Trim(); // task 2: the returning user never retypes the name
+            _name.Text = rememberedName.Trim();
         }
 
         _signIn = new FlatButton
@@ -174,7 +134,6 @@ public sealed class LoginForm : Form
 
         AcceptButton = _signIn;
 
-        // Tab order: name → button.
         _name.TabIndex = 0;
         _signIn.TabIndex = 1;
 
@@ -187,15 +146,8 @@ public sealed class LoginForm : Form
         };
     }
 
-    /// <summary>The account resolved for this session; set together with DialogResult.OK.</summary>
     public UserAccount? AuthenticatedUser { get; private set; }
 
-    /// <summary>
-    /// The sign-in flow (D1): read the name, find or create the account, open
-    /// the shell on success or show the inline error for an empty field —
-    /// never a dialog for the inline error (§4.11's dialog is for unexpected
-    /// failures only).
-    /// </summary>
     private void HandleSignInClick(object? sender, EventArgs e)
     {
         if (_signingIn)
@@ -205,7 +157,7 @@ public sealed class LoginForm : Form
 
         _signingIn = true;
         _signIn.Enabled = false;
-        Refresh(); // paint the disabled state before the (fast, blocking) database calls
+        Refresh();
 
         UserAccount? user;
         try
@@ -214,10 +166,6 @@ public sealed class LoginForm : Form
         }
         finally
         {
-            // A database failure is not a sign-in decision (approved D1
-            // disposition): it propagates to the §4.11 unexpected dialog in
-            // Program — and when the user returns via "Try again", the form
-            // must be usable again, so the guard and button reset always run.
             _signingIn = false;
             _signIn.Enabled = true;
         }
@@ -225,7 +173,7 @@ public sealed class LoginForm : Form
         if (user is not null)
         {
             AuthenticatedUser = user;
-            DialogResult = DialogResult.OK; // success opens the shell (Program runs it next)
+            DialogResult = DialogResult.OK;
             return;
         }
 
@@ -233,15 +181,6 @@ public sealed class LoginForm : Form
         _name.FocusInput();
     }
 
-    /// <summary>
-    /// Finds the account for the entered name or creates it on first use.
-    /// Returns null only for an empty/whitespace name (the caller shows the
-    /// inline error). A database failure is deliberately not caught here —
-    /// it is not a sign-in decision and travels to the application's §4.11
-    /// unexpected dialog. The stored password_hash is left empty: the column
-    /// is unused since directive D1 — its security disposition is recorded in
-    /// the revised plan and in docs/security-notes.md when I5 creates it.
-    /// </summary>
     private UserAccount? ResolveUser(string rawName)
     {
         string name = rawName.Trim();
@@ -260,14 +199,13 @@ public sealed class LoginForm : Form
         {
             Username = name,
             DisplayName = name,
-            PasswordHash = string.Empty, // unused column since directive D1
+            PasswordHash = string.Empty,
             CreatedAt = DateTimeOffset.UtcNow,
         };
         _users.Add(created);
         return created;
     }
 
-    /// <summary>Names the field's inner text box so tests can address it.</summary>
     private static void NameInnerBox(InputField field, string name)
     {
         foreach (Control child in field.Controls)

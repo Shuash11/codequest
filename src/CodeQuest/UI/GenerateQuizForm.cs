@@ -1,26 +1,4 @@
-// =============================================================================
-// CodeQuest — AI Quiz Generation (I4): the generation screen of spec 5.11.
-// Ready state: options card — Topic (§4.5 combo over every existing topic),
-// Difficulty (§4.9 segmented Easy/Medium/Hard), Questions (the §4.12
-// sanctioned ComboBox fallback prefilled 5–20) — and the action card with the
-// "Generate" primary plus the quiet connection note.
-// Busy state (the binding R-5 #3 obligation): the generation call runs OFF
-// the UI thread (it can block ~2 minutes across the timeout tiers), so the
-// §4.13 marquee actually animates, an elapsed-seconds counter ticks on the UI
-// timer, the options and the sidebar disable, and Cancel returns immediately —
-// a late result after a cancel is discarded, never half-saved. No percentage,
-// no fake progress (§4.13: activity, not percent).
-// Typed failure (the banner): every contract error class maps to one plain-
-// language line (never a raw reason string), plus the offline pointer — the
-// app never crashes and never half-saves a quiz (P13 acceptance).
-// Success: the quiz saves as Draft (nothing auto-approves, R-2 #4), the title
-// is de-duplicated against the topic's existing quizzes (the R-5 #1 insert-
-// time rule), the strip announces it, and "Review now" deep-links to §5.12.
-// Without configured keys — a fresh clone's state — the chain ends in the
-// chain-level typed failure and the banner shows the no-provider message with
-// the offline pointer: exactly the offline path this screen is designed for.
-// The live path needs the owner's keys in config/config.local.json.
-// =============================================================================
+// The AI quiz creation screen.
 
 using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
@@ -31,10 +9,6 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The AI generation module (spec 5.11): options, busy block, typed-failure
-/// banner, and the draft hand-off to the review screen.
-/// </summary>
 public sealed class GenerateQuizForm : ModulePanel
 {
     private const string GenerateButton = "Generate";
@@ -83,13 +57,12 @@ public sealed class GenerateQuizForm : ModulePanel
     private readonly System.Windows.Forms.Timer _elapsedTimer = new() { Interval = 1000 };
 
     private List<Topic> _topicsCache = new();
-    private bool _busy; // a generation is in flight (also the re-entrancy guard)
-    private bool _cancelPending; // the user cancelled; the late result is discarded, never saved
-    private int _generationId; // increments per start — the continuation's id must match or it is discarded
+    private bool _busy;
+    private bool _cancelPending;
+    private int _generationId;
     private DateTimeOffset _startedAt;
-    private int _savedQuizId; // the last saved quiz (the "Take it now" hand-off)
+    private int _savedQuizId;
 
-    /// <summary>Creates the generation module over the configured provider chain.</summary>
     public GenerateQuizForm(
         QuizRepository quizzes,
         TopicRepository topics,
@@ -115,12 +88,9 @@ public sealed class GenerateQuizForm : ModulePanel
         {
             Name = "GenerateOptionsCard",
             Location = new Point(0, 0),
-            Size = new Size(cardWidth, 0), // the layout method sets the height (banner aware)
+            Size = new Size(cardWidth, 0),
         };
 
-        // The typed-failure banner (§5.11): WarningTint, 8px radius, 12px
-        // padding; laid out INLINE at the top of the options card (the option
-        // rows reflow beneath it — never an overlay).
         _banner = new Panel
         {
             Name = "GenerateFailureBanner",
@@ -194,7 +164,6 @@ public sealed class GenerateQuizForm : ModulePanel
         _banner.Controls.Add(tryAgain);
         _banner.Controls.Add(browseQuizzes);
 
-        // The option rows.
         _topicLabel = new Label
         {
             Name = "GenerateTopicLabel",
@@ -226,7 +195,7 @@ public sealed class GenerateQuizForm : ModulePanel
         {
             Name = "GenerateDifficultyPicker",
             Size = new Size(UITheme.Scaled(this, 300), UITheme.Scaled(this, 32)),
-            LabeledBy = _difficultyLabel, // §4.9: the visible label is the accessible name's source
+            LabeledBy = _difficultyLabel,
         };
         _difficulty.Items = new[] { Difficulty.Easy.ToString(), Difficulty.Medium.ToString(), Difficulty.Hard.ToString() };
         _difficulty.SelectedIndex = 0;
@@ -249,11 +218,10 @@ public sealed class GenerateQuizForm : ModulePanel
         };
         for (int count = 5; count <= 20; count++)
         {
-            _count.Items.Add(count.ToString()); // §4.12's sanctioned fallback: a combo prefilled 5–20
+            _count.Items.Add(count.ToString());
         }
         _count.SelectedIndex = 0;
 
-        // The action card.
         _actionCard = new CardPanel
         {
             Name = "GenerateActionCard",
@@ -304,7 +272,6 @@ public sealed class GenerateQuizForm : ModulePanel
         _actionCard.Controls.Add(_takeNow);
         _actionCard.Controls.Add(note);
 
-        // The busy block (§5.11 busy state): marquee + status + Cancel.
         _busyBlock = new Panel
         {
             Name = "GenerateBusyBlock",
@@ -347,7 +314,6 @@ public sealed class GenerateQuizForm : ModulePanel
         _busyBlock.Controls.Add(_busyStatus);
         _busyBlock.Controls.Add(cancelButton);
 
-        // The no-topics empty state (§5.11).
         _emptyTopics = new Panel
         {
             Name = "GenerateNoTopics",
@@ -399,7 +365,6 @@ public sealed class GenerateQuizForm : ModulePanel
         _optionsCard.Controls.Add(_countLabel);
         _optionsCard.Controls.Add(_count);
 
-        // The elapsed-seconds counter ticks on the UI timer (§5.11 busy state).
         _elapsedTimer.Tick += static (sender, e) =>
         {
             if (sender is System.Windows.Forms.Timer timer && timer.Tag is GenerateQuizForm form)
@@ -410,7 +375,6 @@ public sealed class GenerateQuizForm : ModulePanel
         };
         _elapsedTimer.Tag = this;
 
-        // The card re-flows whenever the banner appears or the width changes.
         _optionsCard.Resize += static (sender, e) =>
         {
             if (sender is CardPanel card && card.FindAncestor<GenerateQuizForm>() is { } form)
@@ -426,7 +390,6 @@ public sealed class GenerateQuizForm : ModulePanel
         LayoutGenerateLayout();
     }
 
-    /// <summary>Stops the elapsed timer when the control is disposed (L1).</summary>
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -438,11 +401,6 @@ public sealed class GenerateQuizForm : ModulePanel
         base.Dispose(disposing);
     }
 
-    /// <summary>
-    /// Lays out the options card and the blocks below it: the failure banner
-    /// is INLINE at the card's top (the option rows reflow beneath it), and
-    /// the action/busy cards follow the card's bottom edge.
-    /// </summary>
     private void LayoutGenerateLayout()
     {
         int inset = UITheme.Scaled(this, UITheme.Spacing16);
@@ -476,7 +434,6 @@ public sealed class GenerateQuizForm : ModulePanel
         _busyBlock.Location = new Point(0, blockTop);
     }
 
-    /// <inheritdoc />
     public override void RefreshData()
     {
         _topicsCache = _topics.GetAll().OrderBy(topic => topic.Name, StringComparer.Ordinal).ToList();
@@ -488,14 +445,12 @@ public sealed class GenerateQuizForm : ModulePanel
         }
         _topicFilter.SelectedIndex = _topicsCache.Count > 0 ? 0 : -1;
 
-        // The §5.11 empty state: without a topic there is nothing to generate for.
         bool hasTopics = _topicsCache.Count > 0;
         _optionsCard.Visible = hasTopics;
         _busyBlock.Visible = false;
         _emptyTopics.Visible = !hasTopics;
         if (!hasTopics)
         {
-            // The empty state owns the module: hide the action card behind it.
             foreach (Control child in Controls)
             {
                 child.Visible = child == _emptyTopics;
@@ -512,11 +467,6 @@ public sealed class GenerateQuizForm : ModulePanel
         }
     }
 
-    /// <summary>
-    /// Starts one generation: reads the pickers, disables the form (and the
-    /// sidebar, §5.11), and runs the blocking chain call off the UI thread.
-    /// The continuation lands back on the UI thread with the typed outcome.
-    /// </summary>
     private void StartGeneration()
     {
         if (_busy || _topicFilter.SelectedIndex < 0 || _topicFilter.SelectedIndex >= _topicsCache.Count)
@@ -531,12 +481,12 @@ public sealed class GenerateQuizForm : ModulePanel
             2 => Difficulty.Hard,
             _ => Difficulty.Easy,
         };
-        int questionCount = 5 + Math.Max(_count.SelectedIndex, 0); // combo index 0..15 → 5..20
+        int questionCount = 5 + Math.Max(_count.SelectedIndex, 0);
 
         _busy = true;
         _cancelPending = false;
         _generationId++;
-        int generationId = _generationId; // this request's token (the H2 fix: a superseded completion is discarded)
+        int generationId = _generationId;
         _startedAt = DateTimeOffset.UtcNow;
         _savedQuizId = 0;
 
@@ -544,14 +494,12 @@ public sealed class GenerateQuizForm : ModulePanel
         HideBanner();
         _busyStatus.Text = GeneratingStatus;
         _busyBlock.Visible = true;
-        _busyTrack.Marquee = true; // armed per run (M1: never left over from a previous run)
+        _busyTrack.Marquee = true;
         _busyBlock.BringToFront();
         _elapsedTimer.Start();
         this.FindAncestor<MainForm>()?.SetSidebarEnabled(enabled: false);
-        Refresh(); // paint the busy state before the (off-thread) call starts
+        Refresh();
 
-        // The P5 chain call is synchronous and can block ~2 minutes — it runs
-        // off the UI thread so the marquee animates (the binding R-5 #3 rule).
         Task.Run(() => _generation.GenerateQuiz(topic, difficulty, questionCount))
             .ContinueWith(
                 task => HandleOutcome(topic, task.Result, generationId),
@@ -560,19 +508,10 @@ public sealed class GenerateQuizForm : ModulePanel
                 TaskScheduler.FromCurrentSynchronizationContext());
     }
 
-    /// <summary>
-    /// The UI-thread continuation: save, or show the typed failure banner. A
-    /// completion whose token no longer matches (cancelled or superseded by a
-    /// newer request) is discarded — never saved, never touching the state of
-    /// the generation that is now current.
-    /// </summary>
     private void HandleOutcome(Topic topic, QuizGenerationOutcome outcome, int generationId)
     {
         if (generationId != _generationId)
         {
-            // The §5.11 cancellation rule: the late result is discarded and
-            // nothing is saved. The strip notes it once, when the user is
-            // back on the ready form and no newer run owns the busy state.
             if (_cancelPending && !_busy)
             {
                 _cancelPending = false;
@@ -591,8 +530,6 @@ public sealed class GenerateQuizForm : ModulePanel
             return;
         }
 
-        // The R-5 #1 insert-time title de-dup (P13's persisting-phase duty):
-        // the AI's title is unique per topic; a collision gets a numbered suffix.
         Quiz draft = outcome.QuizDraft;
         draft.TopicId = topic.TopicId;
         string baseTitle = draft.Title;
@@ -605,15 +542,10 @@ public sealed class GenerateQuizForm : ModulePanel
 
         try
         {
-            _savedQuizId = _quizzes.Add(draft); // one atomic write — never a half-saved quiz
+            _savedQuizId = _quizzes.Add(draft);
         }
         catch (Exception)
         {
-            // A persistence failure is an unsuccessful operation, not an
-            // unexpected crash: it ends the busy state cleanly and reports
-            // through the strip (§4.11 — feedback is an inline strip line).
-            // Throwing inside the continuation would hand the exception to
-            // the unobserved-task machinery, where nobody would see it.
             EndBusy(readyOnly: true);
             ReportStatus(SaveFailedMessage, success: false);
             return;
@@ -621,14 +553,9 @@ public sealed class GenerateQuizForm : ModulePanel
 
         EndBusy(readyOnly: false);
         ReportStatus(ReadyMessage, success: true);
-        _takeNow.Visible = true; // "Take it now": play the fresh quiz immediately (no review gate)
+        _takeNow.Visible = true;
     }
 
-    /// <summary>
-    /// The §5.11 Cancel: the form returns to its ready state immediately; the
-    /// in-flight call cannot be aborted through the P5 client, so its token
-    /// is invalidated — the late result is discarded (nothing is saved).
-    /// </summary>
     private void CancelGeneration()
     {
         if (!_busy)
@@ -637,11 +564,10 @@ public sealed class GenerateQuizForm : ModulePanel
         }
 
         _cancelPending = true;
-        _generationId++; // invalidate the in-flight request's completion
+        _generationId++;
         EndBusy(readyOnly: true);
     }
 
-    /// <summary>Restores the ready state (and the sidebar) after the busy state.</summary>
     private void EndBusy(bool readyOnly)
     {
         _busy = false;
@@ -657,7 +583,6 @@ public sealed class GenerateQuizForm : ModulePanel
         }
     }
 
-    /// <summary>Disables or re-enables every option control and the Generate button (§5.11).</summary>
     private void SetFormEnabled(bool enabled)
     {
         _topicFilter.Enabled = enabled;
@@ -667,7 +592,6 @@ public sealed class GenerateQuizForm : ModulePanel
         _takeNow.Enabled = enabled;
     }
 
-    /// <summary>Shows the typed-failure banner with the plain-language detail (§5.11); the card re-flows inline.</summary>
     private void ShowBanner(IReadOnlyList<string> reasons)
     {
         _bannerDetail.Text = DescribeFailure(reasons);
@@ -676,19 +600,12 @@ public sealed class GenerateQuizForm : ModulePanel
         _banner.BringToFront();
     }
 
-    /// <summary>Hides the banner ("Try again"); the card re-flows back.</summary>
     private void HideBanner()
     {
         _banner.Visible = false;
         LayoutGenerateLayout();
     }
 
-    /// <summary>
-    /// Maps the typed reason strings to the §5.11 plain-language lines — never
-    /// a raw reason, never a provider detail that could leak configuration.
-    /// The chain-level class (contract 7.6 — a fresh clone has no config file)
-    /// maps to the no-provider message, not to a retry hint.
-    /// </summary>
     private static string DescribeFailure(IReadOnlyList<string> reasons)
     {
         string first = reasons.Count > 0 ? reasons[0] : string.Empty;
@@ -704,7 +621,6 @@ public sealed class GenerateQuizForm : ModulePanel
         return $"{detail} {OfflinePointer}";
     }
 
-    /// <summary>The "Take it now" deep-link: the Take-quiz module running the fresh quiz.</summary>
     private void OpenTakeNow()
     {
         if (_savedQuizId == 0)
@@ -715,13 +631,11 @@ public sealed class GenerateQuizForm : ModulePanel
         this.FindAncestor<MainForm>()?.NavigateToNewQuiz(_savedQuizId);
     }
 
-    /// <summary>The failure banner's "Browse quizzes": the take-quiz list (the offline path).</summary>
     private void NavigateHome()
     {
         this.FindAncestor<MainForm>()?.NavigateToModule("TakeQuiz");
     }
 
-    /// <summary>The empty state's "Go to topics".</summary>
     private void NavigateToTopics()
     {
         this.FindAncestor<MainForm>()?.NavigateToModule("Topics");

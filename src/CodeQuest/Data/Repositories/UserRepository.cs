@@ -1,26 +1,10 @@
-// =============================================================================
-// CodeQuest — Phase P4: Data Access Layer
-// OOP rubric: ABSTRACTION — UserRepository is the concrete implementation
-//              behind the IUserRepository contract of phase P3.
-// Look at: GetByUsername() below — the lookup the login screen uses to resolve
-//          the entered name: the account is found by its exact login name, or
-//          created on first use (name-only sign-in, directive D1; the
-//          password_hash column is NOT NULL in the schema and stays in place
-//          but unused — callers store an empty string since D1).
-// Table:   users (database/schema.sql) — the username is unique in the schema,
-//          so a duplicate registration surfaces as a DuplicateEntityException
-//          (plan ruling R-2 #5).
-// =============================================================================
+// Reads and writes player accounts. (Abstraction)
 
 using CodeQuest.Models;
 using Microsoft.Data.Sqlite;
 
 namespace CodeQuest.Data.Repositories;
 
-/// <summary>
-/// Reads and writes the accounts of the application (schema table
-/// <c>users</c>).
-/// </summary>
 public sealed class UserRepository : IUserRepository
 {
     private const string SelectAllSql =
@@ -69,15 +53,13 @@ public sealed class UserRepository : IUserRepository
 
     private readonly Db _db;
 
-    /// <summary>Creates the repository.</summary>
-    /// <param name="db">The connection factory of the database.</param>
     public UserRepository(Db db)
     {
         ArgumentNullException.ThrowIfNull(db);
         _db = db;
     }
 
-    /// <inheritdoc />
+    // Reads all player accounts.
     public IReadOnlyList<UserAccount> GetAll()
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -87,7 +69,7 @@ public sealed class UserRepository : IUserRepository
         return ReadUsers(command);
     }
 
-    /// <inheritdoc />
+    // Reads one player account.
     public UserAccount? GetById(int userId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -99,7 +81,7 @@ public sealed class UserRepository : IUserRepository
         return reader.Read() ? ReadUser(reader) : null;
     }
 
-    /// <inheritdoc />
+    // Finds one player by name.
     public UserAccount? GetByUsername(string username)
     {
         ArgumentNullException.ThrowIfNull(username);
@@ -113,7 +95,7 @@ public sealed class UserRepository : IUserRepository
         return reader.Read() ? ReadUser(reader) : null;
     }
 
-    /// <inheritdoc />
+    // Adds a new player account.
     public int Add(UserAccount user)
     {
         ArgumentNullException.ThrowIfNull(user);
@@ -132,8 +114,6 @@ public sealed class UserRepository : IUserRepository
         }
         catch (SqliteException exception)
         {
-            // A username that already exists is refused by the schema
-            // (UNIQUE); the caller shows a friendly duplicate message (P8).
             throw DataAccessException.FromSqlite(exception);
         }
 
@@ -141,7 +121,7 @@ public sealed class UserRepository : IUserRepository
         return user.UserId;
     }
 
-    /// <inheritdoc />
+    // Updates a player account.
     public void Update(UserAccount user)
     {
         ArgumentNullException.ThrowIfNull(user);
@@ -170,7 +150,7 @@ public sealed class UserRepository : IUserRepository
         }
     }
 
-    /// <inheritdoc />
+    // Deletes a player account.
     public bool Delete(int userId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -184,16 +164,10 @@ public sealed class UserRepository : IUserRepository
         }
         catch (SqliteException exception)
         {
-            // An account that still owns attempts is protected by the database
-            // (quiz_attempts.user_id ON DELETE RESTRICT); the history stays.
             throw DataAccessException.FromSqlite(exception);
         }
     }
 
-    /// <summary>
-    /// Reads the id the last insert produced. SQLite reports it through
-    /// last_insert_rowid() — the value belongs to the connection that inserted.
-    /// </summary>
     private static int ReadLastInsertRowId(SqliteConnection connection)
     {
         using SqliteCommand command = connection.CreateCommand();
@@ -203,7 +177,6 @@ public sealed class UserRepository : IUserRepository
         return value is null or DBNull ? 0 : Convert.ToInt32(value);
     }
 
-    /// <summary>Reads one account from the current row.</summary>
     private static UserAccount ReadUser(SqliteDataReader reader) => new()
     {
         UserId = reader.GetInt32(0),
@@ -213,7 +186,6 @@ public sealed class UserRepository : IUserRepository
         CreatedAt = SqlValueMap.FromStorage(reader.GetString(4)),
     };
 
-    /// <summary>Reads every account of an open command.</summary>
     private static IReadOnlyList<UserAccount> ReadUsers(SqliteCommand command)
     {
         List<UserAccount> users = new();

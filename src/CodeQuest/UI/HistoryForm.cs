@@ -1,16 +1,4 @@
-// =============================================================================
-// CodeQuest — Quiz History & Answer Review (the fun-UI redesign): past
-// attempts as CARDS, not table rows. The toolbar keeps search ("Search
-// quizzes…"), the topic filter, and the score filter (Any / ≥80% / 50–79% /
-// <50%); each attempt renders as a card — date, quiz title, topic, and a
-// score pill (wash fill + Level* text: green ≥80%, amber 50–79%, red <50% —
-// the numbers always ride on the pill, never color alone; the D4 audit #5
-// recipe — a Level* fill behind white text failed AA) — with a "Review"
-// button that opens the §5.9 answer-review drill-in.
-// Derived data (R-2 #1): the score denominator is the quiz's own question
-// count, computed live. Fully local — no network dependency (proposal line
-// 23). Read-only by design: no CRUD feedback lines on this screen.
-// =============================================================================
+// The past attempts screen.
 
 using CodeQuest.Data.Repositories;
 using CodeQuest.Models;
@@ -19,10 +7,6 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The history module (the fun-UI redesign): attempt cards with search,
-/// filters, and the answer-review drill-in.
-/// </summary>
 public sealed class HistoryForm : ModulePanel
 {
     private const string ReviewAction = "Review";
@@ -43,12 +27,11 @@ public sealed class HistoryForm : ModulePanel
     private readonly ThemedComboBox _scoreFilter = null!;
     private readonly FlowLayoutPanel _cardFlow = null!;
     private readonly Panel _emptyView = null!;
-    private AttemptReviewForm? _reviewPanel; // the §5.9 drill-in state, created on first open
-    private bool _rebuildingFilters; // guards the SelectedIndexChanged feedback loop
+    private AttemptReviewForm? _reviewPanel;
+    private bool _rebuildingFilters;
 
     private Dictionary<int, string> _topicNames = new();
 
-    /// <summary>Creates the history module for the signed-in user's attempts.</summary>
     public HistoryForm(
         UserAccount user,
         AttemptRepository attempts,
@@ -133,7 +116,6 @@ public sealed class HistoryForm : ModulePanel
             BackColor = UITheme.Background,
         };
 
-        // The empty view replaces the cards (§5.8: empty vs filtered-empty copy).
         _emptyView = new Panel
         {
             Name = "HistoryEmptyView",
@@ -149,7 +131,6 @@ public sealed class HistoryForm : ModulePanel
         Controls.Add(_emptyView);
     }
 
-    /// <inheritdoc />
     public override void RefreshData()
     {
         Dictionary<int, string> names = new();
@@ -163,11 +144,10 @@ public sealed class HistoryForm : ModulePanel
         ApplyFilter();
     }
 
-    /// <summary>Rebuilds the topic filter items, preserving the selection BY NAME.</summary>
     private void RebuildTopicFilter()
     {
         _rebuildingFilters = true;
-        string? previous = _topicFilter.SelectedItem as string; // topics.name is UNIQUE
+        string? previous = _topicFilter.SelectedItem as string;
 
         _topicFilter.Items.Clear();
         _topicFilter.Items.Add(AllTopicsLabel);
@@ -181,13 +161,8 @@ public sealed class HistoryForm : ModulePanel
         _rebuildingFilters = false;
     }
 
-    /// <summary>Builds one attempt card: date, quiz, topic, colored score pill, Review button.</summary>
     private Control BuildAttemptCard(QuizAttempt attempt, Quiz quiz, string topicName, int total, double percent)
     {
-        // The score pill (D4 audit #5): a Level* fill behind white text fails
-        // AA on dark (2.26/2.10/2.72:1 — and light's 4.17 already failed).
-        // The recipe is the wash fill + the Level* text token (6.30/6.70/
-        // 5.77 ✓) — text always carries the numbers, never color alone.
         (Color pillBack, Color pillText) = percent switch
         {
             >= 80d => (UITheme.SuccessTint, UITheme.LevelEasy),
@@ -242,7 +217,7 @@ public sealed class HistoryForm : ModulePanel
             Name = "HistoryCardScore" + attempt.AttemptId,
             Text = $"{attempt.Score}/{total}  ({percent:0}%)",
             Font = UITheme.BodySemibold,
-            ForeColor = pillText, // Level* on its wash — the D4 audit #5 recipe
+            ForeColor = pillText,
             BackColor = pillBack,
             AutoSize = false,
             TextAlign = ContentAlignment.MiddleCenter,
@@ -284,7 +259,6 @@ public sealed class HistoryForm : ModulePanel
         return card;
     }
 
-    /// <summary>Applies the live search and the topic/score filters to the cards.</summary>
     private void ApplyFilter()
     {
         if (_rebuildingFilters)
@@ -294,7 +268,7 @@ public sealed class HistoryForm : ModulePanel
 
         string searchText = _search.Text.Trim();
         string? topicFilterName = _topicFilter.SelectedIndex is > 0 ? _topicFilter.Items[_topicFilter.SelectedIndex]?.ToString() : null;
-        int scoreBucket = _scoreFilter.SelectedIndex; // 0 any, 1 ≥80, 2 50–79, 3 <50
+        int scoreBucket = _scoreFilter.SelectedIndex;
 
         IReadOnlyList<QuizAttempt> attempts = _attempts.GetByUser(_user.UserId);
 
@@ -306,10 +280,10 @@ public sealed class HistoryForm : ModulePanel
             Quiz? quiz = _quizzes.GetById(attempt.QuizId);
             if (quiz is null)
             {
-                continue; // unreachable — the FK keeps a quiz alive while attempts exist
+                continue;
             }
 
-            int total = quiz.Questions.Count; // the R-2 denominator, computed live
+            int total = quiz.Questions.Count;
             double percent = total == 0
                 ? 0d
                 : Math.Round(attempt.Score * 100d / total, MidpointRounding.AwayFromZero);
@@ -343,14 +317,12 @@ public sealed class HistoryForm : ModulePanel
 
         _cardFlow.ResumeLayout();
 
-        // The states of §5.8: empty (no attempts at all) vs filtered-empty.
         EmptyState state = attempts.Count == 0
             ? EmptyState.AllEmpty
             : _cardFlow.Controls.Count == 0 ? EmptyState.Filtered : EmptyState.None;
         ShowState(state);
     }
 
-    /// <summary>The two §5.8 empty states.</summary>
     private enum EmptyState
     {
         None,
@@ -358,7 +330,6 @@ public sealed class HistoryForm : ModulePanel
         Filtered,
     }
 
-    /// <summary>Shows the cards, or the §5.8 empty state with its "Clear filters" action.</summary>
     private void ShowState(EmptyState state)
     {
         if (state == EmptyState.None)
@@ -430,7 +401,6 @@ public sealed class HistoryForm : ModulePanel
         _emptyView.BringToFront();
     }
 
-    /// <summary>The filtered-empty state's action: reset search and filters.</summary>
     private void ClearFilters()
     {
         _search.ClearText();
@@ -439,7 +409,6 @@ public sealed class HistoryForm : ModulePanel
         ApplyFilter();
     }
 
-    /// <summary>Opens the §5.9 review drill-in for one attempt id.</summary>
     internal void OpenAttemptById(int attemptId)
     {
         if (_reviewPanel is null)
@@ -467,7 +436,6 @@ public sealed class HistoryForm : ModulePanel
         _reviewPanel.BringToFront();
     }
 
-    /// <summary>Shows or hides this module's list state (toolbar + cards).</summary>
     private void ShowListView(bool visible)
     {
         _search.Visible = visible;

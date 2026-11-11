@@ -1,30 +1,10 @@
-// =============================================================================
-// CodeQuest — Phase P4: Data Access Layer
-// OOP rubric: ABSTRACTION — SubmittedAnswerRepository is the concrete
-//              implementation behind the ISubmittedAnswerRepository contract of
-//              phase P3.
-// Look at: Add() below — before an answer row is written, the write-time rule
-//          of plan ruling R-2 #3 is checked: the answered question has to
-//          belong to the quiz of the attempt. The check lives in
-//          AttemptAnswerGuard; a violated rule raises AnswerValidationException
-//          and nothing is written. InsertAnswer() — the one place where an
-//          answer row is written; the attempt repository uses it when it stores
-//          an attempt together with all of its answers.
-// Table:   submitted_answers (database/schema.sql) — the primary key is the
-//          pair (attempt_id, question_id), so a question is answered once per
-//          attempt; the composite foreign key proves that the picked option
-//          belongs to the answered question.
-// =============================================================================
+// Reads and writes picked answers. (Abstraction)
 
 using CodeQuest.Models;
 using Microsoft.Data.Sqlite;
 
 namespace CodeQuest.Data.Repositories;
 
-/// <summary>
-/// Reads and writes the answers a student picked
-/// (schema table <c>submitted_answers</c>).
-/// </summary>
 public sealed class SubmittedAnswerRepository : ISubmittedAnswerRepository
 {
     private const string SelectByAttemptSql =
@@ -72,15 +52,13 @@ public sealed class SubmittedAnswerRepository : ISubmittedAnswerRepository
 
     private readonly Db _db;
 
-    /// <summary>Creates the repository.</summary>
-    /// <param name="db">The connection factory of the database.</param>
     public SubmittedAnswerRepository(Db db)
     {
         ArgumentNullException.ThrowIfNull(db);
         _db = db;
     }
 
-    /// <inheritdoc />
+    // Reads the picked answers of one attempt.
     public IReadOnlyList<SubmittedAnswer> GetByAttempt(int attemptId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -91,7 +69,7 @@ public sealed class SubmittedAnswerRepository : ISubmittedAnswerRepository
         return ReadAnswers(command);
     }
 
-    /// <inheritdoc />
+    // Reads the picked answers of one question.
     public IReadOnlyList<SubmittedAnswer> GetByQuestion(int questionId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -102,7 +80,7 @@ public sealed class SubmittedAnswerRepository : ISubmittedAnswerRepository
         return ReadAnswers(command);
     }
 
-    /// <inheritdoc />
+    // Reads one picked answer.
     public SubmittedAnswer? GetByAttemptAndQuestion(int attemptId, int questionId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -115,15 +93,13 @@ public sealed class SubmittedAnswerRepository : ISubmittedAnswerRepository
         return reader.Read() ? ReadAnswer(reader) : null;
     }
 
-    /// <inheritdoc />
+    // Adds a new picked answer.
     public int Add(SubmittedAnswer submittedAnswer)
     {
         ArgumentNullException.ThrowIfNull(submittedAnswer);
 
         using SqliteConnection connection = _db.OpenConnection();
 
-        // Plan ruling R-2 #3: the answered question has to belong to the quiz
-        // of the attempt. An unknown attempt is refused as well.
         int quizId = AttemptAnswerGuard.GetQuizIdOfAttempt(connection, null, submittedAnswer.AttemptId);
         AttemptAnswerGuard.EnsureAnswersBelongToQuiz(connection, null, quizId, new[] { submittedAnswer });
 
@@ -133,19 +109,13 @@ public sealed class SubmittedAnswerRepository : ISubmittedAnswerRepository
         }
         catch (SqliteException exception)
         {
-            // An answer whose option does not belong to the answered question
-            // (composite foreign key) or whose question was already answered in
-            // this attempt (primary key) is refused by the database.
             throw DataAccessException.FromSqlite(exception);
         }
 
-        // The table has no single generated id — its primary key is the pair
-        // attempt_id + question_id. The attempt id is what the caller can go
-        // on with, so it is returned.
         return submittedAnswer.AttemptId;
     }
 
-    /// <inheritdoc />
+    // Deletes a picked answer.
     public bool Delete(int attemptId, int questionId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -157,7 +127,7 @@ public sealed class SubmittedAnswerRepository : ISubmittedAnswerRepository
         return command.ExecuteNonQuery() > 0;
     }
 
-    /// <inheritdoc />
+    // Deletes the picked answers of one attempt.
     public void DeleteByAttempt(int attemptId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -168,15 +138,6 @@ public sealed class SubmittedAnswerRepository : ISubmittedAnswerRepository
         command.ExecuteNonQuery();
     }
 
-    /// <summary>
-    /// Writes one answer row. The caller decides whether the write belongs to a
-    /// transaction — an attempt with all of its answers is one unit of work; a
-    /// single answer carries no transaction. The caller has already checked the
-    /// R-2 #3 rule for this answer.
-    /// </summary>
-    /// <param name="connection">The connection of the write.</param>
-    /// <param name="transaction">The transaction of the write, or null.</param>
-    /// <param name="answer">The answer to write.</param>
     internal static void InsertAnswer(
         SqliteConnection connection,
         SqliteTransaction? transaction,
@@ -194,9 +155,6 @@ public sealed class SubmittedAnswerRepository : ISubmittedAnswerRepository
         command.ExecuteNonQuery();
     }
 
-    /// <summary>Reads one answer from the current row.</summary>
-    /// <param name="reader">The reader on the current row.</param>
-    /// <returns>The answer of the row.</returns>
     private static SubmittedAnswer ReadAnswer(SqliteDataReader reader) => new()
     {
         AttemptId = reader.GetInt32(0),
@@ -204,7 +162,6 @@ public sealed class SubmittedAnswerRepository : ISubmittedAnswerRepository
         ChosenChoiceId = reader.GetInt32(2),
     };
 
-    /// <summary>Reads every answer of an open command.</summary>
     private static IReadOnlyList<SubmittedAnswer> ReadAnswers(SqliteCommand command)
     {
         List<SubmittedAnswer> answers = new();

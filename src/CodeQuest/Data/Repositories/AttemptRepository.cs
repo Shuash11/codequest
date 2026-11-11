@@ -1,32 +1,10 @@
-// =============================================================================
-// CodeQuest — Phase P4: Data Access Layer
-// OOP rubric: ABSTRACTION — AttemptRepository is the concrete implementation
-//              behind the IAttemptRepository contract of phase P3.
-// Look at: AddWithAnswers() below — the write the quiz-taking screen (P9) uses:
-//          the attempt row and every submitted answer go into the database in
-//          ONE transaction, and the write-time rule of plan ruling R-2 #3 is
-//          checked before anything is written, so an answer pointing at a
-//          question of another quiz refuses the whole attempt
-//          (AnswerValidationException, nothing stays in the database).
-//          Add() — stores the bare attempt row without answers, for the flows
-//          that record an attempt on its own.
-// History: the read methods order newest first, so the history list (P10) can
-//          show the latest run of a quiz first.
-// Table:   quiz_attempts (database/schema.sql) — the score is the number of
-//          correct answers (plan ruling R-2 #1); the answers are the child rows
-//          of the submitted_answers table, which the schema deletes together
-//          with their attempt (ON DELETE CASCADE).
-// =============================================================================
+// Reads and writes quiz attempts. (Abstraction)
 
 using CodeQuest.Models;
 using Microsoft.Data.Sqlite;
 
 namespace CodeQuest.Data.Repositories;
 
-/// <summary>
-/// Reads and writes the completed quiz runs (schema table
-/// <c>quiz_attempts</c>).
-/// </summary>
 public sealed class AttemptRepository : IAttemptRepository
 {
     private const string SelectByUserSql =
@@ -85,15 +63,13 @@ public sealed class AttemptRepository : IAttemptRepository
 
     private readonly Db _db;
 
-    /// <summary>Creates the repository.</summary>
-    /// <param name="db">The connection factory of the database.</param>
     public AttemptRepository(Db db)
     {
         ArgumentNullException.ThrowIfNull(db);
         _db = db;
     }
 
-    /// <inheritdoc />
+    // Reads the attempts of one player.
     public IReadOnlyList<QuizAttempt> GetByUser(int userId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -104,7 +80,7 @@ public sealed class AttemptRepository : IAttemptRepository
         return ReadAttempts(command);
     }
 
-    /// <inheritdoc />
+    // Reads the attempts of one quiz.
     public IReadOnlyList<QuizAttempt> GetByQuiz(int quizId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -115,7 +91,7 @@ public sealed class AttemptRepository : IAttemptRepository
         return ReadAttempts(command);
     }
 
-    /// <inheritdoc />
+    // Reads one player's attempts of one quiz.
     public IReadOnlyList<QuizAttempt> GetByUserAndQuiz(int userId, int quizId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -127,7 +103,7 @@ public sealed class AttemptRepository : IAttemptRepository
         return ReadAttempts(command);
     }
 
-    /// <inheritdoc />
+    // Reads one attempt.
     public QuizAttempt? GetById(int attemptId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -139,7 +115,7 @@ public sealed class AttemptRepository : IAttemptRepository
         return reader.Read() ? ReadAttempt(reader) : null;
     }
 
-    /// <inheritdoc />
+    // Adds a new attempt.
     public int Add(QuizAttempt attempt)
     {
         ArgumentNullException.ThrowIfNull(attempt);
@@ -158,31 +134,17 @@ public sealed class AttemptRepository : IAttemptRepository
         return attempt.AttemptId;
     }
 
-    /// <summary>
-    /// Stores a new attempt together with all of its answers in one transaction
-    /// and returns the generated id of the attempt. Before anything is written,
-    /// every answer is checked against plan ruling R-2 #3: the answered
-    /// question has to belong to the quiz of the attempt. A violated rule
-    /// refuses the whole attempt — nothing stays in the database. The generated
-    /// attempt id is written onto the attempt and onto every answer.
-    /// </summary>
-    /// <param name="attempt">The attempt to store.</param>
-    /// <param name="answers">The answers of the attempt; they are bound to it.</param>
-    /// <returns>The id the database gave to the attempt.</returns>
+    // Saves an attempt with its answers.
     public int AddWithAnswers(QuizAttempt attempt, IEnumerable<SubmittedAnswer> answers)
     {
         ArgumentNullException.ThrowIfNull(attempt);
         ArgumentNullException.ThrowIfNull(answers);
 
-        // The answers are read twice — once by the guard, once by the insert —
-        // so they are materialised once here and a caller may pass any
-        // collection, even a query that can be walked only once.
         IReadOnlyList<SubmittedAnswer> answerList =
             answers as IReadOnlyList<SubmittedAnswer> ?? answers.ToList();
 
         return _db.RunInTransaction((connection, transaction) =>
         {
-            // Plan ruling R-2 #3, checked before any row is written.
             AttemptAnswerGuard.EnsureAnswersBelongToQuiz(connection, transaction, attempt.QuizId, answerList);
 
             int attemptId = InsertAttempt(connection, transaction, attempt);
@@ -198,7 +160,7 @@ public sealed class AttemptRepository : IAttemptRepository
         });
     }
 
-    /// <inheritdoc />
+    // Updates a attempt.
     public void Update(QuizAttempt attempt)
     {
         ArgumentNullException.ThrowIfNull(attempt);
@@ -226,7 +188,7 @@ public sealed class AttemptRepository : IAttemptRepository
         }
     }
 
-    /// <inheritdoc />
+    // Deletes a attempt.
     public bool Delete(int attemptId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -244,14 +206,6 @@ public sealed class AttemptRepository : IAttemptRepository
         }
     }
 
-    /// <summary>
-    /// Writes one attempt row. The caller decides whether the write belongs to
-    /// a transaction — an attempt with its answers is one unit of work.
-    /// </summary>
-    /// <param name="connection">The connection of the write.</param>
-    /// <param name="transaction">The transaction of the write, or null.</param>
-    /// <param name="attempt">The attempt to write.</param>
-    /// <returns>The id the database gave to the attempt.</returns>
     private static int InsertAttempt(
         SqliteConnection connection,
         SqliteTransaction? transaction,
@@ -274,7 +228,6 @@ public sealed class AttemptRepository : IAttemptRepository
         return value is null or DBNull ? 0 : Convert.ToInt32(value);
     }
 
-    /// <summary>Reads one attempt from the current row.</summary>
     private static QuizAttempt ReadAttempt(SqliteDataReader reader) => new()
     {
         AttemptId = reader.GetInt32(0),
@@ -284,7 +237,6 @@ public sealed class AttemptRepository : IAttemptRepository
         AttemptedAt = SqlValueMap.FromStorage(reader.GetString(4)),
     };
 
-    /// <summary>Reads every attempt of an open command.</summary>
     private static IReadOnlyList<QuizAttempt> ReadAttempts(SqliteCommand command)
     {
         List<QuizAttempt> attempts = new();

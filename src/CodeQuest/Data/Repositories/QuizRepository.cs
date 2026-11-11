@@ -1,31 +1,10 @@
-// =============================================================================
-// CodeQuest — Phase P4: Data Access Layer
-// OOP rubric: ABSTRACTION — QuizRepository is the concrete implementation
-//              behind the IQuizRepository contract of phase P3. The screens of
-//              the later phases only ever talk to the interface.
-// Look at: Add() below — a quiz is never stored alone: the quiz header, its
-//          questions and their options go into the database in ONE transaction
-//          (a forced failure leaves no partial quiz behind, plan phase P4
-//          acceptance). GetById() — the one query that rebuilds the whole quiz
-//          with its questions and their options, in display order.
-// Status:  the review workflow Draft -> Approved lives in the status column
-//          (plan ruling R-2 #4); GetByStatus() and GetByTopicAndStatus() read
-//          each state, so the review screen (P13) can list its drafts and the
-//          quiz-taking screen (P9) can list the takeable, approved quizzes.
-// Table:   quizzes (database/schema.sql) — the questions are the child rows of
-//          the questions table and the options the child rows of the choices
-//          table.
-// =============================================================================
+// Reads and writes quizzes. (Abstraction)
 
 using CodeQuest.Models;
 using Microsoft.Data.Sqlite;
 
 namespace CodeQuest.Data.Repositories;
 
-/// <summary>
-/// Reads and writes the quizzes of the application (schema table
-/// <c>quizzes</c>).
-/// </summary>
 public sealed class QuizRepository : IQuizRepository
 {
     private const string SelectAllSql =
@@ -102,18 +81,16 @@ public sealed class QuizRepository : IQuizRepository
 
     private readonly Db _db;
 
-    /// <summary>Creates the repository.</summary>
-    /// <param name="db">The connection factory of the database.</param>
     public QuizRepository(Db db)
     {
         ArgumentNullException.ThrowIfNull(db);
         _db = db;
     }
 
-    /// <inheritdoc />
+    // Reads all quizzes.
     public IReadOnlyList<Quiz> GetAll() => ReadQuizzes(SelectAllSql);
 
-    /// <inheritdoc />
+    // Reads the quizzes of one topic.
     public IReadOnlyList<Quiz> GetByTopic(int topicId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -124,7 +101,7 @@ public sealed class QuizRepository : IQuizRepository
         return ReadQuizzes(command);
     }
 
-    /// <inheritdoc />
+    // Reads the quizzes with one status.
     public IReadOnlyList<Quiz> GetByStatus(QuizStatus status)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -135,7 +112,7 @@ public sealed class QuizRepository : IQuizRepository
         return ReadQuizzes(command);
     }
 
-    /// <inheritdoc />
+    // Reads the quizzes of one topic and status.
     public IReadOnlyList<Quiz> GetByTopicAndStatus(int topicId, QuizStatus status)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -147,7 +124,7 @@ public sealed class QuizRepository : IQuizRepository
         return ReadQuizzes(command);
     }
 
-    /// <inheritdoc />
+    // Reads one quiz.
     public Quiz? GetById(int quizId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -163,8 +140,6 @@ public sealed class QuizRepository : IQuizRepository
 
         Quiz quiz = ReadQuiz(reader);
 
-        // The questions and their options are child rows of the quiz; they are
-        // read on the same connection, in display order.
         foreach (Question question in QuestionRepository.ReadQuestionsOfQuiz(connection, null, quizId))
         {
             quiz.AddQuestion(question);
@@ -173,13 +148,11 @@ public sealed class QuizRepository : IQuizRepository
         return quiz;
     }
 
-    /// <inheritdoc />
+    // Adds a new quiz.
     public int Add(Quiz quiz)
     {
         ArgumentNullException.ThrowIfNull(quiz);
 
-        // The quiz header, its questions and their options are one unit of
-        // work: a failure anywhere rolls the whole quiz back.
         return _db.RunInTransaction((connection, transaction) =>
         {
             int quizId = InsertQuiz(connection, transaction, quiz);
@@ -196,7 +169,7 @@ public sealed class QuizRepository : IQuizRepository
         });
     }
 
-    /// <inheritdoc />
+    // Updates a quiz.
     public void Update(Quiz quiz)
     {
         ArgumentNullException.ThrowIfNull(quiz);
@@ -226,7 +199,7 @@ public sealed class QuizRepository : IQuizRepository
         }
     }
 
-    /// <inheritdoc />
+    // Deletes a quiz.
     public bool Delete(int quizId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -240,15 +213,11 @@ public sealed class QuizRepository : IQuizRepository
         }
         catch (SqliteException exception)
         {
-            // A quiz that has been taken is history and protected by the
-            // database (quiz_attempts.quiz_id ON DELETE RESTRICT); its
-            // questions and options, in contrast, are deleted with it
-            // (CASCADE) when it was never attempted.
             throw DataAccessException.FromSqlite(exception);
         }
     }
 
-    /// <inheritdoc />
+    // Checks if a quiz title already exists.
     public bool ExistsByTitle(int topicId, string title, int? ignoreQuizId = null)
     {
         ArgumentNullException.ThrowIfNull(title);
@@ -264,14 +233,6 @@ public sealed class QuizRepository : IQuizRepository
         return count is not null and not DBNull && Convert.ToInt64(count) > 0;
     }
 
-    /// <summary>
-    /// Writes one quiz header row. The caller decides whether the write belongs
-    /// to a transaction — the full quiz with its questions is one unit of work.
-    /// </summary>
-    /// <param name="connection">The connection of the write.</param>
-    /// <param name="transaction">The transaction of the write, or null.</param>
-    /// <param name="quiz">The quiz to write.</param>
-    /// <returns>The id the database gave to the quiz.</returns>
     private static int InsertQuiz(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -295,14 +256,9 @@ public sealed class QuizRepository : IQuizRepository
         return value is null or DBNull ? 0 : Convert.ToInt32(value);
     }
 
-    /// <summary>
-    /// Turns an optional id into the value of a parameter: the id itself, or
-    /// NULL when there is none ("no id to ignore").
-    /// </summary>
     private static object AsParameterValue(int? value)
         => value.HasValue ? value.Value : DBNull.Value;
 
-    /// <summary>Reads every quiz of a query.</summary>
     private IReadOnlyList<Quiz> ReadQuizzes(string sql)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -312,7 +268,6 @@ public sealed class QuizRepository : IQuizRepository
         return ReadQuizzes(command);
     }
 
-    /// <summary>Reads every quiz of an open command.</summary>
     private static IReadOnlyList<Quiz> ReadQuizzes(SqliteCommand command)
     {
         List<Quiz> quizzes = new();
@@ -326,7 +281,6 @@ public sealed class QuizRepository : IQuizRepository
         return quizzes;
     }
 
-    /// <summary>Reads one quiz header from the current row.</summary>
     private static Quiz ReadQuiz(SqliteDataReader reader) => new()
     {
         QuizId = reader.GetInt32(0),

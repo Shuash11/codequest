@@ -1,24 +1,10 @@
-// =============================================================================
-// CodeQuest — Phase P4: Data Access Layer
-// OOP rubric: ABSTRACTION — TopicRepository is the concrete implementation
-//              behind the ITopicRepository contract of phase P3. The screens of
-//              the later phases only ever talk to the interface.
-// Look at: the SQL constants below — every statement is constant text and every
-//          value travels as a $parameter. No statement is ever built from
-//          pieces, so a topic named "'; DROP TABLE topics;--" is stored as the
-//          literal text it is.
-// Table:   topics (database/schema.sql)
-// =============================================================================
+// Reads and writes topics. (Abstraction)
 
 using CodeQuest.Models;
 using Microsoft.Data.Sqlite;
 
 namespace CodeQuest.Data.Repositories;
 
-/// <summary>
-/// Reads and writes the subject areas of the application (schema table
-/// <c>topics</c>).
-/// </summary>
 public sealed class TopicRepository : ITopicRepository
 {
     private const string SelectAllSql =
@@ -85,18 +71,16 @@ public sealed class TopicRepository : ITopicRepository
 
     private readonly Db _db;
 
-    /// <summary>Creates the repository.</summary>
-    /// <param name="db">The connection factory of the database.</param>
     public TopicRepository(Db db)
     {
         ArgumentNullException.ThrowIfNull(db);
         _db = db;
     }
 
-    /// <inheritdoc />
+    // Reads all topics.
     public IReadOnlyList<Topic> GetAll() => ReadTopics(SelectAllSql);
 
-    /// <inheritdoc />
+    // Reads the topics of one category.
     public IReadOnlyList<Topic> GetByCategory(string category)
     {
         ArgumentNullException.ThrowIfNull(category);
@@ -109,7 +93,7 @@ public sealed class TopicRepository : ITopicRepository
         return ReadTopics(command);
     }
 
-    /// <inheritdoc />
+    // Finds topics by search text.
     public IReadOnlyList<Topic> Search(string searchText)
     {
         ArgumentNullException.ThrowIfNull(searchText);
@@ -122,7 +106,7 @@ public sealed class TopicRepository : ITopicRepository
         return ReadTopics(command);
     }
 
-    /// <inheritdoc />
+    // Reads one topic.
     public Topic? GetById(int topicId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -134,7 +118,7 @@ public sealed class TopicRepository : ITopicRepository
         return reader.Read() ? ReadTopic(reader) : null;
     }
 
-    /// <inheritdoc />
+    // Adds a new topic.
     public int Add(Topic topic)
     {
         ArgumentNullException.ThrowIfNull(topic);
@@ -160,7 +144,7 @@ public sealed class TopicRepository : ITopicRepository
         return topic.TopicId;
     }
 
-    /// <inheritdoc />
+    // Updates a topic.
     public void Update(Topic topic)
     {
         ArgumentNullException.ThrowIfNull(topic);
@@ -189,7 +173,7 @@ public sealed class TopicRepository : ITopicRepository
         }
     }
 
-    /// <inheritdoc />
+    // Deletes a topic.
     public bool Delete(int topicId)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -203,13 +187,11 @@ public sealed class TopicRepository : ITopicRepository
         }
         catch (SqliteException exception)
         {
-            // A topic that still owns quizzes is refused by the database; the
-            // caller shows the friendly message (plan ruling R-2 #1).
             throw DataAccessException.FromSqlite(exception);
         }
     }
 
-    /// <inheritdoc />
+    // Checks if a topic name already exists.
     public bool ExistsByName(string name, int? ignoreTopicId = null)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -224,10 +206,6 @@ public sealed class TopicRepository : ITopicRepository
         return count is not null and not DBNull && Convert.ToInt64(count) > 0;
     }
 
-    /// <summary>
-    /// Reads the id the last insert produced. SQLite reports it through
-    /// last_insert_rowid() — the value belongs to the connection that inserted.
-    /// </summary>
     private static int ReadLastInsertRowId(SqliteConnection connection)
     {
         using SqliteCommand command = connection.CreateCommand();
@@ -237,14 +215,9 @@ public sealed class TopicRepository : ITopicRepository
         return value is null or DBNull ? 0 : Convert.ToInt32(value);
     }
 
-    /// <summary>
-    /// Turns an optional id into the value of a parameter: the id itself, or
-    /// NULL when there is none ("no id to ignore").
-    /// </summary>
     private static object AsParameterValue(int? value)
         => value.HasValue ? value.Value : DBNull.Value;
 
-    /// <summary>Reads every topic of a query.</summary>
     private IReadOnlyList<Topic> ReadTopics(string sql)
     {
         using SqliteConnection connection = _db.OpenConnection();
@@ -254,7 +227,6 @@ public sealed class TopicRepository : ITopicRepository
         return ReadTopics(command);
     }
 
-    /// <summary>Reads every topic of an open command.</summary>
     private static IReadOnlyList<Topic> ReadTopics(SqliteCommand command)
     {
         List<Topic> topics = new();
@@ -268,7 +240,6 @@ public sealed class TopicRepository : ITopicRepository
         return topics;
     }
 
-    /// <summary>Reads one topic from the current row.</summary>
     private static Topic ReadTopic(SqliteDataReader reader) => new()
     {
         TopicId = reader.GetInt32(0),

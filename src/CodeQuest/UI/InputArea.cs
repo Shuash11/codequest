@@ -1,28 +1,9 @@
-// =============================================================================
-// CodeQuest — Phase P8: Topic & Quiz Management
-// Recipe 4.4 of the design of record, multi-line editors: "Multi-line editors
-// (question text, explanation): same recipe, minimum 64px height, top-aligned."
-// Look at: the same Surface field, 8px radius, 1px border with the
-//          default/focus/error swaps as <see cref="InputField"/> (the focus
-//          swap is AccentText on dark), but the TextBox inside is multiline,
-//          top-aligned, and the field is as tall as the form asks (≥64px).
-//          The area outside the rounded field (corner cutouts and the error-
-//          line slot) shows the CONTAINER's surface, resolved via
-//          UITheme.ContainerSurface (D4 audit rules #1/#9). The inline error
-//          line below (DangerText Caption) is owned here like InputField
-//          owns it — errors are inline, never dialogs (§4.4).
-// =============================================================================
+// The multi-line text editors.
 
 using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
-/// <summary>
-/// The styled multi-line text input of recipe 4.4: the question text and
-/// explanation editors of the question form (spec 5.5). The error-line slot
-/// below the field is always reserved (login-card convention, spec 5.1), so
-/// showing an error never shifts the surrounding layout.
-/// </summary>
 public sealed class InputArea : Panel
 {
     private readonly TextBox _box = new();
@@ -31,10 +12,6 @@ public sealed class InputArea : Panel
     private Control? _labeledBy;
     private bool _borderError;
 
-    /// <summary>
-    /// Creates the multi-line field. <paramref name="accessibleName"/> names
-    /// the inner text box for screen readers (WCAG 4.1.2).
-    /// </summary>
     public InputArea(string? accessibleName = null)
     {
         SetStyle(ControlStyles.UserPaint, true);
@@ -42,7 +19,7 @@ public sealed class InputArea : Panel
         SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
         SetStyle(ControlStyles.ResizeRedraw, true);
 
-        BackColor = UITheme.Surface; // the field fill token (see OnPaint/OnPaintBackground)
+        BackColor = UITheme.Surface;
         _fallbackAccessibleName = accessibleName;
 
         _box.Multiline = true;
@@ -61,17 +38,12 @@ public sealed class InputArea : Panel
 
         _errorLine.AutoSize = true;
         _errorLine.Font = UITheme.Caption;
-        _errorLine.BackColor = UITheme.Surface; // corrected to the container surface on attach (OnParentChanged)
+        _errorLine.BackColor = UITheme.Surface;
         Controls.Add(_errorLine);
 
         LayoutArea();
     }
 
-    /// <summary>
-    /// The area was placed on its container: the error line sits directly on
-    /// that surface (below the rounded field), so its BackColor must equal
-    /// the container's — never a fixed token (D4 audit rules #1/#9).
-    /// </summary>
     protected override void OnParentChanged(EventArgs e)
     {
         base.OnParentChanged(e);
@@ -79,17 +51,11 @@ public sealed class InputArea : Panel
         Invalidate();
     }
 
-    /// <summary>
-    /// Everything OUTSIDE the rounded field — the corner cutouts and the
-    /// error-line slot — shows the container's surface (D4 audit rule #1).
-    /// The field fill itself paints in OnPaint.
-    /// </summary>
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         e.Graphics.Clear(UITheme.ContainerSurface(this));
     }
 
-    /// <summary>The entered text.</summary>
     [System.Diagnostics.CodeAnalysis.AllowNull]
     public override string Text
     {
@@ -97,7 +63,6 @@ public sealed class InputArea : Panel
         set => _box.Text = value;
     }
 
-    /// <summary>The quiet hint shown when the field is empty (recipe 4.4).</summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public string PlaceholderText
     {
@@ -105,11 +70,6 @@ public sealed class InputArea : Panel
         set => _box.PlaceholderText = value;
     }
 
-    /// <summary>
-    /// The visible label whose text names this field (§4.4's association rule,
-    /// F2): the label is the source of the input's accessible name, not a
-    /// string retyped beside it. Setting it replaces the fallback name.
-    /// </summary>
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     public Control? LabeledBy
     {
@@ -121,10 +81,8 @@ public sealed class InputArea : Panel
         }
     }
 
-    /// <summary>True when the field carries the recipe's error border.</summary>
     public bool HasError => _borderError;
 
-    /// <summary>Recipe 4.4 error state: border DangerText + the inline line below.</summary>
     public void ShowError(string message)
     {
         _borderError = true;
@@ -134,7 +92,6 @@ public sealed class InputArea : Panel
         Invalidate();
     }
 
-    /// <summary>Leaves the error state: border restored, line cleared.</summary>
     public void ClearError()
     {
         _borderError = false;
@@ -143,7 +100,6 @@ public sealed class InputArea : Panel
         Invalidate();
     }
 
-    /// <summary>Moves the keyboard focus into the field's text box.</summary>
     public void FocusInput() => _box.Focus();
 
     protected override void OnResize(EventArgs eventargs)
@@ -162,7 +118,6 @@ public sealed class InputArea : Panel
     {
         base.OnEnabledChanged(eventargs);
 
-        // Recipe 4.4 disabled state: Fill background, TextTertiary text.
         _box.BackColor = Enabled ? UITheme.Surface : UITheme.Fill;
         _box.ForeColor = Enabled ? UITheme.TextPrimary : UITheme.TextTertiary;
         Invalidate();
@@ -172,9 +127,6 @@ public sealed class InputArea : Panel
     {
         e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-        // The field fill: Surface (the input fill token at every elevation),
-        // or the recipe's disabled Fill — over the container surface the
-        // background pass already filled.
         var bounds = new System.Drawing.Rectangle(0, 0, Width - 1, FieldHeight - 1);
         using (var fieldPath = UITheme.RoundedPath(bounds, UITheme.Scaled(this, UITheme.RadiusControl)))
         using (var fieldBrush = new System.Drawing.SolidBrush(Enabled ? UITheme.Surface : UITheme.Fill))
@@ -184,10 +136,9 @@ public sealed class InputArea : Panel
 
         if (!Enabled)
         {
-            return; // the disabled state has no border at all (recipe 4.4)
+            return;
         }
 
-        // The focus swap is AccentText on dark (the accent-as-ink rule).
         Color borderColor = _borderError ? UITheme.DangerText
             : _box.Focused ? UITheme.AccentText
             : UITheme.BorderControl;
@@ -196,12 +147,10 @@ public sealed class InputArea : Panel
         e.Graphics.DrawPath(new System.Drawing.Pen(borderColor), borderPath);
     }
 
-    /// <summary>The editable area height: the control's height minus the reserved error slot.</summary>
     private int FieldHeight => Height - UITheme.Scaled(this, UITheme.Spacing8) - LineHeight;
 
     private int LineHeight => _errorLine.GetPreferredSize(System.Drawing.Size.Empty).Height;
 
-    /// <summary>Places the text box (12px horizontal padding, 8px vertical) and the error line.</summary>
     private void LayoutArea()
     {
         int horizontalPadding = UITheme.Scaled(this, UITheme.Spacing12);
@@ -215,7 +164,6 @@ public sealed class InputArea : Panel
         _errorLine.SetBounds(horizontalPadding, Height - LineHeight, Width, LineHeight);
     }
 
-    /// <summary>The text box repaints its border owner on focus changes.</summary>
     private static void RepaintOwner(object? sender)
     {
         if (sender is Control box && box.Parent is InputArea owner)
@@ -224,13 +172,6 @@ public sealed class InputArea : Panel
         }
     }
 
-    /// <summary>
-    /// Forwards the inner text box's text changes to the area: the border
-    /// repaints and the area's own TextChanged event fires. The Text
-    /// override delegates to the inner box, so without this forwarding the
-    /// area's subscribers never hear anything — the question form's inline
-    /// error-clearing handlers (spec 5.5) would stay silent.
-    /// </summary>
     private static void ForwardTextChanged(object? sender)
     {
         if (sender is Control box && box.Parent is InputArea owner)
