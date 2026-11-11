@@ -2,12 +2,13 @@
 // CodeQuest — Phase P4: Data Access Layer
 // Tests for: the repository layer of phase P4 (all seven repositories), run
 // against a FRESH temporary SQLite database that every test builds for itself
-// by executing database/schema.sql and database/seed.sql (read as text — the
-// scripts are never modified). The scratch file lives in the user's temp
-// folder with a unique name per test and is deleted again in the teardown;
-// nothing is left in the repository tree.
+// by executing database/schema.sql and the frozen pre-campaign demo fixture
+// (tests/CodeQuest.Tests/Fixtures/demo-seed.sql, read as text — the scripts
+// are never modified). The scratch file lives in the user's temp folder with
+// a unique name per test and is deleted again in the teardown; nothing is
+// left in the repository tree.
 // Look at: the nine cases below — one behavior each, independent and hand-
-//          verifiable against database/seed.sql:
+//          verifiable against the demo fixture:
 //            1. seeded round-trip (counts and spot values),
 //            2. topic CRUD,
 //            3. atomic quiz write (quiz + questions + choices in one call),
@@ -30,8 +31,8 @@ namespace CodeQuest.Tests;
 
 /// <summary>
 /// Phase P4 repository tests: every case runs against its own fresh copy of
-/// the seeded demo database (schema.sql + seed.sql) and proves one behavior of
-/// the data access layer.
+/// the demo database (schema.sql + the frozen demo fixture) and proves one
+/// behavior of the data access layer.
 /// </summary>
 public class RepositoryTests : IDisposable
 {
@@ -64,7 +65,7 @@ public class RepositoryTests : IDisposable
         _db = new Db(_databasePath);
 
         ExecuteScript(ReadScript("schema.sql"));
-        ExecuteScript(ReadScript("seed.sql"));
+        ExecuteScript(ReadFixture("demo-seed.sql"));
 
         _topics = new TopicRepository(_db);
         _quizzes = new QuizRepository(_db);
@@ -514,5 +515,29 @@ public class RepositoryTests : IDisposable
         }
 
         throw new FileNotFoundException($"The SQL script '{fileName}' was not found in a 'database' folder above the test directory.");
+    }
+
+    /// <summary>
+    /// Reads the frozen pre-campaign demo fixture (tests/CodeQuest.Tests/Fixtures)
+    /// — the rich sample data this file's hand-computed expectations are built
+    /// on. The folder is found by walking up from the test directory.
+    /// </summary>
+    private static string ReadFixture(string fileName)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            string candidate = Path.Combine(directory.FullName, "tests", "CodeQuest.Tests", "Fixtures", fileName);
+
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException($"The SQL fixture '{fileName}' was not found in the tests/CodeQuest.Tests/Fixtures folder above the test directory.");
     }
 }

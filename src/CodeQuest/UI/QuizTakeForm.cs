@@ -15,6 +15,10 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private static readonly Color[] TileColors =
         { UITheme.TileRed, UITheme.TileBlue, UITheme.TileAmber, UITheme.TileGreen };
 
+    private static readonly Bitmap? CorrectSprite = UITheme.LoadSprite("correct");
+
+    private static readonly Bitmap? WrongSprite = UITheme.LoadSprite("wrong");
+
     private const string EmptyTitle = "No quizzes yet.";
     private const string ResultSavedMessage = "Result saved.";
     private const string LeaveTitle = "Leave this quiz?";
@@ -33,6 +37,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private readonly IGamificationRepository _gamification;
     private readonly IAchievementEvaluator _achievements;
     private readonly IRandomMixService _randomMix;
+    private readonly QuizGenerationService _generation;
+    private readonly CampaignLevelService _campaignLevels;
 
     private FlowLayoutPanel _cardFlow = null!;
     private Panel _emptyView = null!;
@@ -45,6 +51,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private Label _questionBadge = null!;
     private Label _questionTopic = null!;
     private Label _feedbackGlyph = null!;
+    private PictureBox _feedbackSprite = null!;
     private Label _streakFlame = null!;
     private Label _streakCount = null!;
     private Label _resultTrophy = null!;
@@ -52,7 +59,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private Panel _resultLevelUp = null!;
     private Label _resultLevelUpText = null!;
     private Label _resultLevelUpCaption = null!;
-    private System.Windows.Forms.Timer _streakPulseTimer = null!;
+    private System.Windows.Forms.Timer? _streakPulseTimer;
+    private System.Windows.Forms.Timer? _autoAdvanceTimer;
     private int _streakPulseTicks;
     private int _streak;
     private int _levelBeforeRun;
@@ -98,6 +106,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private Quiz? _resultQuiz;
     private int _resultCorrect;
     private bool _awaitingSavedAnnouncement;
+    private bool _rivalOfferShown;
     private long _resultXpEarned;
     private UserProgress? _resultProgress;
     private IReadOnlyList<AchievementDefinition> _resultNewlyUnlocked = Array.Empty<AchievementDefinition>();
@@ -111,7 +120,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         IScoringService scoring,
         UserAccount user,
         IGamificationRepository gamification,
-        IAchievementEvaluator achievements)
+        IAchievementEvaluator achievements,
+        QuizGenerationService generation)
     {
         ArgumentNullException.ThrowIfNull(quizzes);
         ArgumentNullException.ThrowIfNull(questions);
@@ -122,6 +132,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(gamification);
         ArgumentNullException.ThrowIfNull(achievements);
+        ArgumentNullException.ThrowIfNull(generation);
         _quizzes = quizzes;
         _questions = questions;
         _topics = topics;
@@ -131,7 +142,9 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _user = user;
         _gamification = gamification;
         _achievements = achievements;
+        _generation = generation;
         _randomMix = new RandomMixService(quizzes, questions, topics);
+        _campaignLevels = new CampaignLevelService(quizzes);
 
         Dock = DockStyle.Fill;
         BackColor = UITheme.Background;
@@ -210,6 +223,17 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         };
 
         RefreshData();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            StopAutoAdvance();
+            StopStreakPulse();
+        }
+
+        base.Dispose(disposing);
     }
 
     public override void RefreshData()
@@ -561,6 +585,14 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             TextAlign = ContentAlignment.MiddleLeft,
             Visible = false,
         };
+        _feedbackSprite = new PictureBox
+        {
+            Name = "RunFeedbackSprite",
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = UITheme.Surface,
+            AutoSize = false,
+            Visible = false,
+        };
         _feedback = new Label
         {
             Name = "RunFeedback",
@@ -574,6 +606,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         card.Controls.Add(_questionBadge);
         card.Controls.Add(_questionTopic);
         card.Controls.Add(_questionText);
+        card.Controls.Add(_feedbackSprite);
         card.Controls.Add(_feedbackGlyph);
         card.Controls.Add(_feedback);
         card.Controls.Add(_choiceStack);
@@ -639,13 +672,29 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
         if (_feedback.Visible)
         {
+            int lineHeight = UITheme.Scaled(this, 22);
+            int slotHeight = lineHeight;
+            int textX = inset;
+
+            if (_feedbackSprite.Visible)
+            {
+                // The sprite hangs at the slot's left with its bottom aligned
+                // to the feedback line; the slot grows so the card follows.
+                int spriteSize = UITheme.Scaled(this, 44);
+                slotHeight = Math.Max(slotHeight, spriteSize);
+                _feedbackSprite.SetBounds(inset, top + slotHeight - spriteSize, spriteSize, spriteSize);
+                textX = inset + spriteSize + UITheme.Scaled(this, UITheme.Spacing8);
+            }
+
             Size glyphSize = TextRenderer.MeasureText(
                 _feedbackGlyph.Text.Length == 0 ? " " : _feedbackGlyph.Text, _feedbackGlyph.Font);
-            _feedbackGlyph.Location = new Point(inset, top);
-            _feedbackGlyph.Size = new Size(glyphSize.Width + UITheme.Scaled(this, 2), UITheme.Scaled(this, 22));
-            _feedback.Location = new Point(_feedbackGlyph.Right, top);
-            _feedback.Size = new Size(Math.Max(contentWidth - _feedbackGlyph.Width, 1), UITheme.Scaled(this, 22));
-            top += UITheme.Scaled(this, 22) + UITheme.Scaled(this, UITheme.Spacing8);
+            _feedbackGlyph.Location = new Point(textX, top + slotHeight - lineHeight);
+            _feedbackGlyph.Size = new Size(glyphSize.Width + UITheme.Scaled(this, 2), lineHeight);
+            _feedback.Location = new Point(_feedbackGlyph.Right, _feedbackGlyph.Top);
+            _feedback.Size = new Size(
+                Math.Max(contentWidth - (textX - inset) - _feedbackGlyph.Width, 1),
+                lineHeight);
+            top += slotHeight + UITheme.Scaled(this, UITheme.Spacing8);
         }
 
         _choiceStack.Location = new Point(inset, top);
@@ -678,7 +727,17 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             return;
         }
 
+        StopAutoAdvance();
         _runQuiz = quiz;
+
+        // Every take is randomized (spec C3): the tiers stay progressive while
+        // the order inside a tier and the answer positions are fresh each run.
+        _runQuiz.OrderQuestionsForRun(Random.Shared);
+        foreach (Question runQuestion in _runQuiz.Questions)
+        {
+            runQuestion.ShuffleChoices(Random.Shared);
+        }
+
         _selections = new int?[quiz.Questions.Count];
         _revealed = new bool[quiz.Questions.Count];
         _runIndex = 0;
@@ -698,6 +757,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             {
                 Difficulty.Easy => (UITheme.SuccessTint, UITheme.LevelEasy),
                 Difficulty.Hard => (UITheme.DangerTint, UITheme.LevelHard),
+                Difficulty.Insane => (UITheme.InsaneTint, UITheme.InsaneText),
                 _ => (UITheme.WarningTint, UITheme.LevelMedium),
             };
         _questionTopic.Text = topicName;
@@ -711,6 +771,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
     private void DiscardRun()
     {
+        StopAutoAdvance();
         _runQuiz = null;
         _selections = Array.Empty<int?>();
         _revealed = Array.Empty<bool>();
@@ -734,6 +795,8 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         UpdateRunProgress();
         _questionText.Text = question.QuestionText;
         _feedback.Visible = false;
+        _feedbackGlyph.Visible = false;
+        _feedbackSprite.Visible = false;
 
         _choiceStack.SuspendLayout();
         foreach (AnswerTile existing in _tiles)
@@ -791,6 +854,12 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _feedbackGlyph.Text = correct ? UITheme.GlyphCheck : UITheme.GlyphDismiss;
         _feedbackGlyph.ForeColor = correct ? UITheme.SuccessText : UITheme.DangerText;
         _feedbackGlyph.Visible = true;
+
+        // The sprite leads the feedback row; without it the glyph stays (spec C4).
+        Bitmap? sprite = correct ? CorrectSprite : WrongSprite;
+        _feedbackSprite.Image = sprite;
+        _feedbackSprite.Visible = sprite is not null;
+
         _feedback.Text = correct ? FeedbackCorrect : FeedbackWrong;
         _feedback.ForeColor = correct ? UITheme.SuccessText : UITheme.DangerText;
         _feedback.Visible = true;
@@ -849,6 +918,39 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         ShowFeedback(correct);
         UpdateRunProgress();
         LayoutQuestionCard();
+        StartAutoAdvance(correct);
+    }
+
+    // The one-shot advance after a reveal: ~1.2 s when correct, ~1.8 s when
+    // wrong; a manual action anywhere cancels it (spec C2).
+    private void StartAutoAdvance(bool correct)
+    {
+        StopAutoAdvance();
+
+        var timer = new System.Windows.Forms.Timer
+        {
+            Interval = correct ? 1200 : 1800,
+            Tag = _runIndex,
+        };
+        timer.Tick += (sender, e) =>
+        {
+            StopAutoAdvance();
+            if (_runQuiz is null || _submitting || _runIndex != (int)timer.Tag || !_revealed[_runIndex])
+            {
+                return;
+            }
+
+            HandleNext(); // on the last question HandleNext submits the run
+        };
+        _autoAdvanceTimer = timer;
+        timer.Start();
+    }
+
+    private void StopAutoAdvance()
+    {
+        _autoAdvanceTimer?.Stop();
+        _autoAdvanceTimer?.Dispose();
+        _autoAdvanceTimer = null;
     }
 
     private void UpdateStreakCue()
@@ -870,17 +972,17 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         // blink on the increment, never looping, always ending at rest.
         StopStreakPulse();
         _streakPulseTicks = 0;
-        _streakPulseTimer = new System.Windows.Forms.Timer { Interval = 60 };
-        _streakPulseTimer.Tick += static (sender, e) =>
+        var timer = new System.Windows.Forms.Timer { Interval = 60 };
+        timer.Tick += static (sender, e) =>
         {
-            if (sender is System.Windows.Forms.Timer timer && timer.Tag is QuizTakeForm form)
+            if (sender is System.Windows.Forms.Timer tickTimer && tickTimer.Tag is QuizTakeForm form)
             {
                 form._streakPulseTicks++;
                 if (form._streakPulseTicks >= 3)
                 {
                     form.SetStreakCueInverted(false);
-                    timer.Stop();
-                    timer.Dispose();
+                    tickTimer.Stop();
+                    tickTimer.Dispose();
                 }
                 else
                 {
@@ -888,9 +990,10 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
                 }
             }
         };
-        _streakPulseTimer.Tag = this;
+        timer.Tag = this;
+        _streakPulseTimer = timer;
         SetStreakCueInverted(true);
-        _streakPulseTimer.Start();
+        timer.Start();
     }
 
     private void StopStreakPulse()
@@ -928,6 +1031,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             return;
         }
 
+        StopAutoAdvance(); // manual navigation cancels the pending advance
         _runIndex = target;
         RenderQuestion();
     }
@@ -994,6 +1098,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             _resultQuiz = quiz;
             _resultCorrect = score.CorrectCount;
             _awaitingSavedAnnouncement = true;
+            _rivalOfferShown = false;
             _runQuiz = null;
             ShowResult();
         }
@@ -1013,6 +1118,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
     private void EndBusyAfterFailure()
     {
+        StopAutoAdvance(); // a failed save never re-fires through the pending advance
         _previousButton.Enabled = _runIndex > 0;
         _nextButton.Enabled = true;
     }
@@ -1387,6 +1493,112 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         StopStreakPulse(); // the run ended: the pulse never survives a view switch (spec R7)
 
         this.FindAncestor<MainForm>()?.UpdateSidebarLevel();
+
+        MaybeOfferRivalChallenge();
+    }
+
+    // The AI rival (spec C5): completing the CURRENT highest campaign level
+    // offers the next level; the dialog generates it when accepted.
+    private void MaybeOfferRivalChallenge()
+    {
+        if (_rivalOfferShown || _resultQuiz is null)
+        {
+            return;
+        }
+
+        if (!_topicNames.TryGetValue(_resultQuiz.TopicId, out string? topicName)
+            || !string.Equals(topicName, Campaign.TopicName, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        int completedLevel = Campaign.LevelNumberOf(_resultQuiz.Title);
+        if (completedLevel <= 0)
+        {
+            return;
+        }
+
+        // The completed level is the current maximum when the next number the
+        // campaign yields is exactly one past it — the same rule as the save.
+        if (Campaign.NextLevelNumber(_quizzes.GetAll(), _resultQuiz.TopicId) != completedLevel + 1)
+        {
+            return;
+        }
+
+        _rivalOfferShown = true;
+        using var dialog = new RivalDialog(Campaign.TopicName, completedLevel + 1, GenerateRivalQuiz);
+        if (dialog.ShowDialog(this) == DialogResult.OK && dialog.GeneratedQuizId is { } quizId)
+        {
+            StartQuiz(quizId);
+        }
+    }
+
+    // Runs on the dialog's worker thread: the rival's Level N+1 is generated
+    // through the same chain as the Generate screen, named, approved and saved.
+    private int? GenerateRivalQuiz(string topicName, Difficulty difficulty)
+    {
+        try
+        {
+            Topic? campaign = _topics.GetAll().FirstOrDefault(
+                topic => string.Equals(topic.Name, topicName, StringComparison.Ordinal));
+            if (campaign is null)
+            {
+                return null;
+            }
+
+            QuizGenerationOutcome outcome = _generation.GenerateQuiz(campaign, difficulty, 5);
+            if (!outcome.IsSuccess || outcome.QuizDraft is null)
+            {
+                return null;
+            }
+
+            Quiz draft = outcome.QuizDraft;
+            draft.TopicId = campaign.TopicId;
+            string baseTitle = draft.Title;
+            int suffix = 2;
+            while (_quizzes.ExistsByTitle(campaign.TopicId, draft.Title))
+            {
+                draft.Title = $"{baseTitle} ({suffix})";
+                suffix++;
+            }
+
+            int quizId = _quizzes.Add(draft);
+
+            try
+            {
+                // The AI authors the content; the app keeps the campaign
+                // numbering consistent (a stale draft on the number is
+                // replaced) and marks the level ready to play.
+                if (_campaignLevels.NameAndApproveNextLevel(quizId, campaign.TopicId, difficulty))
+                {
+                    return quizId;
+                }
+
+                DeleteRivalDraftQuietly(quizId); // a failed rename never leaves a stray draft
+                return null;
+            }
+            catch (Exception)
+            {
+                DeleteRivalDraftQuietly(quizId); // a failed rename never leaves a stray draft
+                return null;
+            }
+        }
+        catch (Exception)
+        {
+            return null; // the dialog shows the friendly failure state
+        }
+    }
+
+    private void DeleteRivalDraftQuietly(int quizId)
+    {
+        try
+        {
+            _quizzes.Delete(quizId);
+        }
+        catch (Exception)
+        {
+            // A stray draft is harmless; the retry path still never doubles it.
+        }
     }
 
     private void SizeHeroForResult()
@@ -1729,6 +1941,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
     private void ShowList(bool announceCompletion)
     {
+        StopAutoAdvance();
         bool announce = announceCompletion && _awaitingSavedAnnouncement;
         RefreshData();
 

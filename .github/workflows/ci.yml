@@ -50,12 +50,13 @@ jobs:
             )
           } | ConvertTo-Json -Depth 5 | Set-Content 'publish/config/config.local.json'
 
-      - name: Seed the demo database (schema + sample records)
+      - name: Seed the demo database (schema + user + campaign)
         shell: pwsh
         run: >
           python -c "import sqlite3; con = sqlite3.connect('publish/codequest.db');
           con.executescript(open('database/schema.sql', encoding='utf-8').read());
           con.executescript(open('database/seed.sql', encoding='utf-8').read());
+          con.executescript(open('database/campaign.sql', encoding='utf-8').read());
           con.commit(); con.close()"
 
       - name: Build the installer (Inno Setup, per-user)

@@ -2,16 +2,18 @@
 // CodeQuest — Phase I3: Report Data Services
 // Tests for: ReportService (the IReportService implementation), run against a
 // FRESH temporary SQLite database that every test builds for itself by
-// executing database/schema.sql and database/seed.sql — the same pattern as
+// executing database/schema.sql and the frozen pre-campaign demo fixture
+// (tests/CodeQuest.Tests/Fixtures/demo-seed.sql) — the same pattern as
 // RepositoryTests (phase P4). The scratch file lives in the user's temp
 // folder, is unique per test, and is deleted in the teardown.
-// Look at: the hand-computed expectations against database/seed.sql:
+// Look at: the hand-computed expectations against the demo fixture:
 //   attempts: (quiz 1, 4/5), (quiz 1, 2/5), (quiz 2, 5/5), (quiz 3, 3/5)
 //   topic C#      : attempts 2, avg 60%, best 80%, latest 40% -> needs practice
 //   topic Python  : attempts 1, avg 100%, best 100%, latest 100%      -> ok
 //   topic SQL     : attempts 1, avg 60%, best 60%, latest 60%  -> needs practice
 //   topic Networking / Web Security : zero attempts -> the defined empty row
-//   difficulty Easy: 3 attempts, (4+2+3)/15 = 60%; Medium: 100%; Hard: zero
+//   difficulty Easy: 3 attempts, (4+2+3)/15 = 60%; Medium: 100%; Hard: zero;
+//   Insane: zero (ordered Easy, Medium, Hard, Insane)
 //   overall: 4 attempts, 3 quizzes taken, (4+2+5+3)/20 = 70%
 //   weak topics : [C# 60%, SQL 60%] — weakest first, ties by name
 // A zero-attempt topic and a difficulty with no attempts return the defined
@@ -51,7 +53,7 @@ public class ReportServiceTests : IDisposable
         _db = new Db(_databasePath);
 
         ExecuteScript(ReadScript("schema.sql"));
-        ExecuteScript(ReadScript("seed.sql"));
+        ExecuteScript(ReadFixture("demo-seed.sql"));
 
         _reports = new ReportService(
             new AttemptRepository(_db),
@@ -121,14 +123,18 @@ public class ReportServiceTests : IDisposable
     }
 
     // -------------------------------------------------------------------------
-    // 3. Per-difficulty rows: Easy 60%, Medium 100%, Hard empty.
+    // 3. Per-difficulty rows: Easy 60%, Medium 100%, Hard empty, Insane empty
+    //    (the four rows always come in the declaration order of the enum).
     // -------------------------------------------------------------------------
     [Fact]
     public void Build_DifficultyRows_MatchSeedData()
     {
         PracticeReport report = _reports.Build(userId: 1);
 
-        Assert.Equal(3, report.Difficulties.Count); // Easy, Medium, Hard in declaration order
+        Assert.Equal(4, report.Difficulties.Count);
+        Assert.Equal(
+            new[] { Difficulty.Easy, Difficulty.Medium, Difficulty.Hard, Difficulty.Insane },
+            report.Difficulties.Select(row => row.Difficulty).ToArray());
 
         DifficultyReport easy = report.Difficulties.Single(row => row.Difficulty == Difficulty.Easy);
         Assert.Equal(3, easy.Attempts); // quizzes 1 and 3 are Easy
@@ -141,6 +147,10 @@ public class ReportServiceTests : IDisposable
         DifficultyReport hard = report.Difficulties.Single(row => row.Difficulty == Difficulty.Hard);
         Assert.Equal(0, hard.Attempts); // only the Draft quiz is Hard — it has no attempts
         Assert.Equal(0d, hard.AveragePercent);
+
+        DifficultyReport insane = report.Difficulties.Single(row => row.Difficulty == Difficulty.Insane);
+        Assert.Equal(0, insane.Attempts); // the demo fixture holds no Insane quiz
+        Assert.Equal(0d, insane.AveragePercent);
     }
 
     // -------------------------------------------------------------------------
@@ -228,5 +238,29 @@ public class ReportServiceTests : IDisposable
         }
 
         throw new FileNotFoundException($"The SQL script '{fileName}' was not found in a 'database' folder above the test directory.");
+    }
+
+    /// <summary>
+    /// Reads the frozen pre-campaign demo fixture (tests/CodeQuest.Tests/Fixtures)
+    /// — the rich sample data this file's hand-computed expectations are built
+    /// on. The folder is found by walking up from the test directory.
+    /// </summary>
+    private static string ReadFixture(string fileName)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            string candidate = Path.Combine(directory.FullName, "tests", "CodeQuest.Tests", "Fixtures", fileName);
+
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException($"The SQL fixture '{fileName}' was not found in the tests/CodeQuest.Tests/Fixtures folder above the test directory.");
     }
 }

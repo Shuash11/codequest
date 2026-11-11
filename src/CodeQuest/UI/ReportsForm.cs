@@ -274,6 +274,7 @@ public sealed class ReportsForm : ModulePanel
             _difficultyFilter.Items.Add(Difficulty.Easy.ToString());
             _difficultyFilter.Items.Add(Difficulty.Medium.ToString());
             _difficultyFilter.Items.Add(Difficulty.Hard.ToString());
+            _difficultyFilter.Items.Add(Difficulty.Insane.ToString());
         }
 
         ApplyFilter(rebuildTopicItems: true);
@@ -291,6 +292,7 @@ public sealed class ReportsForm : ModulePanel
             1 => Difficulty.Easy,
             2 => Difficulty.Medium,
             3 => Difficulty.Hard,
+            4 => Difficulty.Insane,
             _ => null,
         };
 

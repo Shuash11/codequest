@@ -10,6 +10,7 @@ public abstract class Question
     private string _explanation = string.Empty;
     private int _position;
     private DateTimeOffset _createdAt;
+    private Difficulty _difficulty = Difficulty.Medium;
     private readonly List<Choice> _choices = new();
 
     public int QuestionId
@@ -48,6 +49,12 @@ public abstract class Question
         set => _createdAt = value;
     }
 
+    public Difficulty Difficulty
+    {
+        get => _difficulty;
+        set => _difficulty = value;
+    }
+
     public IReadOnlyList<Choice> Choices => _choices;
 
     public void AddChoice(Choice choice)
@@ -63,6 +70,23 @@ public abstract class Question
     public abstract bool ValidateAnswer(Choice? chosenChoice);
 
     public virtual string FormatForDisplay() => $"[{QuestionKind}] {QuestionText}";
+
+    // Reorders the choices for a run and reassigns their display positions.
+    public void ShuffleChoices(Random random)
+    {
+        ArgumentNullException.ThrowIfNull(random);
+
+        for (int index = _choices.Count - 1; index > 0; index--)
+        {
+            int swapIndex = random.Next(index + 1);
+            (_choices[index], _choices[swapIndex]) = (_choices[swapIndex], _choices[index]);
+        }
+
+        for (int index = 0; index < _choices.Count; index++)
+        {
+            _choices[index].Position = index + 1;
+        }
+    }
 
     public Choice? GetCorrectChoice() => _choices.FirstOrDefault(choice => choice.IsCorrect);
 

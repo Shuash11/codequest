@@ -264,7 +264,7 @@ Field rules (all enforced; deviation ⇒ error class 4):
 |---|---|---|
 | `title` | string | trimmed non-empty; ≤ 120 chars |
 | `topic` | string | trimmed non-empty; **must equal the requested topic name exactly** (after trim) |
-| `difficulty` | string | one of `Easy` \| `Medium` \| `Hard`; **must equal the requested difficulty** |
+| `difficulty` | string | one of `Easy` \| `Medium` \| `Hard` \| `Insane`; **must equal the requested difficulty** |
 | `questions` | array | length exactly = requested N (5–20); order = display order |
 | `questions[].text` | string | trimmed non-empty |
 | `questions[].choices` | string[4] | **exactly 4** items; each trimmed non-empty; **pairwise distinct** (schema `UNIQUE (question_id, choice_text)`) |
@@ -300,7 +300,7 @@ JSON guarantee.
 | `topic` (echo, verified) | — | topic resolution uses the **user's topic picker selection** (an existing `topics` row); the echo is a generation-consistency check only |
 | (picker selection) | `quizzes.topic_id` | NOT NULL; FK → `topics` ON DELETE RESTRICT |
 | `title` | `quizzes.title` | NOT NULL; **UNIQUE per `(topic_id, title)`** — P8/P13 de-duplicates at insert (e.g. `" (2)"` suffix) so the insert never violates the constraint |
-| `difficulty` (echo, verified) | `quizzes.difficulty` | CHECK `('Easy','Medium','Hard')`; difficulty is a **quiz-level** column — the `questions` table has no difficulty column, and none is invented |
+| `difficulty` (echo, verified) | `quizzes.difficulty` | CHECK `('Easy','Medium','Hard','Insane')`; the `questions` table also carries a per-question difficulty (task 5) |
 | — (app sets) | `quizzes.status` | `'Draft'` at insert (§9) |
 | — (app sets) | `quizzes.created_at` | ISO-8601 UTC, app-generated; never model-supplied |
 | `questions[].text` | `questions.question_text` | NOT NULL |

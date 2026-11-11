@@ -104,7 +104,7 @@ public sealed class ReportService : IReportService
         List<(QuizAttempt Attempt, Quiz Quiz)> rows)
     {
         var reports = new List<DifficultyReport>();
-        var difficulties = new[] { Difficulty.Easy, Difficulty.Medium, Difficulty.Hard };
+        var difficulties = new[] { Difficulty.Easy, Difficulty.Medium, Difficulty.Hard, Difficulty.Insane };
 
         foreach (Difficulty difficulty in difficulties)
         {

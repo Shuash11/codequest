@@ -1,8 +1,10 @@
 # CodeQuest — Entity Relationship Diagram (ERD)
 
-*Final (increment I6, 2026-11-08) — drawn from `database/schema.sql`, which is
-the single source of truth. The schema has not changed since the P1 draft, so
-the diagram below is the deployed shape. One disposition note: the owner
+*Final (increment I6, 2026-11-08; task-5 amendment 2026-11-12) — drawn from
+`database/schema.sql`, which is the single source of truth. Task 5 widened
+`quizzes.difficulty` to accept `Insane` and added the per-question
+`questions.difficulty` column (backfilled from the parent quiz by the startup
+migration), so the diagram below is the deployed shape. One disposition note: the owner
 directive D1 (name-only sign-in) made `users.password_hash` unused at runtime
 — accounts created through the UI store an empty string there; the column
 stays in the schema and in this diagram (see `docs/security-notes.md`).*
@@ -41,6 +43,7 @@ erDiagram
         INTEGER quiz_id FK
         TEXT question_text
         TEXT explanation
+        TEXT difficulty
         INTEGER position
         TEXT created_at
     }
@@ -93,7 +96,7 @@ erDiagram
 | **USERS** | `user_id` INTEGER, `username` TEXT, `password_hash` TEXT, `display_name` TEXT, `created_at` TEXT | `user_id` (PK); `username` unique |
 | **TOPICS** | `topic_id` INTEGER, `name` TEXT, `category` TEXT, `description` TEXT, `created_at` TEXT | `topic_id` (PK); `name` unique |
 | **QUIZZES** | `quiz_id` INTEGER, `topic_id` INTEGER, `title` TEXT, `difficulty` TEXT, `status` TEXT, `created_at` TEXT | `quiz_id` (PK); `(topic_id, title)` unique |
-| **QUESTIONS** | `question_id` INTEGER, `quiz_id` INTEGER, `question_text` TEXT, `explanation` TEXT, `position` INTEGER, `created_at` TEXT | `question_id` (PK); `(quiz_id, position)` unique |
+| **QUESTIONS** | `question_id` INTEGER, `quiz_id` INTEGER, `question_text` TEXT, `explanation` TEXT, `difficulty` TEXT, `position` INTEGER, `created_at` TEXT | `question_id` (PK); `(quiz_id, position)` unique |
 | **CHOICES** | `choice_id` INTEGER, `question_id` INTEGER, `choice_text` TEXT, `is_correct` INTEGER, `position` INTEGER | `choice_id` (PK); `(question_id, choice_text)` unique |
 | **QUIZ_ATTEMPTS** | `attempt_id` INTEGER, `quiz_id` INTEGER, `user_id` INTEGER, `score` INTEGER, `attempted_at` TEXT | `attempt_id` (PK) |
 | **SUBMITTED_ANSWERS** | `attempt_id` INTEGER, `question_id` INTEGER, `chosen_choice_id` INTEGER | `(attempt_id, question_id)` (composite PK) |
@@ -104,7 +107,12 @@ erDiagram
   `Draft` and becomes `Approved` only after its answer key has been reviewed;
   only `Approved` quizzes are takeable (P9) and only `Draft` quizzes appear in
   the review screen (P13).
-* `quizzes.difficulty` — `CHECK (difficulty IN ('Easy', 'Medium', 'Hard'))`.
+* `quizzes.difficulty` — `CHECK (difficulty IN ('Easy', 'Medium', 'Hard',
+  'Insane'))`. `Insane` is the fourth tier (task 5: the campaign ladder and
+  the AI rival levels).
+* `questions.difficulty` — the same four values, per question; it drives the
+  progressive run ordering and the random-mix copies, and the startup
+  migration backfills it from the parent quiz.
 * `topics.category` — `CHECK (category IN ('Programming', 'Cybersecurity'))`.
 * `choices.is_correct` — `CHECK (is_correct IN (0, 1))`; exactly one option of
   each question has the value `1`.

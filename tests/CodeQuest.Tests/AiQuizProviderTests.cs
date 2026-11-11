@@ -7,7 +7,7 @@
 // — all against contracts/ai-quiz-api.md.
 // No network: every AI test answers through a stub HttpMessageHandler, so the
 // suite runs hermetically in CI. The offline tests run against a FRESH
-// temporary SQLite database built from database/schema.sql + database/seed.sql
+// temporary SQLite database built from database/schema.sql + the demo fixture
 // (the RepositoryTests pattern of P4).
 // Look at: one behavior per case, hand-verifiable against the contract:
 //   valid draft, wire envelope, and every error class 1-6 of contract 7
@@ -107,6 +107,24 @@ public class AiQuizProviderTests : IDisposable
         Question third = quiz.Questions[2];
         Assert.Equal(1, third.Choices.Count(choice => choice.IsCorrect));
         Assert.True(third.IsCorrectChoice(third.Choices[3]));
+    }
+
+    // -------------------------------------------------------------------------
+    // (a2) The Insane tier (task 5): the echo grammar accepts it and the
+    //      generated draft carries it.
+    // -------------------------------------------------------------------------
+    [Fact]
+    public void InsaneDifficulty_IsAcceptedByTheEchoRule_AndMapsToTheDraft()
+    {
+        string[] questions = ThreeQuestions();
+        StubHttpMessageHandler handler = Stub(_ => HttpResponse(200, Envelope(QuizJson(questions, difficulty: "Insane"))));
+        AiQuizProvider provider = ProviderFor(NvidiaConfig(), handler);
+
+        QuizGenerationOutcome outcome = provider.GenerateQuiz(
+            new QuizGenerationRequest(NewTopic(), Difficulty.Insane, 3));
+
+        Assert.True(outcome.IsSuccess);
+        Assert.Equal(Difficulty.Insane, outcome.QuizDraft!.Difficulty);
     }
 
     // -------------------------------------------------------------------------
@@ -787,8 +805,8 @@ public class AiQuizProviderTests : IDisposable
 /// <summary>
 /// Phase P5 tests for the offline tier (contract 3.4): the approved quizzes of
 /// the seeded database are the takeable ones, and the tier never authors a
-/// quiz. Every case runs against its own fresh copy of the seeded demo
-/// database (schema.sql + seed.sql), like the P4 repository tests.
+/// quiz. Every case runs against its own fresh copy of the demo database
+/// (schema.sql + the demo fixture), like the P4 repository tests.
 /// </summary>
 public class OfflineQuizProviderTests : IDisposable
 {
@@ -808,7 +826,7 @@ public class OfflineQuizProviderTests : IDisposable
         _db = new Db(_databasePath);
 
         ExecuteScript(ReadScript("schema.sql"));
-        ExecuteScript(ReadScript("seed.sql"));
+        ExecuteScript(ReadFixture("demo-seed.sql"));
 
         _quizzes = new QuizRepository(_db);
         _offline = new OfflineQuizProvider(_quizzes);
@@ -827,7 +845,7 @@ public class OfflineQuizProviderTests : IDisposable
 
     // -------------------------------------------------------------------------
     // (k) Retrieval only: the seeded APPROVED quizzes, and nothing else
-    //     (contract 3.4 — the drafts 4 and 5 of seed.sql are not takeable)
+    //     (contract 3.4 — the drafts 4 and 5 of the demo fixture are not takeable)
     // -------------------------------------------------------------------------
     [Fact]
     public void GetTakeableQuizzes_ReturnsTheSeededApprovedQuizzesOnly()
@@ -891,5 +909,28 @@ public class OfflineQuizProviderTests : IDisposable
         }
 
         throw new FileNotFoundException($"The SQL script '{fileName}' was not found in a 'database' folder above the test directory.");
+    }
+
+    /// <summary>
+    /// Reads the frozen pre-campaign demo fixture (tests/CodeQuest.Tests/Fixtures)
+    /// — the seeded demo quizzes this file's expectations are built on.
+    /// </summary>
+    private static string ReadFixture(string fileName)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            string candidate = Path.Combine(directory.FullName, "tests", "CodeQuest.Tests", "Fixtures", fileName);
+
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException($"The SQL fixture '{fileName}' was not found in the tests/CodeQuest.Tests/Fixtures folder above the test directory.");
     }
 }

@@ -10,11 +10,14 @@ public static class DifficultyXpWeights
 
     public const int Hard = 30;
 
+    public const int Insane = 40;
+
     public static int For(Difficulty difficulty) => difficulty switch
     {
         Difficulty.Easy => Easy,
         Difficulty.Medium => Medium,
         Difficulty.Hard => Hard,
+        Difficulty.Insane => Insane,
         _ => throw new ArgumentOutOfRangeException(
             nameof(difficulty),
             difficulty,

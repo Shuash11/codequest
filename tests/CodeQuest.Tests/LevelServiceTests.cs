@@ -3,7 +3,8 @@
 // Tests for: LevelService (the XP/level math). PURE unit tests — no database,
 // no UI: every expected value below is hand-computed from the threshold
 // formula 25(n-1)(n+2) the plan fixes (L1=0, L2=100, L3=250, L4=450, L5=700,
-// L6=1000) and from the difficulty weights Easy 10 / Medium 20 / Hard 30.
+// L6=1000) and from the difficulty weights Easy 10 / Medium 20 / Hard 30 /
+// Insane 40.
 // Look at: the boundary cases 99/100 and 249/250 (A3 asks for exactly these),
 //          the round-trip ComputeLevel(CumulativeXpForLevel(n)) == n, the huge
 //          XP value near long.MaxValue (the binary search must stay exact
@@ -31,6 +32,7 @@ public class LevelServiceTests
     [InlineData(Difficulty.Easy, 10)]
     [InlineData(Difficulty.Medium, 20)]
     [InlineData(Difficulty.Hard, 30)]
+    [InlineData(Difficulty.Insane, 40)]
     public void XpForCorrectAnswer_UsesTheDifficultyWeight(Difficulty difficulty, int expectedXp)
     {
         Assert.Equal(expectedXp, _levels.XpForCorrectAnswer(difficulty));

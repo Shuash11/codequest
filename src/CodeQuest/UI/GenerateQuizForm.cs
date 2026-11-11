@@ -197,7 +197,13 @@ public sealed class GenerateQuizForm : ModulePanel
             Size = new Size(UITheme.Scaled(this, 300), UITheme.Scaled(this, 32)),
             LabeledBy = _difficultyLabel,
         };
-        _difficulty.Items = new[] { Difficulty.Easy.ToString(), Difficulty.Medium.ToString(), Difficulty.Hard.ToString() };
+        _difficulty.Items = new[]
+        {
+            Difficulty.Easy.ToString(),
+            Difficulty.Medium.ToString(),
+            Difficulty.Hard.ToString(),
+            Difficulty.Insane.ToString(),
+        };
         _difficulty.SelectedIndex = 0;
 
         _countLabel = new Label
@@ -527,6 +533,7 @@ public sealed class GenerateQuizForm : ModulePanel
         {
             1 => Difficulty.Medium,
             2 => Difficulty.Hard,
+            3 => Difficulty.Insane,
             _ => Difficulty.Easy,
         };
         int questionCount = 5 + Math.Max(_count.SelectedIndex, 0);

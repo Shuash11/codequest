@@ -77,6 +77,15 @@ public sealed class QuizRepository : IQuizRepository
         WHERE quiz_id = $quizId;
         """;
 
+    // The status guard is the belt-and-braces: an approved quiz never matches.
+    private const string DeleteDraftByTitleSql =
+        """
+        DELETE FROM quizzes
+        WHERE topic_id = $topicId
+          AND title = $title
+          AND status = 'Draft';
+        """;
+
     private const string LastInsertRowIdSql = "SELECT last_insert_rowid();";
 
     private readonly Db _db;
@@ -206,6 +215,27 @@ public sealed class QuizRepository : IQuizRepository
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = DeleteSql;
         command.Parameters.AddWithValue("$quizId", quizId);
+
+        try
+        {
+            return command.ExecuteNonQuery() > 0;
+        }
+        catch (SqliteException exception)
+        {
+            throw DataAccessException.FromSqlite(exception);
+        }
+    }
+
+    // Deletes the Draft with this exact title in one topic; approved quizzes never match.
+    public bool DeleteDraftWithTitle(int topicId, string title)
+    {
+        ArgumentNullException.ThrowIfNull(title);
+
+        using SqliteConnection connection = _db.OpenConnection();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = DeleteDraftByTitleSql;
+        command.Parameters.AddWithValue("$topicId", topicId);
+        command.Parameters.AddWithValue("$title", title);
 
         try
         {

@@ -2,7 +2,9 @@
 // CodeQuest — Gamification Foundation (plan WP1, acceptance A4/A5/A8)
 // Tests for: GamificationRepository, run against a FRESH temporary SQLite
 // database that every test builds for itself by executing database/schema.sql
-// and database/seed.sql — the same pattern as RepositoryTests (phase P4).
+// and the frozen pre-campaign demo fixture
+// (tests/CodeQuest.Tests/Fixtures/demo-seed.sql) — the same pattern as
+// RepositoryTests (phase P4).
 // The scratch file lives in the user's temp folder, is unique per test, and
 // is deleted in the teardown.
 // Look at: the hand-computed expectations. The seeded demo user owns the
@@ -42,8 +44,9 @@ public class GamificationRepositoryTests : IDisposable
     private readonly GamificationRepository _gamification;
 
     /// <summary>
-    /// Builds one fresh seeded database for THIS test (schema.sql + seed.sql
-    /// through a connection of the data layer), like RepositoryTests does.
+    /// Builds one fresh seeded database for THIS test (schema.sql + the frozen
+    /// demo fixture through a connection of the data layer), like
+    /// RepositoryTests does.
     /// </summary>
     public GamificationRepositoryTests()
     {
@@ -56,7 +59,7 @@ public class GamificationRepositoryTests : IDisposable
         _db = new Db(_databasePath);
 
         ExecuteScript(ReadScript("schema.sql"));
-        ExecuteScript(ReadScript("seed.sql"));
+        ExecuteScript(ReadFixture("demo-seed.sql"));
 
         _gamification = new GamificationRepository(_db);
     }
@@ -461,5 +464,29 @@ public class GamificationRepositoryTests : IDisposable
         }
 
         throw new FileNotFoundException($"The SQL script '{fileName}' was not found in a 'database' folder above the test directory.");
+    }
+
+    /// <summary>
+    /// Reads the frozen pre-campaign demo fixture (tests/CodeQuest.Tests/Fixtures)
+    /// — the rich sample data this file's hand-computed expectations are built
+    /// on. The folder is found by walking up from the test directory.
+    /// </summary>
+    private static string ReadFixture(string fileName)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            string candidate = Path.Combine(directory.FullName, "tests", "CodeQuest.Tests", "Fixtures", fileName);
+
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new FileNotFoundException($"The SQL fixture '{fileName}' was not found in the tests/CodeQuest.Tests/Fixtures folder above the test directory.");
     }
 }

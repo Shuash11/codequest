@@ -306,7 +306,7 @@ public sealed class MainForm : Form
             Control module = key switch
             {
                 "TakeQuiz" => BuildModulePanel(
-                    new QuizTakeForm(quizzes, questions, topics, attempts, answers, scoring, _user, gamification, achievementEvaluator), key),
+                    new QuizTakeForm(quizzes, questions, topics, attempts, answers, scoring, _user, gamification, achievementEvaluator, generation), key),
                 "History" => BuildModulePanel(new HistoryForm(_user, attempts, quizzes, topics, answers), key),
                 "Reports" => BuildModulePanel(new ReportsForm(_user, reports), key),
                 "GenerateQuiz" => BuildModulePanel(new GenerateQuizForm(quizzes, topics, generation, _user), key),

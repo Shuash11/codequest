@@ -134,6 +134,7 @@ public sealed class RandomMixService : IRandomMixService
         copy.QuizId = quizId;
         copy.QuestionText = source.QuestionText;
         copy.Explanation = source.Explanation;
+        copy.Difficulty = source.Difficulty; // the copy keeps its tier for the run ordering
         copy.Position = position;
         copy.CreatedAt = DateTimeOffset.UtcNow;
 

@@ -74,7 +74,8 @@ public sealed class AiQuizProvider : IQuizProvider
             The JSON object must have exactly these fields:
             "title": a concise quiz title of at most 120 characters.
             "topic": the requested topic name, echoed back exactly.
-            "difficulty": the requested difficulty, echoed back exactly ("Easy", "Medium" or "Hard").
+            "difficulty": the requested difficulty, echoed back exactly ("Easy", "Medium", "Hard" or "Insane").
+            Insane means expert-level content: trick phrasing, close distractors, and deep language or framework corner cases.
             "questions": an array of exactly {request.QuestionCount} question objects, in display order.
             Every question object must have exactly these fields:
             "text": the question text.
@@ -120,6 +121,7 @@ public sealed class AiQuizProvider : IQuizProvider
                 QuestionText = parsedQuestion.Text,
                 Explanation = parsedQuestion.Explanation,
                 Position = questionIndex + 1,
+                Difficulty = request.Difficulty,
             };
 
             for (int choiceIndex = 0; choiceIndex < parsedQuestion.Choices.Count; choiceIndex++)

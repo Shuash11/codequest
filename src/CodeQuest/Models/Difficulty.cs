@@ -1,4 +1,4 @@
-// The three difficulty levels.
+// The four difficulty levels.
 
 namespace CodeQuest.Models;
 
@@ -9,4 +9,6 @@ public enum Difficulty
     Medium,
 
     Hard,
+
+    Insane,
 }

@@ -113,6 +113,10 @@ public static class UITheme
 
     public static readonly Color LevelHard = ColorTranslator.FromHtml("#F07A72");
 
+    public static readonly Color InsaneText = ColorTranslator.FromHtml("#D8B4FE");
+
+    public static readonly Color InsaneTint = ColorTranslator.FromHtml("#3B2154");
+
     public static readonly Color StreakFlame = ColorTranslator.FromHtml("#F97316");
 
     public static readonly Color PerfectGold = ColorTranslator.FromHtml("#F2C14E");
@@ -162,6 +166,54 @@ public static class UITheme
     public static readonly string GlyphFlash = GameIcon("\uE619", string.Empty);
 
     public static bool UsesGameIconFont { get; } = GameFontBytes is not null;
+
+    private static readonly Dictionary<string, Bitmap?> SpriteCache = new();
+
+    // Loads one embedded sprite once (for example "correct" or "wrong"); the
+    // decoded bitmap stays for the whole process, null when it is missing.
+    public static Bitmap? LoadSprite(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        lock (SpriteCache)
+        {
+            if (SpriteCache.TryGetValue(name, out Bitmap? cached))
+            {
+                return cached;
+            }
+
+            Bitmap? sprite = LoadSpriteCore(name);
+            SpriteCache[name] = sprite;
+            return sprite;
+        }
+    }
+
+    private static Bitmap? LoadSpriteCore(string name)
+    {
+        try
+        {
+            using Stream? stream = typeof(UITheme).Assembly.GetManifestResourceStream(
+                $"CodeQuest.Assets.Sprites.{name}.png");
+            if (stream is null)
+            {
+                return null;
+            }
+
+            using var memory = new MemoryStream();
+            stream.CopyTo(memory);
+            memory.Position = 0;
+
+            using Image source = Image.FromStream(memory);
+            return new Bitmap(source);
+        }
+        catch
+        {
+            return null; // a missing sprite degrades to the glyph feedback
+        }
+    }
 
     // The Fluent System Icons font, embedded once and pinned for the whole
     // process (GDI+ reads the memory while any Font from it is alive).

@@ -64,7 +64,7 @@ public class RandomMixServiceTests : IDisposable
 
         int mixId = _service.CreateMix();
 
-        Quiz mix = _quizzes.GetById(mixId);
+        Quiz mix = _quizzes.GetById(mixId)!;
         Assert.NotNull(mix);
         Assert.Equal(Difficulty.Medium, mix.Difficulty);
         Assert.Equal(QuizStatus.Approved, mix.Status);
@@ -109,6 +109,22 @@ public class RandomMixServiceTests : IDisposable
     }
 
     [Fact]
+    public void CreateMix_StampsEachCopiedQuestionWithItsSourceDifficulty()
+    {
+        int topicId = AddTopic("C#");
+        AddQuizWithQuestions(topicId, "Easy quiz", QuizStatus.Approved, multipleChoiceCount: 2, difficulty: Difficulty.Easy);
+        AddQuizWithQuestions(topicId, "Hard quiz", QuizStatus.Approved, multipleChoiceCount: 2, difficulty: Difficulty.Hard);
+
+        int mixId = _service.CreateMix();
+
+        // The copies keep their tier so the run ordering can stay progressive.
+        IReadOnlyList<Question> mixQuestions = _questions.GetByQuiz(mixId);
+        Assert.Equal(4, mixQuestions.Count);
+        Assert.Equal(2, mixQuestions.Count(question => question.Difficulty == Difficulty.Easy));
+        Assert.Equal(2, mixQuestions.Count(question => question.Difficulty == Difficulty.Hard));
+    }
+
+    [Fact]
     public void CreateMix_PreservesTheQuestionKind()
     {
         SeedTwoApprovedQuizzes(); // one multiple-choice quiz, one true/false quiz
@@ -128,7 +144,7 @@ public class RandomMixServiceTests : IDisposable
         _service.CreateMix();
         _service.CreateMix();
 
-        Assert.Single(_topics.GetAll().Where(t => t.Name == "Random Mix"));
+        Assert.Single(_topics.GetAll(), topic => topic.Name == "Random Mix");
         Assert.Equal(2, _quizzes.GetAll().Count(quiz => quiz.Title.StartsWith("Random mix", StringComparison.Ordinal)));
     }
 
@@ -139,7 +155,7 @@ public class RandomMixServiceTests : IDisposable
         AddQuizWithQuestions(topicId, "Tiny quiz", QuizStatus.Approved, multipleChoiceCount: 2);
 
         Assert.Throws<RandomMixException>(() => _service.CreateMix());
-        Assert.Empty(_quizzes.GetAll().Where(quiz => quiz.Title.StartsWith("Random mix", StringComparison.Ordinal)));
+        Assert.DoesNotContain(_quizzes.GetAll(), quiz => quiz.Title.StartsWith("Random mix", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -179,13 +195,14 @@ public class RandomMixServiceTests : IDisposable
         QuizStatus status,
         int multipleChoiceCount = 0,
         int trueFalseCount = 0,
-        int draftCount = 0)
+        int draftCount = 0,
+        Difficulty difficulty = Difficulty.Easy)
     {
         var quiz = new Quiz
         {
             TopicId = topicId,
             Title = title,
-            Difficulty = Difficulty.Easy,
+            Difficulty = difficulty,
             Status = status,
             CreatedAt = DateTimeOffset.UtcNow,
         };
@@ -194,26 +211,26 @@ public class RandomMixServiceTests : IDisposable
         int position = 1;
         for (int i = 0; i < multipleChoiceCount; i++)
         {
-            _questions.Add(BuildMultipleChoice(quizId, position, $"Q{position}"));
+            _questions.Add(BuildMultipleChoice(quizId, position, $"Q{position}", difficulty));
             position++;
         }
 
         for (int i = 0; i < trueFalseCount; i++)
         {
-            _questions.Add(BuildTrueFalse(quizId, position, $"Q{position}"));
+            _questions.Add(BuildTrueFalse(quizId, position, $"Q{position}", difficulty));
             position++;
         }
 
         for (int i = 0; i < draftCount; i++)
         {
-            _questions.Add(BuildMultipleChoice(quizId, position, $"DRAFT-Q{position}"));
+            _questions.Add(BuildMultipleChoice(quizId, position, $"DRAFT-Q{position}", difficulty));
             position++;
         }
 
         return quizId;
     }
 
-    private static Question BuildMultipleChoice(int quizId, int position, string text)
+    private static Question BuildMultipleChoice(int quizId, int position, string text, Difficulty difficulty = Difficulty.Medium)
     {
         var question = new MultipleChoiceQuestion
         {
@@ -222,6 +239,7 @@ public class RandomMixServiceTests : IDisposable
             Explanation = $"{text} explanation",
             Position = position,
             CreatedAt = DateTimeOffset.UtcNow,
+            Difficulty = difficulty,
         };
         for (int choice = 1; choice <= 4; choice++)
         {
@@ -236,7 +254,7 @@ public class RandomMixServiceTests : IDisposable
         return question;
     }
 
-    private static Question BuildTrueFalse(int quizId, int position, string text)
+    private static Question BuildTrueFalse(int quizId, int position, string text, Difficulty difficulty = Difficulty.Medium)
     {
         var question = new TrueFalseQuestion
         {
@@ -245,6 +263,7 @@ public class RandomMixServiceTests : IDisposable
             Explanation = $"{text} explanation",
             Position = position,
             CreatedAt = DateTimeOffset.UtcNow,
+            Difficulty = difficulty,
         };
         question.AddChoice(new Choice { ChoiceText = "True", IsCorrect = true, Position = 1 });
         question.AddChoice(new Choice { ChoiceText = "False", IsCorrect = false, Position = 2 });

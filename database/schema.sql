@@ -65,7 +65,7 @@ CREATE TABLE quizzes (
     quiz_id    INTEGER PRIMARY KEY AUTOINCREMENT,
     topic_id   INTEGER NOT NULL,
     title      TEXT    NOT NULL,
-    difficulty TEXT    NOT NULL CHECK (difficulty IN ('Easy', 'Medium', 'Hard')),
+    difficulty TEXT    NOT NULL CHECK (difficulty IN ('Easy', 'Medium', 'Hard', 'Insane')),
     status     TEXT    NOT NULL DEFAULT 'Draft' CHECK (status IN ('Draft', 'Approved')),
     created_at TEXT    NOT NULL,                    -- ISO-8601 UTC
 
@@ -95,6 +95,7 @@ CREATE TABLE questions (
     quiz_id       INTEGER NOT NULL,
     question_text TEXT    NOT NULL,
     explanation   TEXT    NOT NULL,                  -- shown in answer review (P10) and review screen (P13)
+    difficulty    TEXT    NOT NULL DEFAULT 'Medium' CHECK (difficulty IN ('Easy', 'Medium', 'Hard', 'Insane')),  -- per-question tier (run ordering); backfilled from the quiz by the startup migration
     position      INTEGER NOT NULL CHECK (position >= 1),
     created_at    TEXT    NOT NULL,                  -- ISO-8601 UTC
 

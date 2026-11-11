@@ -22,5 +22,7 @@ public interface IQuizRepository
 
     bool Delete(int quizId);
 
+    bool DeleteDraftWithTitle(int topicId, string title);
+
     bool ExistsByTitle(int topicId, string title, int? ignoreQuizId = null);
 }

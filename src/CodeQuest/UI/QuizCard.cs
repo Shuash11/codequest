@@ -117,6 +117,7 @@ public sealed class QuizCard : Panel
     {
         Difficulty.Easy => UITheme.LevelEasy,
         Difficulty.Medium => UITheme.LevelMedium,
+        Difficulty.Insane => UITheme.InsaneText,
         _ => UITheme.LevelHard,
     };
 
@@ -124,6 +125,7 @@ public sealed class QuizCard : Panel
     {
         Difficulty.Easy => UITheme.SuccessTint,
         Difficulty.Medium => UITheme.WarningTint,
+        Difficulty.Insane => UITheme.InsaneTint,
         _ => UITheme.DangerTint,
     };
 }

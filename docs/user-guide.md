@@ -6,8 +6,8 @@ This document doubles as the demo script: the steps below are the exact
 clicks, in order, with the expected outcome of each. They assume a fresh
 machine with the app running (from the CI-built `CodeQuest.exe` artifact, or
 `dotnet run` on a machine with the .NET 10 SDK) and the database seeded
-(`database/schema.sql` + `database/seed.sql` — the app blocks with a friendly
-message if the database file is missing).
+(`database/schema.sql` + `database/seed.sql` + `database/campaign.sql` — the
+app blocks with a friendly message if the database file is missing).
 
 **The offline rehearsal (the safe demo path):** everything except
 "Generate quiz" works with the network disconnected. Rehearse the full script
@@ -31,9 +31,11 @@ behave identically.
 ## 2. Take a quiz (offline-capable)
 
 1. In "Take quiz", the list shows the approved quizzes with Title, Topic,
-   Difficulty, Questions, and an Approved badge. A hint under the list reads
-   "Enter activates a focused row action."
-2. Press "Start" on **C# Core Concepts** (or click the row's action).
+   Difficulty, Questions, and an Approved badge. On a fresh install the list
+   holds the 25 built-in campaign levels — Level 1 (Easy) through Level 25
+   (Insane), five questions each. A hint under the list reads "Enter activates
+   a focused row action."
+2. Press "Start" on **Level 1** (or click the row's action).
    - **Expected:** the run header shows the quiz title and "Question 1 of 5";
      an 8px progress track; the question card with four choice rows.
 3. Click a choice — the row tints and its mark fills (one selection; click
@@ -48,6 +50,22 @@ behave identically.
    and the correct one plus the explanation. Press **Back**.
 7. Press **Retake** to run it again, or **Done** to return to the list — the
    status strip announces "Result saved."
+
+Every take is fresh: the questions and the answer options are shuffled on
+every run, and after an answer the app advances by itself — about 1.2 seconds
+on a correct answer, 1.8 seconds on a wrong one (answering the last question
+submits the run). A green check or red cross sprite appears next to the
+feedback line; **Previous** / **Next** still work and simply cancel the
+pending advance.
+
+**The AI rival (campaign levels only):** completing the *current highest*
+campaign level (Level 25 on a fresh install, then each generated one) opens
+the dialog "The AI strikes back" — accept and the AI writes Level N+1
+(Insane) through the same provider chain as "Generate quiz", approved
+immediately and joined to the campaign list, and offers **Play now**;
+decline or lose the connection and nothing changes (a failed generation
+offers **Try again**). Closing the dialog while the AI is still writing does
+not stop it: the level may still finish and join the campaign list.
 
 Mid-quiz, click another sidebar item (for example History): the confirm
 dialog "Leave this quiz? / Your answers so far will be discarded." appears —
@@ -70,8 +88,8 @@ dialog "Leave this quiz? / Your answers so far will be discarded." appears —
 1. Open **Reports**. The summary card shows Attempts, Quizzes taken, and the
    Average score; the per-topic table shows Average %, Best %, and the
    "Needs practice" flag; the weak-topic list ranks lowest averages first.
-2. Change the difficulty filter (All / Easy / Medium / Hard) — every number
-   recomputes. Try the topic filter.
+2. Change the difficulty filter (All / Easy / Medium / Hard / Insane) — every
+   number recomputes. Try the topic filter.
 3. With a topic averaging below 70%, the topic carries the flag in both the
    table and the list.
 

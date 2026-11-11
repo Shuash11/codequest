@@ -25,6 +25,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Assets\FluentSystemIcons-Regular.ttf" />
     <EmbeddedResource Include="Assets\Sprites\*.png" />
+    <!-- The campaign script ships INSIDE the exe: the installed app has no database/ folder, and the startup migration replays it to guarantee the 25 levels. -->
+    <EmbeddedResource Include="..\..\database\campaign.sql" Link="Database\campaign.sql" />
   </ItemGroup>
 
 </Project>

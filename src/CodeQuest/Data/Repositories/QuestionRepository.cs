@@ -9,7 +9,7 @@ public sealed class QuestionRepository : IQuestionRepository
 {
     private const string SelectByQuizSql =
         """
-        SELECT question_id, quiz_id, question_text, explanation, position, created_at
+        SELECT question_id, quiz_id, question_text, explanation, difficulty, position, created_at
         FROM questions
         WHERE quiz_id = $quizId
         ORDER BY position, question_id;
@@ -17,15 +17,15 @@ public sealed class QuestionRepository : IQuestionRepository
 
     private const string SelectByIdSql =
         """
-        SELECT question_id, quiz_id, question_text, explanation, position, created_at
+        SELECT question_id, quiz_id, question_text, explanation, difficulty, position, created_at
         FROM questions
         WHERE question_id = $questionId;
         """;
 
     private const string InsertSql =
         """
-        INSERT INTO questions (quiz_id, question_text, explanation, position, created_at)
-        VALUES ($quizId, $questionText, $explanation, $position, $createdAt);
+        INSERT INTO questions (quiz_id, question_text, explanation, difficulty, position, created_at)
+        VALUES ($quizId, $questionText, $explanation, $difficulty, $position, $createdAt);
         """;
 
     private const string UpdateSql =
@@ -33,6 +33,7 @@ public sealed class QuestionRepository : IQuestionRepository
         UPDATE questions
         SET question_text = $questionText,
             explanation = $explanation,
+            difficulty = $difficulty,
             position = $position
         WHERE question_id = $questionId;
         """;
@@ -122,6 +123,7 @@ public sealed class QuestionRepository : IQuestionRepository
         command.CommandText = UpdateSql;
         command.Parameters.AddWithValue("$questionText", question.QuestionText);
         command.Parameters.AddWithValue("$explanation", question.Explanation);
+        command.Parameters.AddWithValue("$difficulty", SqlValueMap.ToStorage(question.Difficulty));
         command.Parameters.AddWithValue("$position", question.Position);
         command.Parameters.AddWithValue("$questionId", question.QuestionId);
 
@@ -280,6 +282,7 @@ public sealed class QuestionRepository : IQuestionRepository
         command.Parameters.AddWithValue("$quizId", question.QuizId);
         command.Parameters.AddWithValue("$questionText", question.QuestionText);
         command.Parameters.AddWithValue("$explanation", question.Explanation);
+        command.Parameters.AddWithValue("$difficulty", SqlValueMap.ToStorage(question.Difficulty));
         command.Parameters.AddWithValue("$position", question.Position);
         command.Parameters.AddWithValue("$createdAt", SqlValueMap.ToStorage(question.CreatedAt));
         command.Transaction = transaction;
@@ -297,8 +300,9 @@ public sealed class QuestionRepository : IQuestionRepository
         int quizId = reader.GetInt32(1);
         string questionText = reader.GetString(2);
         string explanation = reader.GetString(3);
-        int position = reader.GetInt32(4);
-        DateTimeOffset createdAt = SqlValueMap.FromStorage(reader.GetString(5));
+        Difficulty difficulty = SqlValueMap.ParseDifficulty(reader.GetString(4));
+        int position = reader.GetInt32(5);
+        DateTimeOffset createdAt = SqlValueMap.FromStorage(reader.GetString(6));
 
         IReadOnlyList<Choice> choices = ChoiceRepository.ReadChoices(connection, transaction, questionId);
 
@@ -307,6 +311,7 @@ public sealed class QuestionRepository : IQuestionRepository
         question.QuizId = quizId;
         question.QuestionText = questionText;
         question.Explanation = explanation;
+        question.Difficulty = difficulty;
         question.Position = position;
         question.CreatedAt = createdAt;
 
