@@ -81,8 +81,18 @@ sitting at the machine), and never turn a failure into a crash or a leak.
 - **Update check (I6+):** once per launch the app contacts GitHub's public
   releases API (`api.github.com/repos/Shuash11/codequest/releases/latest`,
   unauthenticated, 8-second timeout, no data sent beyond a User-Agent
-  header) to detect a newer version. Every failure is silent. No other
-  network calls exist besides the AI generation the user explicitly
+  header) to detect a newer version. Every failure is silent.
+- **In-app update (task 2):** when the release carries an installer asset,
+  "Update now" downloads it over https from GitHub's release storage
+  (`SelfUpdateService`), verifies the sha256 digest GitHub supplies for the
+  asset when one is present (a non-sha256 or malformed digest is never
+  treated as verified), and runs the installer silently from
+  `%TEMP%\CodeQuestUpdate` through a generated apply script. The URL comes
+  only from the app's own release-API parse — never user input — and the
+  command line contains only the service's two absolute paths. An unverified
+  digest (none supplied) still updates; the integrity check is an
+  enhancement over plain https, not a bypass of it.
+- No other network calls exist besides the AI generation the user explicitly
   triggers.
 - Grep for empty catch blocks: **clean** (the only swallow-by-design catch is
   the error-log write itself, commented as such).
@@ -92,6 +102,10 @@ sitting at the machine), and never turn a failure into a crash or a leak.
 - The only stored personal data is the **display name** the user types at
   sign-in (directive D1) — no email, no password, no usage telemetry, no
   network calls other than the AI generation the user explicitly triggers.
+- The **remembered name** (task 2) is that same login name stored
+  machine-locally in `%LOCALAPPDATA%\CodeQuest\session.json` so later
+  launches skip the name screen; it never travels over the network and is
+  cleared by "Log out".
 - Quiz attempts store scores and chosen options; nothing about the machine
   or the user beyond the name and timestamps.
 

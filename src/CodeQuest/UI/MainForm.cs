@@ -617,8 +617,10 @@ public sealed class MainForm : Form
 
     /// <summary>
     /// The version check (once per launch, off the UI thread): a newer public
-    /// release raises the "update required" dialog with the release notes.
-    /// Every failure is silent — the check never disturbs a study session.
+    /// release raises the "update required" dialog with the release notes;
+    /// "Update now" performs the update inside the app (task 2) — no browser,
+    /// no GitHub. Every failure is silent — the check never disturbs a study
+    /// session.
     /// </summary>
     private void StartUpdateCheck()
     {
@@ -630,7 +632,12 @@ public sealed class MainForm : Form
                 TaskScheduler.FromCurrentSynchronizationContext());
     }
 
-    /// <summary>Shows the update dialog only for a verified newer release.</summary>
+    /// <summary>
+    /// Shows the update dialog only for a verified newer release, then the
+    /// "Updating CodeQuest" dialog performs the in-app update; the shell
+    /// closes only when the installer is actually applying (its script
+    /// relaunches CodeQuest). A failed or cancelled update keeps the session.
+    /// </summary>
     private void MaybeShowUpdateDialog(UpdateCheckResult? result)
     {
         if (result is not { IsNewer: true })
@@ -638,10 +645,26 @@ public sealed class MainForm : Form
             return; // current build, offline, or a failed check — stay silent
         }
 
-        using var dialog = new UpdateDialog(result);
-        if (dialog.ShowDialog(this) == DialogResult.OK)
+        using (var dialog = new UpdateDialog(result))
         {
-            Close(); // "Download update" — the browser has the new build; this session ends
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return; // "Not now" — the session continues
+            }
+        }
+
+        if (result.InstallerUrl is null)
+        {
+            Close(); // no installer asset: the browser fallback already opened; this session ends
+            return;
+        }
+
+        using (var updating = new UpdateProgressDialog(result))
+        {
+            if (updating.ShowDialog(this) == DialogResult.OK)
+            {
+                Close(); // the installer is applying; the apply script relaunches CodeQuest
+            }
         }
     }
 }

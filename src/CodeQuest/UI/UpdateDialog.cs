@@ -3,10 +3,13 @@
 // check. UX contract: the user learns THREE things at a glance — that an
 // update is required, WHICH version they would get, and WHAT changed (the
 // release notes, rendered as plain readable text, never raw markdown).
-// Buttons: "Download update" opens the release asset in the browser and ends
-// this session (the app closes so the new build replaces it — the update is
-// required); "Not now" continues the current session for people on a metered
-// connection or in the middle of something.
+// Buttons: "Update now" performs the update INSIDE the app — when the release
+// carries an installer asset it opens the "Updating CodeQuest" dialog
+// (UpdateProgressDialog): download, verify, silent install, self-relaunch —
+// the user is never sent to GitHub. A release without an installer asset
+// falls back to the old browser hand-off (the release asset opens in the
+// browser) and ends this session. "Not now" continues the current session for
+// people on a metered connection or in the middle of something.
 // =============================================================================
 
 using CodeQuest.Services;
@@ -24,7 +27,7 @@ public sealed class UpdateDialog : Form
 {
     private const string Title = "Update required";
     private const string NotNowButton = "Not now";
-    private const string DownloadButton = "Download update";
+    private const string UpdateNowButton = "Update now";
     private const string WhatIsNewLabel = "What's new";
     private const string NotesFallback = "Bug fixes and improvements.";
 
@@ -119,12 +122,14 @@ public sealed class UpdateDialog : Form
         card.Controls.Add(subtitle);
         card.Controls.Add(whatIsNew);
 
-        // The action row: the primary action updates (browser download + the
-        // app closes so the new build replaces it); "Not now" stays local.
+        // The action row: the primary action updates INSIDE the app (the
+        // "Updating CodeQuest" dialog takes over; the browser hand-off is the
+        // fallback for releases without an installer asset); "Not now" stays
+        // local.
         var download = new FlatButton
         {
             Name = "UpdateDownloadButton",
-            Text = DownloadButton,
+            Text = UpdateNowButton,
             Location = new Point(inset, ClientSize.Height - inset - UITheme.Scaled(this, 34)),
             Size = new Size(UITheme.Scaled(this, 180), UITheme.Scaled(this, 34)),
         };
@@ -132,7 +137,7 @@ public sealed class UpdateDialog : Form
         {
             if (sender is FlatButton button && button.FindAncestor<UpdateDialog>() is { } dialog)
             {
-                dialog.Download();
+                dialog.UpdateNow();
             }
         };
         var notNow = new FlatButton
@@ -160,10 +165,29 @@ public sealed class UpdateDialog : Form
     }
 
     /// <summary>
-    /// Opens the release asset in the browser and closes the app, so the next
-    /// launch is the new version (the update is required by design).
+    /// The primary path: when the release carries an installer asset, the
+    /// "Updating CodeQuest" dialog performs the whole update (the shell
+    /// closes once it reports the installer is applying). Without an
+    /// installer asset, the old hand-off: the release asset opens in the
+    /// browser and this session ends.
     /// </summary>
-    private void Download()
+    private void UpdateNow()
+    {
+        if (_result.InstallerUrl is null)
+        {
+            OpenInBrowser();
+        }
+
+        DialogResult = DialogResult.OK; // MainForm decides what runs next
+        Close();
+    }
+
+    /// <summary>
+    /// The fallback hand-off: opens the release asset in the browser. Never
+    /// crashes the dialog — the user can still reach the release page
+    /// manually.
+    /// </summary>
+    private void OpenInBrowser()
     {
         try
         {
@@ -175,11 +199,6 @@ public sealed class UpdateDialog : Form
         }
         catch
         {
-            // A browser that refuses to open must not crash the dialog; the
-            // user can still reach the release page manually.
         }
-
-        DialogResult = DialogResult.OK; // the shell closes; Program ends the session
-        Close();
     }
 }

@@ -43,8 +43,13 @@ public sealed class LoginForm : Form
     private readonly FlatButton _signIn;
     private bool _signingIn;
 
-    /// <summary>Creates the login screen for the user repository to resolve against.</summary>
-    public LoginForm(UserRepository users)
+    /// <summary>
+    /// Creates the login screen for the user repository to resolve against.
+    /// <paramref name="rememberedName"/> prefills the name field — the screen
+    /// asks for the name only once per account (task 2): on the first start,
+    /// after a log out, or when the remembered account no longer exists.
+    /// </summary>
+    public LoginForm(UserRepository users, string? rememberedName = null)
     {
         ArgumentNullException.ThrowIfNull(users);
         _users = users;
@@ -145,6 +150,11 @@ public sealed class LoginForm : Form
             Size = new Size(fieldWidth, fieldHeight),
         };
         NameInnerBox(_name, "NameField");
+
+        if (!string.IsNullOrWhiteSpace(rememberedName))
+        {
+            _name.Text = rememberedName.Trim(); // task 2: the returning user never retypes the name
+        }
 
         _signIn = new FlatButton
         {

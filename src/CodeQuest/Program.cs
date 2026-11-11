@@ -55,23 +55,49 @@ internal static class Program
 
         var users = new UserRepository(db);
 
+        // Remembered name (task 2, owner directive): the name screen shows
+        // only once. The store holds the name of the last successful sign-in;
+        // on later launches it is resolved directly against the accounts and
+        // the shell opens without the login. Log out clears the store — an
+        // explicit sign-out asks for the name again (prefilled for
+        // convenience).
+        var sessions = new SessionStore();
+        string? prefillName = null;
+
         // Login → shell → (logout →) login, until the user leaves the login.
         while (true)
         {
-            UserAccount? signedIn;
-            using (LoginForm login = new(users))
-            {
-                if (login.ShowDialog() != DialogResult.OK)
-                {
-                    return; // the login window was closed — the app ends
-                }
+            UserAccount? signedIn = null;
+            string? remembered = sessions.LoadUsername();
 
-                signedIn = login.AuthenticatedUser;
+            if (remembered is not null)
+            {
+                // The same resolution the sign-in performs. A database
+                // failure is not a sign-in decision: it travels to the §4.11
+                // unexpected dialog, exactly as it would from the login
+                // screen. A name that no longer resolves (replaced database)
+                // falls back to the login below.
+                signedIn = users.GetByUsername(remembered);
             }
 
             if (signedIn is null)
             {
-                return; // unreachable: OK always carries an account (defensive)
+                using (LoginForm login = new(users, remembered ?? prefillName))
+                {
+                    if (login.ShowDialog() != DialogResult.OK)
+                    {
+                        return; // the login window was closed — the app ends
+                    }
+
+                    signedIn = login.AuthenticatedUser;
+                }
+
+                if (signedIn is null)
+                {
+                    return; // unreachable: OK always carries an account (defensive)
+                }
+
+                sessions.SaveUsername(signedIn.Username);
             }
 
             bool backToLogin;
@@ -85,6 +111,11 @@ internal static class Program
             {
                 return;
             }
+
+            // Log out: forget the remembered name (the next launch asks
+            // again) but keep it as the login's prefill for convenience.
+            prefillName = signedIn.Username;
+            sessions.Clear();
         }
     }
 

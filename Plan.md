@@ -1,6 +1,197 @@
 # Plan.md — CodeQuest: AI topic creation, gamification, dark theme
 
-**Status:** active · **Owner:** Lead · **Created:** 2026-11-08
+**Status:** task 1 (1.1.0) shipped · **task 2 active** · **Owner:** Lead · **Created:** 2026-11-08
+
+---
+
+# Task 3 (2026-11-11, active): one-line comments, simple language
+
+**Owner request:** the heavy technical comment banners are disturbing — remove
+them; only ONE short, simple, non-technical comment line per file remains; it
+names where the 4 OOP pillars reside; the CRUD methods also carry short
+comments.
+
+**Owner answers (binding):**
+- Scope: the **codebase only (src/CodeQuest)** — test files keep their
+  comments.
+- OOP tags: **only where a pillar genuinely lives**, per
+  `docs/oop-explanation.md` (plain files get no tag).
+- Depth: **all** other comments go — banners, inline notes, `///` summaries.
+- Sequencing: the task-2 reviews (2 background agents) read the current
+  state; fixes land first, then this sweep — findings stay addressable.
+
+**Comment format:** `// <What this file does, plain words>. (<Pillar> — <why>)`
+CRUD methods in `Data/Repositories/*.cs` get one short line each
+("// Adds a user.", "// Reads all users.", "// Updates a user.",
+"// Deletes a user.").
+
+## File → one-line map (authoritative for the sweep)
+
+- Program.cs — "Starts the app: sign-in, then the main window."
+- Api/AiDtos.cs — "The data sent to and received from the AI."
+- Api/ChatCompletionsClient.cs — "Sends requests to the AI provider. (Abstraction)"
+- Data/Db.cs — "Opens the SQLite database."
+- Data/DatabaseMigrator.cs — "Adds missing tables to old databases safely."
+- Data/DataExceptions.cs — "Clear errors for database problems. (Inheritance)"
+- Data/SqlValueMap.cs — "Converts values between the app and the database."
+- Data/AttemptAnswerGuard.cs — "Checks answers before they are saved."
+- Data/I*Repository.cs (7) — "What the app needs from <X>. (Abstraction)"
+- Data/IGamificationRepository.cs — "What the app needs for XP, levels and achievements. (Abstraction)"
+- Data/Repositories/*.cs (8) — "Reads and writes <X>. (Abstraction)" + CRUD one-liners
+- Models/Choice.cs — "One answer option. (Encapsulation)"
+- Models/Difficulty.cs — "The three difficulty levels."
+- Models/Gamification.cs — "Level, XP and achievement records."
+- Models/MultipleChoiceQuestion.cs — "A question with four options. (Inheritance, Polymorphism)"
+- Models/TrueFalseQuestion.cs — "A true-or-false question. (Inheritance, Polymorphism)"
+- Models/Question.cs — "The base of every question. (Inheritance, Abstraction, Encapsulation)"
+- Models/Quiz.cs — "A quiz with its questions. (Encapsulation)"
+- Models/QuizAttempt.cs — "One finished quiz attempt."
+- Models/QuizStatus.cs — "A quiz is a draft or approved."
+- Models/SubmittedAnswer.cs — "The answers a player picked."
+- Models/Topic.cs — "A subject quizzes belong to."
+- Models/UserAccount.cs — "A player's profile. (Encapsulation)"
+- Services/AppConfig.cs — "Reads the settings file."
+- Services/AchievementEvaluator.cs — "Checks which achievements are unlocked."
+- Services/IAchievementEvaluator.cs — "The achievement contract. (Abstraction)"
+- Services/AiQuizProvider.cs — "Asks the AI to make a quiz. (Polymorphism)"
+- Services/AiTopicProvider.cs — "Asks the AI to make a topic."
+- Services/ILevelService.cs — "The level contract. (Abstraction)"
+- Services/LevelService.cs — "Turns XP into levels."
+- Services/IQuizProvider.cs — "The quiz generator contract. (Abstraction)"
+- Services/OfflineQuizProvider.cs — "Makes quizzes from the ones already saved. (Polymorphism)"
+- Services/QuizGenerationService.cs — "Tries each quiz source until one works."
+- Services/IReportService.cs — "The report contract. (Abstraction)"
+- Services/ReportService.cs — "Builds the player's reports. (Polymorphism)"
+- Services/IScoringService.cs — "The scoring contract. (Abstraction)"
+- Services/ScoringService.cs — "Scores an attempt. (Polymorphism)"
+- Services/ITopicGenerationService.cs — "The AI topic contract. (Abstraction)"
+- Services/TopicGenerationModels.cs — "Data shapes for AI topics."
+- Services/TopicGenerationService.cs — "Asks the AI for a new topic."
+- Services/UpdateCheckService.cs — "Checks GitHub for a newer version."
+- Services/SelfUpdateService.cs — "Downloads and installs the update."
+- Services/SessionStore.cs — "Remembers the player's name between launches."
+- UI/AchievementsForm.cs — "The achievements screen."
+- UI/AnswerTile.cs — "A clickable answer tile."
+- UI/AttemptReviewForm.cs — "Shows the answers of a finished attempt."
+- UI/CardPanel.cs — "A rounded card. (Inheritance)"
+- UI/DialogForm.cs — "The app's message dialog. (Inheritance)"
+- UI/FlatButton.cs — "A styled button. (Inheritance)"
+- UI/GenerateQuizForm.cs — "The AI quiz creation screen."
+- UI/HistoryForm.cs — "The past attempts screen."
+- UI/IModulePanel.cs — "The contract every screen follows. (Abstraction)"
+- UI/InputArea.cs — "The question input area."
+- UI/InputField.cs — "A text field with an error line."
+- UI/IosListGrid.cs — "The card list used by the screens."
+- UI/LevelChip.cs — "The level badge in the sidebar."
+- UI/LiveStatusLabel.cs — "The status line under the header."
+- UI/LoginForm.cs — "The name screen. (Inheritance)"
+- UI/MainForm.cs — "The main window with the sidebar. (Inheritance)"
+- UI/MarkedCheckBox.cs — "A checkbox with a mark."
+- UI/NavItemButton.cs — "A sidebar button."
+- UI/ProgressTrack.cs — "The progress bar."
+- UI/QuizCard.cs — "One quiz row card."
+- UI/QuizListFilter.cs — "The filter row of the quiz list."
+- UI/QuizTakeForm.cs — "The quiz-taking screen."
+- UI/ReportsForm.cs — "The reports screen."
+- UI/ScoreboardForm.cs — "The leaderboard screen."
+- UI/SegmentedControl.cs — "The two-tab switch control."
+- UI/StatusBadge.cs — "A small status label."
+- UI/ThemedComboBox.cs — "A styled dropdown."
+- UI/TopicManageForm.cs — "The topics screen."
+- UI/UiFormat.cs — "Small text formatting helpers."
+- UI/UITheme.cs — "All colors, fonts and sizes. (Encapsulation)"
+- UI/UpdateDialog.cs — "The update dialog."
+- UI/UpdateProgressDialog.cs — "The updating dialog."
+
+## Verification
+
+- `dotnet build` (Debug + Release) 0 warnings 0 errors; full suite 175/175 —
+  comments only, zero code changes beyond deleted comment lines.
+- grep: no `///` left in src; every file starts with exactly one `//` line.
+- Pillar tags cross-checked against docs/oop-explanation.md (which stays the
+  detailed reference and is unchanged).
+
+---
+
+# Task 2 (2026-11-11): in-app update flow + remembered name
+
+**Owner request:** (1) updating must not redirect to GitHub — the app shows an
+"Updating…" dialog and performs the update itself; (2) the name screen asks
+every launch — the name must be asked only once and remembered after the user
+has entered it.
+
+## Goal and acceptance criteria
+
+| # | Criterion |
+|---|---|
+| B1 | The update dialog's primary button ("Update now") never opens a browser when the release carries an installer asset: clicking it shows an "Updating CodeQuest" dialog (download %, then verifying, then installing); when it finishes the app closes, the new installer runs silently, and CodeQuest relaunches by itself. |
+| B2 | Download or integrity failure shows a friendly inline message in the same dialog with "Try again"/"Close"; "Close" (and "Cancel" during download) returns to the running session — the update never blocks studying. "Not now" keeps working. |
+| B3 | A release **without** an installer asset falls back to the previous browser behavior (documented). |
+| B4 | After one successful name sign-in, later launches go straight into the app (no name screen). "Log out" returns to the name screen (prefilled with the last name) and the next launch asks again. A saved name that no longer resolves in the database falls back to the name screen. |
+
+**Assumptions (stated, low-impact):** the in-app update downloads the
+release's installer asset (`CodeQuest-Setup*.exe`) and runs it
+`/VERYSILENT /NORESTART` — the Inno script keeps `codequest.db` +
+`config.local.json` on upgrade (`onlyifdoesntexist`); logout clears the
+remembered name (explicit sign-out asks again next launch).
+
+## Approach
+
+- **Update plumbing:** `UpdateCheckService.ParseReleaseJson` now also selects
+  the **installer** asset (first `*.exe`, preferring a name containing
+  "setup") and its `digest` (sha256, when GitHub supplies one) into
+  `UpdateCheckResult.InstallerUrl`/`InstallerSha256`; `DownloadUrl` keeps its
+  browser-fallback semantics.
+- **`Services/SelfUpdateService`** (static, like `UpdateCheckService`):
+  download to `%TEMP%\CodeQuestUpdate\` with progress + cancellation,
+  sha256-verify when the API supplies a digest, then write a tiny
+  `apply-update.cmd` (wait 2 s → run installer `/VERYSILENT /NORESTART` →
+  relaunch `AppContext.BaseDirectory\CodeQuest.exe`) and start it windowless.
+  Every failure returns a typed outcome; nothing throws to the UI.
+- **`UI/UpdateProgressDialog`**: "Updating CodeQuest" card (UpdateDialog
+  family style) — status line + ProgressTrack + Cancel / (on failure)
+  Try again + Close. DialogResult.OK only when the installer was launched.
+- **`UI/UpdateDialog`**: button text "Update now"; click no longer opens the
+  browser when an installer asset exists (browser fallback only for B3).
+- **`UI/MainForm.MaybeShowUpdateDialog`**: offer → progress dialog → close
+  shell only when the update is actually applying.
+- **Remembered name:** new `Services/SessionStore` (instance, injectable
+  directory for tests) persisting the last signed-in username at
+  `%LOCALAPPDATA%\CodeQuest\session.json`; never throws. `Program.Main`
+  auto-resolves the saved name through `UserRepository` (DB failure keeps the
+  existing §4.11 behavior), skips the login on success, saves on sign-in, and
+  clears on logout (`ReturnedToLogin`); `LoginForm` gains an optional
+  prefilled name.
+- **Docs:** `docs/release-process.md` re-issued: a release must attach
+  `CodeQuest-Setup.exe` (installer) for in-app updates; describes the new
+  update flow.
+
+## Work packages (all Lead-direct: tightly coupled UI+Program changes, single writer)
+
+| WP | Scope | Files |
+|---|---|---|
+| T2-WP1 | Installer asset selection + tests | `UpdateCheckService.cs`, `UpdateCheckTests.cs` |
+| T2-WP2 | Download/verify/apply service + tests | `SelfUpdateService.cs` (new), `SelfUpdateServiceTests.cs` (new) |
+| T2-WP3 | Update progress dialog + dialog wiring | `UpdateProgressDialog.cs` (new), `UpdateDialog.cs`, `MainForm.cs` |
+| T2-WP4 | Remembered name | `SessionStore.cs` (new), `SessionStoreTests.cs` (new), `Program.cs`, `LoginForm.cs` |
+| T2-WP5 | Docs + integration: build, full suite, review of the download-and-execute path (security-sensitive) | `docs/release-process.md` |
+
+## Verification
+
+- Unit: asset selection (exe preferred, setup preferred, zip fallback, digest
+  pass-through), session store (round-trip, clear, corrupt/missing file),
+  script/digest helpers.
+- `dotnet build` 0 warnings + full `dotnet test` green.
+- Independent review of the download-and-execute path (https-only, digest
+  check, no user input in the command line).
+- Manual (owner): GUI walk-through of B1/B2/B4 on an installed build — a
+  real end-to-end silent update and relaunch can only be confirmed by a human
+  on the distributed build.
+
+---
+
+# Task 1 (2026-11-08, shipped as 1.1.0): AI topics, gamification, dark theme
+
 **Requested by owner (this task):** (1) adding a new topic = describe it, AI generates it;
 (2) level + scoreboard for fun; (3) achievements section the app records;
 (4) modern dark theme — mind shadow/border/typography/spacing, "no AI slop".

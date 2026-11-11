@@ -23,6 +23,10 @@ behave identically.
      the sidebar shows your name under the nav list.
 3. The first name creates the profile; the same name in a later session
    resolves to the same profile (attempts stay attributed).
+4. The name is asked **only once** (task 2): after a successful sign-in the
+   app remembers it and every later launch goes straight into the main
+   window — no name screen. "Log out" shows the screen again (your last name
+   prefilled); signing out means the next launch asks for the name again.
 
 ## 2. Take a quiz (offline-capable)
 
