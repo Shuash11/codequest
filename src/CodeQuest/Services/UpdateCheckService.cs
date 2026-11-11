@@ -127,32 +127,37 @@ public static class UpdateCheckService
         IReadOnlyList<(string Name, string Url, string? Sha256)> assets,
         out string? installerSha256)
     {
-        installerSha256 = null;
-        string? firstInstallerUrl = null;
-        string? firstInstallerSha256 = null;
+        // Priority: the documented release asset ("CodeQuest-Setup*"), then
+        // any setup-named exe, then the first exe (security review P6).
+        foreach (Func<string, bool> matches in new Func<string, bool>[]
+                 {
+                     name => name.StartsWith("CodeQuest-Setup", StringComparison.OrdinalIgnoreCase),
+                     name => name.Contains("setup", StringComparison.OrdinalIgnoreCase),
+                 })
+        {
+            foreach ((string name, string url, string? sha256) in assets)
+            {
+                if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrEmpty(url)
+                    && matches(name))
+                {
+                    installerSha256 = sha256;
+                    return url;
+                }
+            }
+        }
 
         foreach ((string name, string url, string? sha256) in assets)
         {
-            if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(url))
-            {
-                continue;
-            }
-
-            if (firstInstallerUrl is null)
-            {
-                firstInstallerUrl = url;
-                firstInstallerSha256 = sha256;
-            }
-
-            if (name.Contains("setup", StringComparison.OrdinalIgnoreCase))
+            if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(url))
             {
                 installerSha256 = sha256;
                 return url;
             }
         }
 
-        installerSha256 = firstInstallerSha256;
-        return firstInstallerUrl;
+        installerSha256 = null;
+        return null;
     }
 
     private static string? ReadSha256Digest(JsonElement asset)

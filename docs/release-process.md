@@ -14,7 +14,7 @@ it silently, and relaunches CodeQuest. The user never visits GitHub.
 | `src/CodeQuest/CodeQuest.csproj` | `<Version>1.0.0</Version>` | What the running app reports — **bump this first** |
 | GitHub release tag | `v1.1.0` (leading `v`) | What the update check compares against |
 | Release **body** | plain markdown list | What the update dialog shows as "What's new" |
-| Release **asset** | `CodeQuest-Setup.exe` | What the in-app update downloads and runs silently — **required for the in-app update** |
+| Release **asset** | `CodeQuest-Setup.exe` | What the in-app update downloads and runs silently — **required for the in-app update**; keep the `CodeQuest-Setup*` name (the update picks the installer by this prefix) |
 | Release **asset** | `CodeQuest-win-x64.zip` | The browser fallback for very old copies; optional |
 
 The release page for each new version must carry the **installer** built by

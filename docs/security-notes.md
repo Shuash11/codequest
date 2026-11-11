@@ -82,16 +82,26 @@ sitting at the machine), and never turn a failure into a crash or a leak.
   releases API (`api.github.com/repos/Shuash11/codequest/releases/latest`,
   unauthenticated, 8-second timeout, no data sent beyond a User-Agent
   header) to detect a newer version. Every failure is silent.
-- **In-app update (task 2):** when the release carries an installer asset,
-  "Update now" downloads it over https from GitHub's release storage
-  (`SelfUpdateService`), verifies the sha256 digest GitHub supplies for the
-  asset when one is present (a non-sha256 or malformed digest is never
-  treated as verified), and runs the installer silently from
-  `%TEMP%\CodeQuestUpdate` through a generated apply script. The URL comes
-  only from the app's own release-API parse — never user input — and the
-  command line contains only the service's two absolute paths. An unverified
-  digest (none supplied) still updates; the integrity check is an
-  enhancement over plain https, not a bypass of it.
+- **In-app update (task 2, hardened after the 2026-11-11 security review):**
+  when the release carries an installer asset, "Update now" downloads it over
+  https from GitHub **only** (`github.com` / `*.githubusercontent.com` hosts,
+  500 MB size cap, random per-attempt temp folder under
+  `%TEMP%\CodeQuestUpdate`, cleaned up afterwards), verifies the sha256
+  digest GitHub supplies for the asset when one is present. A **malformed**
+  digest stops the update; an **absent** one proceeds unverified. The apply
+  script (PowerShell, single-quoted paths, no user input) waits for the
+  running app to actually exit, installs silently, relaunches, and deletes
+  the installer and its folder. Closing the update dialog cancels the
+  download; a network timeout is reported as a failure, not a cancellation.
+- **Accepted risks (recorded, owner-informed):**
+  - The installer is **not code-signed** (no certificate exists). The
+    in-app path compensates with TLS + the GitHub-supplied sha256 digest +
+    the pinned release repository; a signed release is the eventual fix.
+  - A same-user process could tamper with the temp folder between verify
+    and launch (per-user `%TEMP%`; no privilege boundary is crossed).
+  - On a shared Windows account, the remembered name lands the next person
+    in the previous profile; the name screen still gates nothing by design
+    (directive D1: name-only sign-in).
 - No other network calls exist besides the AI generation the user explicitly
   triggers.
 - Grep for empty catch blocks: **clean** (the only swallow-by-design catch is

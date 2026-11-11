@@ -44,7 +44,18 @@ internal static class Program
 
             if (remembered is not null)
             {
-                signedIn = users.GetByUsername(remembered);
+                // A database problem at startup falls back to the name
+                // screen: no message loop exists yet, so an exception here
+                // would end the process instead of showing the §4.11 dialog
+                // (security review F7).
+                try
+                {
+                    signedIn = users.GetByUsername(remembered);
+                }
+                catch (DataAccessException)
+                {
+                    signedIn = null;
+                }
             }
 
             if (signedIn is null)

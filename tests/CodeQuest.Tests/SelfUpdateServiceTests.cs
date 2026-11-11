@@ -9,32 +9,58 @@ using CodeQuest.Services;
 
 namespace CodeQuest.Tests;
 
-/// <summary>One behavior per case; the script contract is what cmd.exe runs.</summary>
+/// <summary>One behavior per case; the script contract is what PowerShell runs.</summary>
 public class SelfUpdateServiceTests
 {
-    private const string Installer = @"C:\Users\someone\AppData\Local\Temp\CodeQuestUpdate\CodeQuest-Setup.exe";
+    private const string Installer = @"C:\Users\someone\AppData\Local\Temp\CodeQuestUpdate\abc\CodeQuest-Setup.exe";
     private const string AppExe = @"C:\Users\someone\AppData\Local\Programs\CodeQuest\CodeQuest.exe";
+    private const string WorkDir = @"C:\Users\someone\AppData\Local\Temp\CodeQuestUpdate\abc";
 
     [Fact]
-    public void BuildRelaunchScript_WaitsThenInstallsSilentlyThenRelaunches()
+    public void BuildRelaunchScript_WaitsForTheRealExitThenInstallsThenRelaunches()
     {
-        string script = SelfUpdateService.BuildRelaunchScript(Installer, AppExe, SelfUpdateService.InstallerSwitches);
+        string script = SelfUpdateService.BuildRelaunchScript(
+            4242, Installer, AppExe, SelfUpdateService.InstallerSwitches, WorkDir);
 
-        Assert.Contains("timeout /t 2", script);                       // the running app exits first
-        Assert.Contains($"/wait \"{Installer}\"", script);             // quoted: paths may contain spaces
+        Assert.Contains("Wait-Process -Id 4242", script);              // the running app exits first — no blind sleep
+        Assert.Contains("-FilePath '{0}'".Replace("{0}", Quote(Installer)), script); // quoted literal path
         Assert.Contains("/VERYSILENT", script);                        // no wizard windows
         Assert.Contains("/NORESTART", script);
-        Assert.Contains($"start \"\" \"{AppExe}\"", script);           // the app comes back by itself
+        Assert.Contains($"-FilePath '{Quote(AppExe)}'", script);       // the app comes back by itself
+        Assert.Contains($"Remove-Item -LiteralPath '{Quote(WorkDir)}'", script); // cleanup (security review P4)
     }
 
     [Fact]
     public void BuildRelaunchScript_InstallsBeforeRelaunch()
     {
-        string script = SelfUpdateService.BuildRelaunchScript(Installer, AppExe, SelfUpdateService.InstallerSwitches);
+        string script = SelfUpdateService.BuildRelaunchScript(
+            4242, Installer, AppExe, SelfUpdateService.InstallerSwitches, WorkDir);
 
         Assert.True(
-            script.IndexOf("/wait", StringComparison.Ordinal) < script.IndexOf($"start \"\" \"{AppExe}\"", StringComparison.Ordinal),
+            script.IndexOf("/VERYSILENT", StringComparison.Ordinal) < script.IndexOf($"-FilePath '{Quote(AppExe)}'", StringComparison.Ordinal),
             "the installer must run before the relaunch");
+    }
+
+    [Theory]
+    [InlineData("C:\\path with spaces\\CodeQuest-Setup.exe")]
+    [InlineData("C:\\users\\o'brien\\CodeQuest-Setup.exe")]
+    public void BuildRelaunchScript_PathsArePowerShellLiterals(string path)
+    {
+        string script = SelfUpdateService.BuildRelaunchScript(1, path, AppExe, SelfUpdateService.InstallerSwitches, WorkDir);
+
+        Assert.Contains(Quote(path), script); // single-quoted, quote doubled — nothing expands
+    }
+
+    [Fact]
+    public void IsTrustedUpdateUrl_AcceptsOnlyHttpsGithubHosts()
+    {
+        Assert.True(SelfUpdateService.IsTrustedUpdateUrl("https://github.com/Shuash11/codequest/releases/download/v1.2.0/CodeQuest-Setup-1.2.0.exe"));
+        Assert.True(SelfUpdateService.IsTrustedUpdateUrl("https://objects.githubusercontent.com/x"));
+        Assert.False(SelfUpdateService.IsTrustedUpdateUrl("http://github.com/x"));               // not https
+        Assert.False(SelfUpdateService.IsTrustedUpdateUrl("https://evil.example.com/x"));       // not a GitHub host
+        Assert.False(SelfUpdateService.IsTrustedUpdateUrl("file://C:/Windows/System32/cmd.exe"));
+        Assert.False(SelfUpdateService.IsTrustedUpdateUrl(null));
+        Assert.False(SelfUpdateService.IsTrustedUpdateUrl("not a url"));
     }
 
     [Fact]
@@ -65,4 +91,6 @@ public class SelfUpdateServiceTests
         Assert.False(SelfUpdateService.IsDigestMatch(null, new string('a', 64)));
         Assert.False(SelfUpdateService.IsDigestMatch("garbage", new string('a', 64)));
     }
+
+    private static string Quote(string path) => path.Replace("'", "''");
 }

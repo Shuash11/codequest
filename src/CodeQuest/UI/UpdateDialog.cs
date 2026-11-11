@@ -154,6 +154,11 @@ public sealed class UpdateDialog : Form
 
     private void OpenInBrowser()
     {
+        if (!_result.DownloadUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return; // the fallback obeys the same https rule as the in-app path (security review P1)
+        }
+
         try
         {
             Process.Start(new ProcessStartInfo

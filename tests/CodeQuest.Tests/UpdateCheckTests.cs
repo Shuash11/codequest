@@ -132,6 +132,21 @@ public class UpdateCheckTests
     }
 
     [Fact]
+    public void SelectInstaller_PrefersTheDocumentedSetupAssetOverOtherSetupNames()
+    {
+        var assets = new List<(string Name, string Url, string? Sha256)>
+        {
+            ("SetupTool.exe", "https://example.com/SetupTool.exe", "cc"),
+            ("CodeQuest-Setup-1.2.0.exe", "https://example.com/CodeQuest-Setup-1.2.0.exe", "dd"),
+        };
+
+        string? installer = UpdateCheckService.SelectInstaller(assets, out string? sha256);
+
+        Assert.Equal("https://example.com/CodeQuest-Setup-1.2.0.exe", installer);
+        Assert.Equal("dd", sha256);
+    }
+
+    [Fact]
     public void SelectInstaller_NoExeAsset_ReturnsNull()
     {
         var assets = new List<(string Name, string Url, string? Sha256)>

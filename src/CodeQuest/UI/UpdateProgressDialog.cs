@@ -156,6 +156,17 @@ public sealed class UpdateProgressDialog : Form
 
         CancelButton = _cancel;
 
+        // Closing the window any other way (the X button) must also stop the
+        // download — a running task must never outlive the dialog and touch
+        // disposed controls (security review F5).
+        FormClosing += static (sender, e) =>
+        {
+            if (sender is UpdateProgressDialog dialog)
+            {
+                dialog._cancellation?.Cancel();
+            }
+        };
+
         Shown += static (sender, e) =>
         {
             if (sender is UpdateProgressDialog dialog)
@@ -184,7 +195,7 @@ public sealed class UpdateProgressDialog : Form
         CancellationTokenSource cancellation = _cancellation;
         string? installerUrl = _result.InstallerUrl;
 
-        Task.Run(() => SelfUpdateService.ApplyAsync(installerUrl!, _result.InstallerSha256, reporter, cancellation.Token))
+        Task.Run(() => SelfUpdateService.ApplyAsync(installerUrl, _result.InstallerSha256, reporter, cancellation.Token))
             .ContinueWith(
                 task => Finish(task),
                 CancellationToken.None,
@@ -194,6 +205,11 @@ public sealed class UpdateProgressDialog : Form
 
     private void ApplyProgress(SelfUpdateProgress progress)
     {
+        if (IsDisposed || Disposing)
+        {
+            return; // the dialog was closed; the task is being cancelled
+        }
+
         switch (progress.Phase)
         {
             case SelfUpdatePhase.Downloading when progress.Fraction is double fraction:
@@ -222,6 +238,11 @@ public sealed class UpdateProgressDialog : Form
 
     private void Finish(Task<SelfUpdateOutcome> task)
     {
+        if (IsDisposed || Disposing)
+        {
+            return; // the dialog was closed; the task is being cancelled
+        }
+
         if (task.IsCanceled || (task.IsFaulted && task.Exception is not null))
         {
             ShowFailure("The update could not be completed. Please try again later.");
