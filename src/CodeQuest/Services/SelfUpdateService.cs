@@ -139,6 +139,11 @@ public static class SelfUpdateService
 
             File.Move(downloadPath, installerPath);
 
+            // The download is done — closing the dialog from here on means
+            // "abort": never write or launch the install script after the
+            // user cancelled (code review m1).
+            cancellation.ThrowIfCancellationRequested();
+
             progress.Report(new SelfUpdateProgress(SelfUpdatePhase.Installing, null));
             string appPath = AppExePath;
             File.WriteAllText(
@@ -155,7 +160,17 @@ public static class SelfUpdateService
                     CreateNoWindow = true,
                 },
             };
-            process.Start();
+            bool started = process.Start();
+            if (!started)
+            {
+                // A false Start means nothing was launched: reporting Applied
+                // would close the app with no installer and no relaunch
+                // (code review m2).
+                CleanupDirectory(workDirectory);
+                return new SelfUpdateOutcome(
+                    SelfUpdateStatus.Failed,
+                    "The update could not be started. Please try again later.");
+            }
 
             return SelfUpdateOutcome.Applied();
         }
@@ -336,11 +351,19 @@ public static class SelfUpdateService
         return string.Join(Environment.NewLine,
             "# CodeQuest in-app update: install silently, then relaunch.",
             $"Wait-Process -Id {processId} -Timeout 30 -ErrorAction SilentlyContinue",
-            $"$p = Start-Process -FilePath '{Quote(installerPath)}' -ArgumentList '{installerSwitches}' -Wait -PassThru",
-            $"Start-Process -FilePath '{Quote(appExePath)}'",
-            $"Remove-Item -LiteralPath '{Quote(installerPath)}' -Force -ErrorAction SilentlyContinue",
-            $"Remove-Item -LiteralPath '{Quote(workDirectory)}' -Recurse -Force -ErrorAction SilentlyContinue",
-            string.Empty);
+            // The app comes back only when the install succeeded — a failed
+            // silent install must not spawn a second instance next to a
+            // running app (code review m1).
+            "$p = Start-Process -FilePath '{0}' -ArgumentList '{1}' -Wait -PassThru",
+            "if ($p.ExitCode -eq 0) { Start-Process -FilePath '{2}' }",
+            "Remove-Item -LiteralPath '{3}' -Force -ErrorAction SilentlyContinue",
+            "Remove-Item -LiteralPath '{4}' -Recurse -Force -ErrorAction SilentlyContinue",
+            string.Empty)
+            .Replace("{0}", Quote(installerPath))
+            .Replace("{1}", installerSwitches)
+            .Replace("{2}", Quote(appExePath))
+            .Replace("{3}", Quote(installerPath))
+            .Replace("{4}", Quote(workDirectory));
     }
 
     /// <summary>Single-quotes a path for PowerShell ('' is one literal quote).</summary>

@@ -608,10 +608,19 @@ public sealed class GenerateQuizForm : ModulePanel
 
     private static string DescribeFailure(IReadOnlyList<string> reasons)
     {
-        string first = reasons.Count > 0 ? reasons[0] : string.Empty;
-        string detail = first.Contains("empty-provider-list", StringComparison.Ordinal) ? NoProviderMessage
-            : first.Contains(":not-configured", StringComparison.Ordinal) ? NoProviderMessage
-            : first.Contains(":auth-failed", StringComparison.Ordinal) ? AuthMessage
+        // A skipped tier ("<tier>:not-configured:...") must not mask a tier
+        // that really tried and failed: describe the first REAL failure, and
+        // show "no provider configured" only when every tier was skipped.
+        string first = reasons.FirstOrDefault(reason =>
+            !reason.Contains(":not-configured", StringComparison.Ordinal)
+            && !reason.Contains("empty-provider-list", StringComparison.Ordinal)) ?? string.Empty;
+
+        if (first.Length == 0)
+        {
+            return $"{NoProviderMessage} {OfflinePointer}";
+        }
+
+        string detail = first.Contains(":auth-failed", StringComparison.Ordinal) ? AuthMessage
             : first.Contains(":quota", StringComparison.Ordinal) ? QuotaMessage
             : first.Contains(":timeout", StringComparison.Ordinal) ? NetworkMessage
             : first.Contains(":http-error", StringComparison.Ordinal) ? HttpMessage

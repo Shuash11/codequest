@@ -145,18 +145,21 @@ public sealed class UpdateDialog : Form
     {
         if (_result.InstallerUrl is null)
         {
-            OpenInBrowser();
+            if (!OpenInBrowser())
+            {
+                return; // the fallback URL was refused; the session stays open
+            }
         }
 
-        DialogResult = DialogResult.OK;
+        DialogResult = DialogResult.OK; // MainForm decides what runs next
         Close();
     }
 
-    private void OpenInBrowser()
+    private bool OpenInBrowser()
     {
         if (!_result.DownloadUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            return; // the fallback obeys the same https rule as the in-app path (security review P1)
+            return false; // the fallback obeys the same https rule as the in-app path (security review P1)
         }
 
         try
@@ -166,9 +169,11 @@ public sealed class UpdateDialog : Form
                 FileName = _result.DownloadUrl,
                 UseShellExecute = true,
             });
+            return true;
         }
         catch
         {
+            return false;
         }
     }
 }

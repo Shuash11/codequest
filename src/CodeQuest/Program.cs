@@ -44,15 +44,17 @@ internal static class Program
 
             if (remembered is not null)
             {
-                // A database problem at startup falls back to the name
+                // Any startup database problem falls back to the name
                 // screen: no message loop exists yet, so an exception here
                 // would end the process instead of showing the §4.11 dialog
-                // (security review F7).
+                // (security review F7; the read path rethrows the raw
+                // SqliteException, so the catch must be broad — code review
+                // M1). The login screen keeps the recoverable behavior.
                 try
                 {
                     signedIn = users.GetByUsername(remembered);
                 }
-                catch (DataAccessException)
+                catch (Exception)
                 {
                     signedIn = null;
                 }

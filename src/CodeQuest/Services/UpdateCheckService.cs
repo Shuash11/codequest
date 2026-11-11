@@ -92,10 +92,14 @@ public static class UpdateCheckService
             foreach (JsonElement asset in root.GetProperty("assets").EnumerateArray())
             {
                 string assetName = asset.GetProperty("name").GetString() ?? string.Empty;
-                string assetUrl = asset.GetProperty("browser_download_url").GetString() ?? string.Empty;
+                string assetUrl = asset.TryGetProperty("browser_download_url", out JsonElement urlElement)
+                    && urlElement.ValueKind == JsonValueKind.String
+                    ? urlElement.GetString() ?? string.Empty
+                    : string.Empty; // an asset without a URL must not kill the whole parse (code review m3)
                 string? assetDigest = ReadSha256Digest(asset);
 
                 if (downloadUrl == releasePageUrl
+                    && assetUrl.Length > 0
                     && assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                 {
                     downloadUrl = assetUrl;

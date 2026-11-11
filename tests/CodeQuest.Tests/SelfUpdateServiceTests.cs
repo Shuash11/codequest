@@ -23,9 +23,10 @@ public class SelfUpdateServiceTests
             4242, Installer, AppExe, SelfUpdateService.InstallerSwitches, WorkDir);
 
         Assert.Contains("Wait-Process -Id 4242", script);              // the running app exits first — no blind sleep
-        Assert.Contains("-FilePath '{0}'".Replace("{0}", Quote(Installer)), script); // quoted literal path
+        Assert.Contains($"-FilePath '{Quote(Installer)}'", script);    // quoted literal path
         Assert.Contains("/VERYSILENT", script);                        // no wizard windows
         Assert.Contains("/NORESTART", script);
+        Assert.Contains("$p.ExitCode -eq 0", script);                  // a failed install must not relaunch (code review m1)
         Assert.Contains($"-FilePath '{Quote(AppExe)}'", script);       // the app comes back by itself
         Assert.Contains($"Remove-Item -LiteralPath '{Quote(WorkDir)}'", script); // cleanup (security review P4)
     }

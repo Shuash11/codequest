@@ -41,9 +41,11 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path 'publish/config' | Out-Null
+          # Only providers with a key are written: an empty-key entry would be
+          # skipped by the chain and its "not-configured" reason once masked a
+          # real failure in the generation banner.
           @{
             aiProviders = @(
-              @{ name = 'nvidia'; baseUrl = 'https://integrate.api.nvidia.com/v1'; apiKey = ''; model = 'meta/llama-3.3-70b-instruct' },
               @{ name = 'openrouter'; baseUrl = 'https://openrouter.ai/api/v1'; apiKey = $env:OPENROUTER_API_KEY; model = 'nvidia/nemotron-3-ultra-550b-a55b:free' }
             )
           } | ConvertTo-Json -Depth 5 | Set-Content 'publish/config/config.local.json'

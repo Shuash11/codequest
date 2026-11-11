@@ -113,6 +113,45 @@ CRUD methods in `Data/Repositories/*.cs` get one short line each
 
 ---
 
+# Task 4 (2026-11-11, active): random mix quizzes + game-like quiz screen
+
+**Owner requests:** (1) quizzes must be "random, not static"; (2) the
+quiz-taking screen design is bad — make it more game-like; (3) owner approves
+downloading assets from GitHub for the redesign.
+
+**Owner answers (binding):**
+- Random = **"Random mix" quiz**: a fresh quiz built by drawing random
+  questions from ALL saved topics, answers shuffled; instant, offline.
+- Design direction = **more game-like** (verdict colors, icons on answer
+  tiles, progress celebration, playful).
+- Assets = **Fluent UI icon set** (free, MIT, from microsoft/fluentui-system-icons).
+
+**Decisions (Lead, from the schema evidence):**
+- `quiz_attempts.quiz_id` is NOT NULL and `quizzes.topic_id` is NOT NULL →
+  each random mix is PERSISTED as a real quiz: a dedicated **"Random Mix"**
+  topic (created idempotently on first use, category Programming) holds one
+  timestamped quiz per take; the mix COPIES the drawn questions + choices as
+  new rows under it (shuffled positions, shuffled choice order). Everything
+  downstream (review, history, XP via Medium weight, achievements) then works
+  unchanged. Draws only from APPROVED quizzes across ALL topics; the take
+  button is disabled with a hint when fewer than 4 drawable questions exist.
+- Verified reward path: AI-generated quizzes already earn XP + achievements
+  (same Submit path; quiz-agnostic) — owner question answered, no change.
+- Fluent icons: ship `FluentSystemIcons-Regular.ttf` next to the exe
+  (`Assets/`), loaded via PrivateFontCollection with Segoe MDL2 fallback;
+  installer iss + csproj include it.
+
+## Work packages
+
+| WP | Scope | Owner | State |
+|---|---|---|---|
+| T4-WP1 | Designer spec: game-like take-quiz screen + random-mix entry + result celebration | UX/UI Designer | 🔄 in flight |
+| T4-WP2 | Random mix: data (special topic/quiz, draw+shuffle service), Take-quiz entry, attempt recording | Implementer/Lead | pending WP1 |
+| T4-WP3 | Quiz screen redesign + Fluent icon integration | Implementer/Lead | pending WP1 |
+| T4-WP4 | Integration: build, tests, visual walk-through | Lead | pending |
+
+---
+
 # Task 2 (2026-11-11): in-app update flow + remembered name
 
 **Owner request:** (1) updating must not redirect to GitHub — the app shows an

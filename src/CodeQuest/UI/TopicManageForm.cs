@@ -845,15 +845,25 @@ public sealed class TopicFormDialog : TopicDialogShell
 
     private static string DescribeFailure(IReadOnlyList<string> reasons)
     {
-        string first = reasons.Count > 0 ? reasons[0] : string.Empty;
-        return first.Contains("empty-provider-list", StringComparison.Ordinal) ? NoProviderMessage
-            : first.Contains(":not-configured", StringComparison.Ordinal) ? NoProviderMessage
-            : first.Contains(":auth-failed", StringComparison.Ordinal) ? AuthMessage
+        // Same rule as the quiz banner: a skipped tier (empty key) must not
+        // mask a tier that really tried and failed.
+        string first = reasons.FirstOrDefault(reason =>
+            !reason.Contains(":not-configured", StringComparison.Ordinal)
+            && !reason.Contains("empty-provider-list", StringComparison.Ordinal)) ?? string.Empty;
+
+        if (first.Length == 0)
+        {
+            return NoProviderMessage;
+        }
+
+        string detail = first.Contains(":auth-failed", StringComparison.Ordinal) ? AuthMessage
             : first.Contains(":quota", StringComparison.Ordinal) ? QuotaMessage
             : first.Contains(":timeout", StringComparison.Ordinal) ? NetworkMessage
             : first.Contains(":http-error", StringComparison.Ordinal) ? HttpMessage
             : first.Contains(":bad-output", StringComparison.Ordinal) ? BadOutputMessage
             : GenericFailureMessage;
+
+        return detail;
     }
 
     private Label MakeFieldLabel(string text, string name)
