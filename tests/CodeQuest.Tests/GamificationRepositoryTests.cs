@@ -316,14 +316,26 @@ public class GamificationRepositoryTests : IDisposable
             _gamification.AddAchievementsIfNew(1, new[] { "level-5", "level-5" });
         Assert.Empty(duplicateBatch);
 
-        // Exactly three unlocks are stored for the user. All three were
-        // stamped within the same whole second, so the stored order is the
-        // key tie-break of the query (alphabetical).
+        // Exactly three unlocks are stored for the user. The stored order
+        // follows the query rule "oldest first, ties by key" — but the three
+        // stamps may land in one whole second (the storage resolution) or
+        // straddle a boundary depending on machine timing, so the RULE is
+        // asserted here, not one timing-dependent sequence.
         IReadOnlyList<UnlockedAchievement> stored = _gamification.GetAchievements(1);
         Assert.Equal(3, stored.Count);
         Assert.Equal(
-            new[] { "first-quiz", "level-5", "perfect-run" },
-            stored.Select(unlocked => unlocked.Key).ToArray());
+            new[] { "first-quiz", "level-5", "perfect-run" }.OrderBy(key => key, StringComparer.Ordinal),
+            stored.Select(unlocked => unlocked.Key).OrderBy(key => key, StringComparer.Ordinal));
+        for (int i = 1; i < stored.Count; i++)
+        {
+            UnlockedAchievement previous = stored[i - 1];
+            UnlockedAchievement current = stored[i];
+            Assert.True(
+                previous.UnlockedAt < current.UnlockedAt
+                || (previous.UnlockedAt == current.UnlockedAt
+                    && string.CompareOrdinal(previous.Key, current.Key) <= 0),
+                $"the unlock order rule broke at {previous.Key} -> {current.Key}");
+        }
     }
 
     [Fact]
