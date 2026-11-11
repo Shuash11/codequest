@@ -347,6 +347,7 @@ public sealed class HistoryForm : ModulePanel
             Name = "HistoryEmptyCard",
             Size = new Size(UITheme.Scaled(this, 460), UITheme.Scaled(this, 140)),
             Anchor = AnchorStyles.Top | AnchorStyles.Left,
+            Location = new Point(Math.Max((Width - UITheme.Scaled(this, 460)) / 2, 0), 0),
         };
         var title = new Label
         {

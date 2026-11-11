@@ -406,6 +406,48 @@ public sealed class GenerateQuizForm : ModulePanel
         int inset = UITheme.Scaled(this, UITheme.Spacing16);
         int y = inset;
 
+        // Responsive content (owner directive): the cards stretch with the
+        // window up to the content cap and stay centered beyond it.
+        int contentWidth = UITheme.ResponsiveWidth(this);
+        int x = Math.Max((ClientSize.Width - contentWidth) / 2, 0);
+        _optionsCard.Location = new Point(x, _optionsCard.Location.Y);
+        _optionsCard.Width = contentWidth;
+        _actionCard.Location = new Point(x, _actionCard.Location.Y);
+        _actionCard.Width = contentWidth;
+        _busyBlock.Location = new Point(x, _busyBlock.Location.Y);
+        _busyBlock.Width = contentWidth;
+
+        int fieldWidth = Math.Max(contentWidth - inset * 2, 1);
+        foreach (Control child in _optionsCard.Controls)
+        {
+            if (child is FlatButton || child == _count)
+            {
+                continue; // buttons keep their recipe size; the count picker stays compact
+            }
+
+            child.Width = fieldWidth;
+            if (child == _banner)
+            {
+                foreach (Control inner in _banner.Controls)
+                {
+                    if (inner is not FlatButton)
+                    {
+                        inner.Width = Math.Max(_banner.Width - UITheme.Scaled(this, UITheme.Spacing24), 1);
+                    }
+                }
+            }
+        }
+
+        foreach (Control child in _actionCard.Controls)
+        {
+            if (child is not FlatButton)
+            {
+                child.Width = fieldWidth;
+            }
+        }
+
+        _busyTrack.Width = fieldWidth;
+
         if (_banner.Visible)
         {
             _banner.Location = new Point(inset, y);
@@ -430,8 +472,14 @@ public sealed class GenerateQuizForm : ModulePanel
         _optionsCard.Height = contentBottom + inset;
 
         int blockTop = _optionsCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16);
-        _actionCard.Location = new Point(0, blockTop);
-        _busyBlock.Location = new Point(0, blockTop);
+        _actionCard.Location = new Point(x, blockTop);
+        _busyBlock.Location = new Point(x, blockTop);
+    }
+
+    protected override void OnResize(EventArgs eventargs)
+    {
+        base.OnResize(eventargs);
+        LayoutGenerateLayout();
     }
 
     public override void RefreshData()

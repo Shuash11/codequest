@@ -29,6 +29,10 @@ public sealed class ReportsForm : ModulePanel
     private readonly Panel _barStack = null!;
     private readonly Panel _weakCard = null!;
     private readonly Panel _emptyView = null!;
+    private readonly CardPanel _summaryCard = null!;
+    private PracticeReport? _lastReport;
+    private string? _lastTopicFilter;
+    private System.Windows.Forms.Timer _resizeTimer = null!;
     private bool _rebuildingFilters;
 
     private Dictionary<int, string> _topicNames = new();
@@ -79,7 +83,7 @@ public sealed class ReportsForm : ModulePanel
 
         int cardWidth = UITheme.Scaled(this, 640);
 
-        var summaryCard = new CardPanel
+        _summaryCard = new CardPanel
         {
             Name = "ReportsSummaryCard",
             Location = new Point(0, filterHeight + UITheme.Scaled(this, UITheme.Spacing16)),
@@ -88,17 +92,17 @@ public sealed class ReportsForm : ModulePanel
         _summaryAttempts = StatLabel("ReportsAttemptsValue", 0);
         _summaryQuizzes = StatLabel("ReportsQuizzesValue", 1);
         _summaryAverage = StatLabel("ReportsAverageValue", 2);
-        summaryCard.Controls.Add(_summaryAttempts);
-        summaryCard.Controls.Add(_summaryQuizzes);
-        summaryCard.Controls.Add(_summaryAverage);
-        summaryCard.Controls.Add(StatCaption("ReportsAttemptsCaption", "Attempts", 0));
-        summaryCard.Controls.Add(StatCaption("ReportsQuizzesCaption", "Quizzes taken", 1));
-        summaryCard.Controls.Add(StatCaption("ReportsAverageCaption", "Average score", 2));
+        _summaryCard.Controls.Add(_summaryAttempts);
+        _summaryCard.Controls.Add(_summaryQuizzes);
+        _summaryCard.Controls.Add(_summaryAverage);
+        _summaryCard.Controls.Add(StatCaption("ReportsAttemptsCaption", "Attempts", 0));
+        _summaryCard.Controls.Add(StatCaption("ReportsQuizzesCaption", "Quizzes taken", 1));
+        _summaryCard.Controls.Add(StatCaption("ReportsAverageCaption", "Average score", 2));
 
         _barStack = new Panel
         {
             Name = "ReportsBarStack",
-            Location = new Point(0, summaryCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16)),
+            Location = new Point(0, _summaryCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16)),
             Size = new Size(cardWidth, UITheme.Scaled(this, 100)),
             BackColor = UITheme.Surface,
         };
@@ -152,10 +156,82 @@ public sealed class ReportsForm : ModulePanel
 
         Controls.Add(_weakCard);
         Controls.Add(_barStack);
-        Controls.Add(summaryCard);
+        Controls.Add(_summaryCard);
         Controls.Add(_topicFilter);
         Controls.Add(_difficultyFilter);
         Controls.Add(_emptyView);
+
+        // Responsive content (owner directive): stretch the cards with the
+        // window; the bar/weak rows rebuild at the new width once the drag
+        // settles (they read the card width while painting).
+        _resizeTimer = new System.Windows.Forms.Timer { Interval = 250 };
+        _resizeTimer.Tick += static (sender, e) =>
+        {
+            if (sender is System.Windows.Forms.Timer timer)
+            {
+                timer.Stop();
+                if (timer.Tag is ReportsForm form)
+                {
+                    form.RebuildForWidth();
+                }
+            }
+        };
+        _resizeTimer.Tag = this;
+    }
+
+    private void RebuildForWidth()
+    {
+        if (_lastReport is not null)
+        {
+            BuildScoreBars(_lastReport, _lastTopicFilter);
+            BuildWeakList(_lastReport);
+        }
+        else
+        {
+            ApplyFilter();
+        }
+    }
+
+    private void LayoutReportCards()
+    {
+        int contentWidth = UITheme.ResponsiveWidth(this);
+        int x = Math.Max((ClientSize.Width - contentWidth) / 2, 0);
+        _summaryCard.Location = new Point(x, _summaryCard.Location.Y);
+        _summaryCard.Width = contentWidth;
+        _barStack.Location = new Point(x, _barStack.Location.Y);
+        _barStack.Width = contentWidth;
+        _weakCard.Location = new Point(x, _weakCard.Location.Y);
+        _weakCard.Width = contentWidth;
+
+        int inset = UITheme.Scaled(this, UITheme.Spacing16);
+        int columnWidth = Math.Max((contentWidth - inset * 2) / 3, 1);
+        string[] valueNames = { "ReportsAttemptsValue", "ReportsQuizzesValue", "ReportsAverageValue" };
+        string[] captionNames = { "ReportsAttemptsCaption", "ReportsQuizzesCaption", "ReportsAverageCaption" };
+        for (int column = 0; column < 3; column++)
+        {
+            int left = inset + column * columnWidth + UITheme.Scaled(this, 8);
+            Control? value = _summaryCard.Controls[valueNames[column]];
+            Control? caption = _summaryCard.Controls[captionNames[column]];
+            if (value is not null)
+            {
+                value.Location = new Point(left, value.Location.Y);
+                value.Width = Math.Max(columnWidth - UITheme.Scaled(this, UITheme.Spacing16), 1);
+            }
+
+            if (caption is not null)
+            {
+                caption.Location = new Point(left, caption.Location.Y);
+                caption.Width = Math.Max(columnWidth - UITheme.Scaled(this, UITheme.Spacing16), 1);
+            }
+        }
+    }
+
+    protected override void OnResize(EventArgs eventargs)
+    {
+        base.OnResize(eventargs);
+        LayoutReportCards();
+        _resizeTimer.Stop();
+        _resizeTimer.Start(); // rebuild the painted rows once the drag settles
     }
 
     private Label StatLabel(string name, int column)
@@ -237,6 +313,8 @@ public sealed class ReportsForm : ModulePanel
 
         string? topicFilterName = _topicFilter.SelectedIndex is > 0 ? _topicFilter.Items[_topicFilter.SelectedIndex]?.ToString() : null;
         _rebuildingFilters = false;
+        _lastReport = report;
+        _lastTopicFilter = topicFilterName;
 
         if (report.Overall.TotalAttempts == 0)
         {

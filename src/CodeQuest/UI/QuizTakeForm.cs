@@ -1371,11 +1371,18 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         FillReveal();
         LayoutReveal();
         SizeHeroForResult();
-        _resultListCard.Location = new Point(0, _heroCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16));
+
+        // The hero stretches with the window and stays centered beyond the
+        // content cap (owner directive: responsive pages).
+        int contentWidth = UITheme.ResponsiveWidth(this);
+        int contentX = Math.Max((ClientSize.Width - contentWidth) / 2, 0);
+        _heroCard.Location = new Point(contentX, _heroCard.Location.Y);
+        _heroCard.Width = contentWidth;
+        _resultListCard.Location = new Point(contentX, _heroCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16));
         _resultListCard.Width = Math.Max(_heroCard.Width, 1);
+        _resultActions.Location = new Point(contentX, _resultListCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16));
 
         BuildResultRows(_resultQuiz);
-        _resultActions.Location = new Point(0, _resultListCard.Bottom + UITheme.Scaled(this, UITheme.Spacing16));
         ShowView(_resultView);
         StopStreakPulse(); // the run ended: the pulse never survives a view switch (spec R7)
 

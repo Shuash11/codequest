@@ -247,6 +247,16 @@ public static class UITheme
         return (int)Math.Round(pixels * control.DeviceDpi / 96f);
     }
 
+    public const int MaxContentWidth = 980;
+
+    /// <summary>
+    /// The width module content should stretch to: the host's full width,
+    /// clamped to a sane minimum and the content cap (owner directive:
+    /// the pages respond to the window instead of hugging one size).
+    /// </summary>
+    public static int ResponsiveWidth(Control host)
+        => Math.Clamp(host.ClientSize.Width, Scaled(host, 320), Scaled(host, MaxContentWidth));
+
     public static Color ContainerSurface(Control control)
         => control.Parent is { } parent ? parent.BackColor : control.BackColor;
 
