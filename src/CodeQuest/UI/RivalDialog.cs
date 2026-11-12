@@ -7,10 +7,18 @@ using System.Windows.Forms;
 
 namespace CodeQuest.UI;
 
+// The result of one rival generation attempt: the new quiz id on success, a
+// friendly reason on failure (never a raw exception).
+public sealed record RivalGeneration(int? QuizId, string? Failure)
+{
+    public static RivalGeneration Ok(int quizId) => new(quizId, null);
+
+    public static RivalGeneration Failed(string reason) => new(null, reason);
+}
+
 public sealed class RivalDialog : Form
 {
     private const string WindowTitle = "The AI strikes back";
-    private const string OfferMessage = "Your rival grins: \"Clear this level\u2026 and I'll have the next one waiting for you.\"";
     private const string SuccessMessageFormat = "Level {0} is ready ({1}). It is waiting for you.";
     private const string FailureMessage = "Your rival retreated for now (no connection). Try again later.";
     private const string BringItOnButton = "Bring it on";
@@ -20,22 +28,26 @@ public sealed class RivalDialog : Form
     private const string TryAgainButton = "Try again";
     private const string CloseButton = "Close";
 
-    private readonly Func<string, Difficulty, int?> _generate;
+    private readonly Func<string, Difficulty, RivalGeneration> _generate;
     private readonly string _topicName;
     private readonly int _nextLevel;
+    private readonly string _offerMessage;
     private readonly Label _message;
+    private string? _failureReason;
     private readonly ProgressTrack _busyTrack;
     private readonly FlatButton _primary;
     private readonly FlatButton _secondary;
     private RivalState _state = RivalState.Offer;
 
-    public RivalDialog(string topicName, int nextLevel, Func<string, Difficulty, int?> generate)
+    public RivalDialog(string topicName, int nextLevel, int passedPercent, Func<string, Difficulty, RivalGeneration> generate)
     {
         ArgumentNullException.ThrowIfNull(topicName);
         ArgumentNullException.ThrowIfNull(generate);
         _topicName = topicName;
         _nextLevel = nextLevel;
         _generate = generate;
+        _offerMessage =
+            $"Your rival grins: \"You passed my level with {passedPercent:0}%\u2026 I'll have the next one waiting for you.\"";
 
         Text = WindowTitle;
         FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -73,7 +85,7 @@ public sealed class RivalDialog : Form
         _message = new Label
         {
             Name = "RivalMessage",
-            Text = OfferMessage,
+            Text = _offerMessage,
             Font = UITheme.Body,
             ForeColor = UITheme.TextPrimary,
             BackColor = UITheme.Surface,
@@ -169,7 +181,7 @@ public sealed class RivalDialog : Form
                 TaskScheduler.FromCurrentSynchronizationContext());
     }
 
-    private int? GenerateSafely()
+    private RivalGeneration? GenerateSafely()
     {
         try
         {
@@ -182,20 +194,21 @@ public sealed class RivalDialog : Form
         }
     }
 
-    private void HandleGenerationResult(int? quizId)
+    private void HandleGenerationResult(RivalGeneration? generation)
     {
         if (IsDisposed || Disposing)
         {
             return; // the user closed the dialog while the rival was writing
         }
 
-        if (quizId is { } id)
+        if (generation?.QuizId is { } id)
         {
             GeneratedQuizId = id;
             ApplyState(RivalState.Success);
         }
         else
         {
+            _failureReason = generation?.Failure;
             ApplyState(RivalState.Failure);
         }
     }
@@ -207,7 +220,7 @@ public sealed class RivalDialog : Form
         switch (state)
         {
             case RivalState.Offer:
-                _message.Text = OfferMessage;
+                _message.Text = _offerMessage;
                 _primary.Text = BringItOnButton;
                 _secondary.Text = NotYetButton;
                 SetButtonsEnabled(enabled: true);
@@ -236,7 +249,11 @@ public sealed class RivalDialog : Form
                 break;
 
             case RivalState.Failure:
-                _message.Text = FailureMessage;
+                // The typed reason when the generator supplied one — "no
+                // connection" alone used to hide quota/auth/service errors.
+                _message.Text = string.IsNullOrWhiteSpace(_failureReason)
+                    ? FailureMessage
+                    : "Your rival stumbled: " + _failureReason;
                 _primary.Text = TryAgainButton;
                 _secondary.Text = CloseButton;
                 SetButtonsEnabled(enabled: true);

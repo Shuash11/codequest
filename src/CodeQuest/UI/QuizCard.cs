@@ -15,16 +15,19 @@ public sealed class QuizCard : Panel
     private readonly Label _title = new();
     private readonly Label _meta = new();
     private readonly Label _chip = new();
+    private readonly Label? _passedChip;
     private readonly FlatButton _play = new();
     private readonly int _quizId;
     private readonly bool _approved;
+    private readonly int? _passedPercent;
 
     public event EventHandler<int>? PlayClicked;
 
-    public QuizCard(Quiz quiz, string topicName, int questionCount)
+    public QuizCard(Quiz quiz, string topicName, int questionCount, int? passedPercent = null)
     {
         _quizId = quiz.QuizId;
         _approved = quiz.Status == QuizStatus.Approved;
+        _passedPercent = passedPercent;
 
         DoubleBuffered = true;
         Size = new Size(UITheme.Scaled(this, 330), UITheme.Scaled(this, 150));
@@ -84,6 +87,25 @@ public sealed class QuizCard : Panel
             Size = new Size(UITheme.Scaled(this, 110), UITheme.Scaled(this, 22)),
         };
 
+        // The passed mark (owner directive): the best percentage the player
+        // achieved on this level — proof of a pass, never a claim of 100%.
+        if (_passedPercent is { } passed)
+        {
+            _passedChip = new Label
+            {
+                Name = "QuizCardPassed",
+                Text = $"Passed \u00B7 {passed}%",
+                Font = UITheme.CaptionSemibold,
+                ForeColor = UITheme.SuccessText,
+                BackColor = UITheme.SuccessTint,
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(
+                    _chip.Right + UITheme.Scaled(this, UITheme.Spacing8), UITheme.Scaled(this, 56)),
+                Size = new Size(UITheme.Scaled(this, 124), UITheme.Scaled(this, 22)),
+            };
+        }
+
         _play = new FlatButton
         {
             Name = "QuizCardPlay",
@@ -106,6 +128,10 @@ public sealed class QuizCard : Panel
         Controls.Add(_title);
         Controls.Add(_meta);
         Controls.Add(_chip);
+        if (_passedChip is not null)
+        {
+            Controls.Add(_passedChip);
+        }
         Controls.Add(_play);
 
         AccessibleName = _approved

@@ -9,14 +9,14 @@ public sealed class QuizRepository : IQuizRepository
 {
     private const string SelectAllSql =
         """
-        SELECT quiz_id, topic_id, title, difficulty, status, created_at
+        SELECT quiz_id, topic_id, title, difficulty, status, created_at, generated_for_user_id
         FROM quizzes
         ORDER BY created_at, quiz_id;
         """;
 
     private const string SelectByTopicSql =
         """
-        SELECT quiz_id, topic_id, title, difficulty, status, created_at
+        SELECT quiz_id, topic_id, title, difficulty, status, created_at, generated_for_user_id
         FROM quizzes
         WHERE topic_id = $topicId
         ORDER BY created_at, quiz_id;
@@ -24,7 +24,7 @@ public sealed class QuizRepository : IQuizRepository
 
     private const string SelectByStatusSql =
         """
-        SELECT quiz_id, topic_id, title, difficulty, status, created_at
+        SELECT quiz_id, topic_id, title, difficulty, status, created_at, generated_for_user_id
         FROM quizzes
         WHERE status = $status
         ORDER BY created_at, quiz_id;
@@ -32,7 +32,7 @@ public sealed class QuizRepository : IQuizRepository
 
     private const string SelectByTopicAndStatusSql =
         """
-        SELECT quiz_id, topic_id, title, difficulty, status, created_at
+        SELECT quiz_id, topic_id, title, difficulty, status, created_at, generated_for_user_id
         FROM quizzes
         WHERE topic_id = $topicId
           AND status = $status
@@ -41,7 +41,7 @@ public sealed class QuizRepository : IQuizRepository
 
     private const string SelectByIdSql =
         """
-        SELECT quiz_id, topic_id, title, difficulty, status, created_at
+        SELECT quiz_id, topic_id, title, difficulty, status, created_at, generated_for_user_id
         FROM quizzes
         WHERE quiz_id = $quizId;
         """;
@@ -57,8 +57,8 @@ public sealed class QuizRepository : IQuizRepository
 
     private const string InsertSql =
         """
-        INSERT INTO quizzes (topic_id, title, difficulty, status, created_at)
-        VALUES ($topicId, $title, $difficulty, $status, $createdAt);
+        INSERT INTO quizzes (topic_id, title, difficulty, status, created_at, generated_for_user_id)
+        VALUES ($topicId, $title, $difficulty, $status, $createdAt, $generatedForUserId);
         """;
 
     private const string UpdateSql =
@@ -67,7 +67,8 @@ public sealed class QuizRepository : IQuizRepository
         SET topic_id = $topicId,
             title = $title,
             difficulty = $difficulty,
-            status = $status
+            status = $status,
+            generated_for_user_id = $generatedForUserId
         WHERE quiz_id = $quizId;
         """;
 
@@ -190,6 +191,7 @@ public sealed class QuizRepository : IQuizRepository
         command.Parameters.AddWithValue("$title", quiz.Title);
         command.Parameters.AddWithValue("$difficulty", SqlValueMap.ToStorage(quiz.Difficulty));
         command.Parameters.AddWithValue("$status", SqlValueMap.ToStorage(quiz.Status));
+        command.Parameters.AddWithValue("$generatedForUserId", AsParameterValue(quiz.GeneratedForUserId));
         command.Parameters.AddWithValue("$quizId", quiz.QuizId);
 
         int changed;
@@ -275,6 +277,7 @@ public sealed class QuizRepository : IQuizRepository
         command.Parameters.AddWithValue("$difficulty", SqlValueMap.ToStorage(quiz.Difficulty));
         command.Parameters.AddWithValue("$status", SqlValueMap.ToStorage(quiz.Status));
         command.Parameters.AddWithValue("$createdAt", SqlValueMap.ToStorage(quiz.CreatedAt));
+        command.Parameters.AddWithValue("$generatedForUserId", AsParameterValue(quiz.GeneratedForUserId));
         command.Transaction = transaction;
         command.ExecuteNonQuery();
 
@@ -319,5 +322,6 @@ public sealed class QuizRepository : IQuizRepository
         Difficulty = SqlValueMap.ParseDifficulty(reader.GetString(3)),
         Status = SqlValueMap.ParseQuizStatus(reader.GetString(4)),
         CreatedAt = SqlValueMap.FromStorage(reader.GetString(5)),
+        GeneratedForUserId = reader.IsDBNull(6) ? null : reader.GetInt32(6),
     };
 }

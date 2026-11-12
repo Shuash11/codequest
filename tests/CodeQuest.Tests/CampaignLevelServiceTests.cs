@@ -1,4 +1,4 @@
-// The rival level naming: the next number, its ladder difficulty and the
+﻿// The rival level naming: the next number, its ladder difficulty and the
 // replacement of a leftover Draft that occupies the number.
 
 using CodeQuest.Data;
@@ -59,30 +59,31 @@ public class CampaignLevelServiceTests : IDisposable
     {
         int topicId = InsertCampaignTopic();
         InsertQuiz(topicId, "Level 25", Difficulty.Insane, QuizStatus.Approved);
-        int staleDraftId = InsertQuiz(topicId, "Level 26", Difficulty.Medium, QuizStatus.Draft, questionCount: 1);
+        int staleDraftId = InsertQuiz(topicId, Campaign.GeneratedTitle(26, "joashua"), Difficulty.Medium, QuizStatus.Draft, questionCount: 1);
 
         // The AI draft the UI just inserted; "Level 26" was taken, so the
         // suffix loop gave it "Level 26 (2)".
-        int aiDraftId = InsertQuiz(topicId, "Level 26 (2)", Difficulty.Medium, QuizStatus.Draft, questionCount: 2);
+        int aiDraftId = InsertQuiz(topicId, Campaign.GeneratedTitle(26, "joashua") + " (2)", Difficulty.Medium, QuizStatus.Draft, questionCount: 2);
 
-        // Precondition — this is the scenario that used to collide forever.
+        // Precondition â€” this is the scenario that used to collide forever.
         Assert.Equal(26, Campaign.NextLevelNumber(_quizzes.GetAll(), topicId));
-        Assert.True(_quizzes.ExistsByTitle(topicId, "Level 26", ignoreQuizId: aiDraftId));
+        Assert.True(_quizzes.ExistsByTitle(topicId, Campaign.GeneratedTitle(26, "joashua"), ignoreQuizId: aiDraftId));
 
-        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId);
+        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId, 1, "joashua");
 
         Assert.True(named);
 
-        // Exactly one "Level 26" — the AI draft — approved at the ladder tier.
+        // Exactly one "Level 26" â€” the AI draft â€” approved at the ladder tier.
         IReadOnlyList<Quiz> topicQuizzes = _quizzes.GetByTopic(topicId);
         Assert.Equal(2, topicQuizzes.Count);
-        Quiz level26 = Assert.Single(topicQuizzes, quiz => quiz.Title == "Level 26");
+        Quiz level26 = Assert.Single(topicQuizzes, quiz => quiz.Title == Campaign.GeneratedTitle(26, "joashua"));
+        Assert.Equal(1, level26.GeneratedForUserId);
         Assert.Equal(aiDraftId, level26.QuizId);
         Assert.Equal(QuizStatus.Approved, level26.Status);
         Assert.Equal(Difficulty.Insane, level26.Difficulty);
 
         // The stale draft id is gone with its content (cascade; it had no
-        // attempts — StartQuiz only runs approved quizzes).
+        // attempts â€” StartQuiz only runs approved quizzes).
         Assert.Null(_quizzes.GetById(staleDraftId));
         Assert.Equal(0, Scalar($"SELECT COUNT(*) FROM questions WHERE quiz_id = {staleDraftId};"));
         Assert.Equal(4, Scalar("SELECT COUNT(*) FROM choices;")); // the AI draft's 2x2 survive
@@ -102,13 +103,13 @@ public class CampaignLevelServiceTests : IDisposable
     {
         int topicId = InsertCampaignTopic();
         InsertQuiz(topicId, "Level 1", Difficulty.Easy, QuizStatus.Approved);
-        int aiDraftId = InsertQuiz(topicId, "Level 2", Difficulty.Medium, QuizStatus.Draft, questionCount: 1);
+        int aiDraftId = InsertQuiz(topicId, Campaign.GeneratedTitle(2, "joashua"), Difficulty.Medium, QuizStatus.Draft, questionCount: 1);
 
-        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId);
+        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId, 1, "joashua");
 
         Assert.True(named);
         IReadOnlyList<Quiz> topicQuizzes = _quizzes.GetByTopic(topicId);
-        Quiz level2 = Assert.Single(topicQuizzes, quiz => quiz.Title == "Level 2");
+        Quiz level2 = Assert.Single(topicQuizzes, quiz => quiz.Title == Campaign.GeneratedTitle(2, "joashua"));
         Assert.Equal(aiDraftId, level2.QuizId);
         Assert.Equal(QuizStatus.Approved, level2.Status);
         Assert.Equal(Difficulty.Easy, level2.Difficulty); // the ladder tier of Level 2
@@ -117,7 +118,7 @@ public class CampaignLevelServiceTests : IDisposable
 
     // -------------------------------------------------------------------------
     // 3. The difficulty follows the ladder, not a fixed tier: with Levels 1-5
-    //    in place, the rival's next level is 6 — Medium, even though the
+    //    in place, the rival's next level is 6 â€” Medium, even though the
     //    generation request asked for Insane content.
     // -------------------------------------------------------------------------
     [Fact]
@@ -131,10 +132,10 @@ public class CampaignLevelServiceTests : IDisposable
 
         int aiDraftId = InsertQuiz(topicId, "AI authored title", Difficulty.Insane, QuizStatus.Draft, questionCount: 1);
 
-        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId);
+        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId, 1, "joashua");
 
         Assert.True(named);
-        Quiz level6 = Assert.Single(_quizzes.GetByTopic(topicId), quiz => quiz.Title == "Level 6");
+        Quiz level6 = Assert.Single(_quizzes.GetByTopic(topicId), quiz => quiz.Title == Campaign.GeneratedTitle(6, "joashua"));
         Assert.Equal(Difficulty.Medium, level6.Difficulty);
         Assert.Equal(QuizStatus.Approved, level6.Status);
     }
@@ -191,7 +192,8 @@ public class CampaignLevelServiceTests : IDisposable
         string title,
         Difficulty difficulty,
         QuizStatus status,
-        int questionCount = 0)
+        int questionCount = 0,
+        int? generatedForUserId = null)
     {
         var quiz = new Quiz
         {
@@ -200,6 +202,7 @@ public class CampaignLevelServiceTests : IDisposable
             Difficulty = difficulty,
             Status = status,
             CreatedAt = FixedTime,
+            GeneratedForUserId = generatedForUserId,
         };
 
         for (int index = 0; index < questionCount; index++)

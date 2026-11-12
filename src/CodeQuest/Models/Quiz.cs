@@ -48,6 +48,16 @@ public sealed class Quiz
         set => _createdAt = value;
     }
 
+    // Ownership (task 5): the AI rival stamps the player it generated this
+    // level for; built-in campaign levels and the Random Mix stay unowned
+    // (null) and are visible to everyone.
+    public int? GeneratedForUserId
+    {
+        get => _generatedForUserId;
+        set => _generatedForUserId = value;
+    }
+    private int? _generatedForUserId;
+
     public IReadOnlyList<Question> Questions => _questions;
 
     public void AddQuestion(Question question)

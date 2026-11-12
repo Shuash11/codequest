@@ -537,3 +537,14 @@ into WP6).
 - A7: `DatabaseMigratorTests` (fresh DB, existing DB re-run, rows preserved); manual: launch on a
   copy of the real `codequest.db`.
 - A8: `dotnet build CodeQuest.sln` + `dotnet test CodeQuest.sln` â€” both green before completion.
+
+**Task 5 COMPLETE (2026-11-12).** Final state at `55820ea` (CI green): campaign.sql =
+exactly Level 1 (Easy, 5 questions, 20 choices, idempotent); ladder via
+`CampaignLevelService` (2-5 Easy / 6-12 Medium / 13-19 Hard / 20+ Insane, service-level
+test proves the request difficulty is overridden); rival copy + a caption under the
+campaign card ("Complete the level and the AI generates the next one."); app icon
+verified end-to-end via ExtractAssociatedIcon on the built exe. Legacy databases KEEP
+their old levels (played content is never deleted); fresh installs get only Level 1.
+Deviations (accepted): ladder stamping lives in CampaignLevelService, not the UI; success
+copy names the tier; user-guide updated beyond the requested copy points. 236/236 tests,
+builds 0/0, real-DB migration harness clean (legacy rows intact, foreign_key_check 0).

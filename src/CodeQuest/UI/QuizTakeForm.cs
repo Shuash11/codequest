@@ -57,6 +57,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private Label _streakCount = null!;
     private Label _resultTrophy = null!;
     private Label _resultXpGlyph = null!;
+    private Label _resultFinished = null!;
     private Panel _resultLevelUp = null!;
     private Label _resultLevelUpText = null!;
     private Label _resultLevelUpCaption = null!;
@@ -302,10 +303,33 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
         foreach (Quiz quiz in quizzes)
         {
+            // Ownership (owner directive): a level the AI generated for one
+            // player is that player's alone — other sign-ins never see it.
+            if (quiz.GeneratedForUserId is { } owner && owner != _user.UserId)
+            {
+                continue;
+            }
+
             string topicName = _topicNames.TryGetValue(quiz.TopicId, out string? name) ? name : string.Empty;
             int questionCount = _questions.GetByQuiz(quiz.QuizId).Count;
 
-            var card = new QuizCard(quiz, topicName, questionCount)
+            // The passed mark (owner directive): the best percentage across
+            // this player's attempts, shown only when it clears the gate.
+            int? passedPercent = null;
+            if (topicName == Campaign.TopicName && Campaign.IsLevelTitle(quiz.Title))
+            {
+                var attempts = _attempts
+                    .GetByUserAndQuiz(_user.UserId, quiz.QuizId)
+                    .Select(attempt => (attempt.Score, questionCount))
+                    .ToList();
+                int? best = Campaign.BestPercent(attempts);
+                if (best is not null && Campaign.IsPassing(best.Value))
+                {
+                    passedPercent = best;
+                }
+            }
+
+            var card = new QuizCard(quiz, topicName, questionCount, passedPercent)
             {
                 Margin = new Padding(0, 0, UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing16)),
             };
@@ -355,7 +379,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         return new Label
         {
             Name = "CampaignCaption",
-            Text = "Complete the level and the AI generates the next one.",
+            Text = "Pass the level (75% or more) and the AI generates the next one.",
             Font = UITheme.Caption,
             ForeColor = UITheme.TextSecondary,
             BackColor = UITheme.Background,
@@ -1294,11 +1318,24 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
                 UITheme.Scaled(this, UITheme.Spacing16),
                 UITheme.Scaled(this, UITheme.Spacing12) + UITheme.Scaled(this, 76)),
         };
+        _resultFinished = new Label
+        {
+            Name = "ResultFinishedLabel",
+            Font = UITheme.CaptionSemibold,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.Surface,
+            AutoSize = true,
+            Visible = false,
+            Location = new Point(
+                UITheme.Scaled(this, UITheme.Spacing16),
+                UITheme.Scaled(this, UITheme.Spacing12) + UITheme.Scaled(this, 96)),
+        };
         hero.Controls.Add(_resultScore);
         hero.Controls.Add(_resultPercent);
         hero.Controls.Add(_resultMessage);
         hero.Controls.Add(_resultTrophy);
         hero.Controls.Add(_resultContext);
+        hero.Controls.Add(_resultFinished);
 
         _resultReveal = new Panel
         {
@@ -1544,6 +1581,21 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             UITheme.Scaled(this, UITheme.Spacing12) + UITheme.Scaled(this, 52));
         _resultContext.Text = $"{topicName} \u2014 {_resultQuiz.Difficulty}";
 
+        // The campaign finish mark (owner directive): every completed level
+        // reads "Finished"; a passing run shows the exact percentage achieved
+        // — proof of a pass, never a claim of a perfect run.
+        bool campaignLevel = string.Equals(topicName, Campaign.TopicName, StringComparison.Ordinal)
+            && Campaign.IsLevelTitle(_resultQuiz.Title);
+        _resultFinished.Visible = campaignLevel;
+        if (campaignLevel)
+        {
+            bool passed = Campaign.IsPassing((int)percent);
+            _resultFinished.Text = passed
+                ? $"{percent:0}% finished \u2014 passed (need {Campaign.PassingScorePercent}%)"
+                : "Finished \u2014 not passed yet, retake to unlock the next level";
+            _resultFinished.ForeColor = passed ? UITheme.SuccessText : UITheme.TextSecondary;
+        }
+
         FillReveal();
         LayoutReveal();
         SizeHeroForResult();
@@ -1564,12 +1616,12 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
 
         this.FindAncestor<MainForm>()?.UpdateSidebarLevel();
 
-        MaybeOfferRivalChallenge();
+        MaybeOfferRivalChallenge(percent: (int)percent);
     }
 
     // The AI rival (spec C5): completing the CURRENT highest campaign level
     // offers the next level; the dialog generates it when accepted.
-    private void MaybeOfferRivalChallenge()
+    private void MaybeOfferRivalChallenge(int percent)
     {
         if (_rivalOfferShown || _resultQuiz is null)
         {
@@ -1588,15 +1640,26 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             return;
         }
 
-        // The completed level is the current maximum when the next number the
-        // campaign yields is exactly one past it — the same rule as the save.
-        if (Campaign.NextLevelNumber(_quizzes.GetAll(), _resultQuiz.TopicId) != completedLevel + 1)
+        // The completed level is THIS PLAYER's current maximum when the next
+        // number their campaign yields is exactly one past it — the same rule
+        // as the save (ownership-aware: other players' levels never count).
+        if (Campaign.NextLevelNumberForUser(_quizzes.GetAll(), _resultQuiz.TopicId, _user.UserId) != completedLevel + 1)
         {
             return;
         }
 
+        // The campaign gate (owner directive): only a PASSING score makes the
+        // AI generate the next level. A failed run stays right where it is.
+        if (!Campaign.IsPassing(percent))
+        {
+            ReportStatus(
+                $"Score {percent:0}% \u2014 you need {Campaign.PassingScorePercent}% to pass this level. Retake it to unlock the next one.",
+                success: false);
+            return;
+        }
+
         _rivalOfferShown = true;
-        using var dialog = new RivalDialog(Campaign.TopicName, completedLevel + 1, GenerateRivalQuiz);
+        using var dialog = new RivalDialog(Campaign.TopicName, completedLevel + 1, percent, GenerateRivalQuiz);
         if (dialog.ShowDialog(this) == DialogResult.OK && dialog.GeneratedQuizId is { } quizId)
         {
             StartQuiz(quizId);
@@ -1604,8 +1667,10 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     }
 
     // Runs on the dialog's worker thread: the rival's Level N+1 is generated
-    // through the same chain as the Generate screen, named, approved and saved.
-    private int? GenerateRivalQuiz(string topicName, Difficulty difficulty)
+    // through the same chain as the Generate screen, named FOR THIS PLAYER
+    // (ownership), approved and saved. Every failure returns the typed reason
+    // so the dialog can say what actually went wrong.
+    private RivalGeneration GenerateRivalQuiz(string topicName, Difficulty difficulty)
     {
         try
         {
@@ -1613,17 +1678,18 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
                 topic => string.Equals(topic.Name, topicName, StringComparison.Ordinal));
             if (campaign is null)
             {
-                return null;
+                return RivalGeneration.Failed("the campaign topic is missing.");
             }
 
             QuizGenerationOutcome outcome = _generation.GenerateQuiz(campaign, difficulty, 5);
             if (!outcome.IsSuccess || outcome.QuizDraft is null)
             {
-                return null;
+                return RivalGeneration.Failed(DescribeGenerationFailure(outcome.ProviderReasons));
             }
 
             Quiz draft = outcome.QuizDraft;
             draft.TopicId = campaign.TopicId;
+            draft.GeneratedForUserId = _user.UserId; // ownership from the very first write
             string baseTitle = draft.Title;
             int suffix = 2;
             while (_quizzes.ExistsByTitle(campaign.TopicId, draft.Title))
@@ -1637,25 +1703,25 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             try
             {
                 // The AI authors the content; the app keeps the campaign
-                // numbering consistent (a stale draft on the number is
-                // replaced) and marks the level ready to play.
-                if (_campaignLevels.NameAndApproveNextLevel(quizId, campaign.TopicId))
+                // numbering consistent (a stale draft of this player on the
+                // number is replaced) and marks the level ready to play.
+                if (_campaignLevels.NameAndApproveNextLevel(quizId, campaign.TopicId, _user.UserId, _user.Username))
                 {
-                    return quizId;
+                    return RivalGeneration.Ok(quizId);
                 }
 
                 DeleteRivalDraftQuietly(quizId); // a failed rename never leaves a stray draft
-                return null;
+                return RivalGeneration.Failed("the level could not be saved.");
             }
             catch (Exception)
             {
                 DeleteRivalDraftQuietly(quizId); // a failed rename never leaves a stray draft
-                return null;
+                return RivalGeneration.Failed("the level could not be saved.");
             }
         }
         catch (Exception)
         {
-            return null; // the dialog shows the friendly failure state
+            return RivalGeneration.Failed("something went wrong while writing.");
         }
     }
 
@@ -1669,6 +1735,27 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         {
             // A stray draft is harmless; the retry path still never doubles it.
         }
+    }
+
+    // The typed reason of one failed generation, in plain words: skips the
+    // "not-configured" skip-notes (they masked real failures before) and
+    // describes the first real failure of the chain.
+    private static string DescribeGenerationFailure(IReadOnlyList<string> reasons)
+    {
+        string first = reasons.FirstOrDefault(reason =>
+            !reason.Contains(":not-configured", StringComparison.Ordinal)
+            && !reason.Contains("empty-provider-list", StringComparison.Ordinal)) ?? string.Empty;
+
+        return first switch
+        {
+            _ when first.Length == 0 => "no AI provider is configured.",
+            _ when first.Contains(":auth-failed", StringComparison.Ordinal) => "the AI refused the key (auth).",
+            _ when first.Contains(":quota", StringComparison.Ordinal) => "the AI is rate-limited right now (quota) \u2014 wait a moment.",
+            _ when first.Contains(":timeout", StringComparison.Ordinal) => "the AI took too long to answer.",
+            _ when first.Contains(":http-error", StringComparison.Ordinal) => "the AI service had a temporary error.",
+            _ when first.Contains(":bad-output", StringComparison.Ordinal) => "the AI's answer could not be read.",
+            _ => "the AI did not answer \u2014 check the internet and try again.",
+        };
     }
 
     private void SizeHeroForResult()

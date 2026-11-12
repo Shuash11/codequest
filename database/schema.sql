@@ -68,6 +68,7 @@ CREATE TABLE quizzes (
     difficulty TEXT    NOT NULL CHECK (difficulty IN ('Easy', 'Medium', 'Hard', 'Insane')),
     status     TEXT    NOT NULL DEFAULT 'Draft' CHECK (status IN ('Draft', 'Approved')),
     created_at TEXT    NOT NULL,                    -- ISO-8601 UTC
+    generated_for_user_id INTEGER NULL,             -- the player the AI generated this level for; NULL = shared content
 
     CONSTRAINT fk_quizzes_topic
         FOREIGN KEY (topic_id) REFERENCES topics (topic_id) ON DELETE RESTRICT,

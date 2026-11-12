@@ -196,6 +196,13 @@ public sealed class ReportsForm : ModulePanel
     {
         int contentWidth = UITheme.ResponsiveWidth(this);
         int x = Math.Max((ClientSize.Width - contentWidth) / 2, 0);
+
+        // The filter row follows the centered content column instead of
+        // hugging the window edge (owner screenshot fix).
+        _topicFilter.Location = new Point(x + UITheme.Scaled(this, UITheme.Spacing8), _topicFilter.Location.Y);
+        _difficultyFilter.Location = new Point(
+            _topicFilter.Right + UITheme.Scaled(this, UITheme.Spacing8), _difficultyFilter.Location.Y);
+
         _summaryCard.Location = new Point(x, _summaryCard.Location.Y);
         _summaryCard.Width = contentWidth;
         _barStack.Location = new Point(x, _barStack.Location.Y);

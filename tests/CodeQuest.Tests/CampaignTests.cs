@@ -43,6 +43,31 @@ public class CampaignTests
         Assert.Equal(expected, Campaign.LevelNumberOf(title));
     }
 
+    [Theory]
+    [InlineData(74, false)]
+    [InlineData(75, true)]
+    [InlineData(100, true)]
+    [InlineData(0, false)]
+    public void IsPassing_AtTheOwnerGate(int percent, bool expected)
+    {
+        Assert.Equal(expected, Campaign.IsPassing(percent));
+    }
+
+    [Fact]
+    public void BestPercent_TakesTheBestAcrossAttempts_AndIgnoresEmptyTotals()
+    {
+        Assert.Null(Campaign.BestPercent(Array.Empty<(int Correct, int Total)>()));
+        Assert.Null(Campaign.BestPercent(new[] { (3, 0) }));
+        Assert.Equal(40, Campaign.BestPercent(new[] { (2, 5), (2, 5), (1, 5) }));
+        Assert.Equal(100, Campaign.BestPercent(new[] { (3, 5), (5, 5) }));
+    }
+
+    [Fact]
+    public void PassingScorePercent_IsTheOwnerGate()
+    {
+        Assert.Equal(75, Campaign.PassingScorePercent);
+    }
+
     // -------------------------------------------------------------------------
     // 1b. The difficulty ladder — Easy through 5, Medium through 12, Hard
     //     through 19, Insane from 20 (boundaries 5/6, 12/13 and 19/20).
