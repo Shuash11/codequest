@@ -137,9 +137,15 @@ public sealed class ScoreboardForm : ModulePanel
         _list.Grid.AddTextColumn("Quizzes", "Quizzes", 18f, minimumWidth: 90);
         _playerColumnIndex = _list.Grid.Columns["Player"]!.Index;
 
+        // The numeric columns right-align their values — their HEADERS follow
+        // the same edge, or the wide responsive columns drift apart (owner
+        // screenshot fix).
         _list.Grid.Columns["Rank"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         _list.Grid.Columns["Xp"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         _list.Grid.Columns["Quizzes"]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+        _list.Grid.Columns["Rank"]!.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+        _list.Grid.Columns["Xp"]!.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+        _list.Grid.Columns["Quizzes"]!.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
 
         _list.Grid.SelectionChanged += static (sender, e) =>
         {
