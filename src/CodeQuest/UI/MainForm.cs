@@ -59,6 +59,7 @@ public sealed class MainForm : Form
         _gamification = gamification;
 
         Text = "CodeQuest";
+        Icon = UITheme.AppIcon;
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = UITheme.Background;
         ClientSize = new Size(UITheme.Scaled(this, 1024), UITheme.Scaled(this, 640));

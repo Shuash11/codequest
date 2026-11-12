@@ -44,6 +44,24 @@ public class CampaignTests
     }
 
     // -------------------------------------------------------------------------
+    // 1b. The difficulty ladder — Easy through 5, Medium through 12, Hard
+    //     through 19, Insane from 20 (boundaries 5/6, 12/13 and 19/20).
+    // -------------------------------------------------------------------------
+    [Theory]
+    [InlineData(1, Difficulty.Easy)]
+    [InlineData(5, Difficulty.Easy)]
+    [InlineData(6, Difficulty.Medium)]
+    [InlineData(12, Difficulty.Medium)]
+    [InlineData(13, Difficulty.Hard)]
+    [InlineData(19, Difficulty.Hard)]
+    [InlineData(20, Difficulty.Insane)]
+    [InlineData(26, Difficulty.Insane)]
+    public void DifficultyForLevel_FollowsTheLadder(int level, Difficulty expected)
+    {
+        Assert.Equal(expected, Campaign.DifficultyForLevel(level));
+    }
+
+    // -------------------------------------------------------------------------
     // 2. The normal case: a full 25-level campaign yields 26.
     // -------------------------------------------------------------------------
     [Fact]

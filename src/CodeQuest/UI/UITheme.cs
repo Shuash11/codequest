@@ -167,7 +167,25 @@ public static class UITheme
 
     public static bool UsesGameIconFont { get; } = GameFontBytes is not null;
 
+    // The application icon, embedded in the exe (a missing icon falls back to
+    // the default form icon).
+    public static readonly Icon? AppIcon = LoadAppIcon();
+
     private static readonly Dictionary<string, Bitmap?> SpriteCache = new();
+
+    private static Icon? LoadAppIcon()
+    {
+        try
+        {
+            using Stream? stream = typeof(UITheme).Assembly.GetManifestResourceStream(
+                "CodeQuest.Assets.app.ico");
+            return stream is null ? null : new Icon(stream);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     // Loads one embedded sprite once (for example "correct" or "wrong"); the
     // decoded bitmap stays for the whole process, null when it is missing.

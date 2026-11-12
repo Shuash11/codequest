@@ -25,6 +25,16 @@ public static class Campaign
         return int.TryParse(LevelTitlePattern.Match(title!).Groups[1].Value, out int level) ? level : 0;
     }
 
+    // The ladder: Easy through Level 5, Medium through 12, Hard through 19,
+    // Insane from Level 20 on.
+    public static Difficulty DifficultyForLevel(int level) => level switch
+    {
+        <= 5 => Difficulty.Easy,
+        <= 12 => Difficulty.Medium,
+        <= 19 => Difficulty.Hard,
+        _ => Difficulty.Insane,
+    };
+
     // The next level number for one topic: the highest existing level + 1.
     // Drafts never count (a half-finished level does not occupy a number) and
     // the caller can exclude the quiz it just inserted itself.

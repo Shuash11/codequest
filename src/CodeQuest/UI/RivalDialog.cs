@@ -10,8 +10,8 @@ namespace CodeQuest.UI;
 public sealed class RivalDialog : Form
 {
     private const string WindowTitle = "The AI strikes back";
-    private const string OfferMessage = "Your rival smiles: \"You cleared my level\u2026 I'll add another quiz for you.\"";
-    private const string SuccessMessageFormat = "Level {0} is ready. It is waiting for you.";
+    private const string OfferMessage = "Your rival grins: \"Clear this level\u2026 and I'll have the next one waiting for you.\"";
+    private const string SuccessMessageFormat = "Level {0} is ready ({1}). It is waiting for you.";
     private const string FailureMessage = "Your rival retreated for now (no connection). Try again later.";
     private const string BringItOnButton = "Bring it on";
     private const string NotYetButton = "Not yet";
@@ -173,7 +173,8 @@ public sealed class RivalDialog : Form
     {
         try
         {
-            return _generate(_topicName, Difficulty.Insane);
+            // The next level's difficulty follows the campaign ladder.
+            return _generate(_topicName, Campaign.DifficultyForLevel(_nextLevel));
         }
         catch
         {
@@ -223,7 +224,11 @@ public sealed class RivalDialog : Form
                 break;
 
             case RivalState.Success:
-                _message.Text = string.Format(CultureInfo.InvariantCulture, SuccessMessageFormat, _nextLevel);
+                _message.Text = string.Format(
+                    CultureInfo.InvariantCulture,
+                    SuccessMessageFormat,
+                    _nextLevel,
+                    Campaign.DifficultyForLevel(_nextLevel));
                 _primary.Text = PlayNowButton;
                 _secondary.Text = LaterButton;
                 SetButtonsEnabled(enabled: true);

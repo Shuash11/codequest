@@ -1,4 +1,5 @@
-// The rival level-naming fix: a leftover Draft on the next number is replaced.
+// The rival level naming: the next number, its ladder difficulty and the
+// replacement of a leftover Draft that occupies the number.
 
 using CodeQuest.Data;
 using CodeQuest.Data.Repositories;
@@ -68,11 +69,11 @@ public class CampaignLevelServiceTests : IDisposable
         Assert.Equal(26, Campaign.NextLevelNumber(_quizzes.GetAll(), topicId));
         Assert.True(_quizzes.ExistsByTitle(topicId, "Level 26", ignoreQuizId: aiDraftId));
 
-        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId, Difficulty.Insane);
+        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId);
 
         Assert.True(named);
 
-        // Exactly one "Level 26" — the AI draft — approved at the rival tier.
+        // Exactly one "Level 26" — the AI draft — approved at the ladder tier.
         IReadOnlyList<Quiz> topicQuizzes = _quizzes.GetByTopic(topicId);
         Assert.Equal(2, topicQuizzes.Count);
         Quiz level26 = Assert.Single(topicQuizzes, quiz => quiz.Title == "Level 26");
@@ -103,18 +104,43 @@ public class CampaignLevelServiceTests : IDisposable
         InsertQuiz(topicId, "Level 1", Difficulty.Easy, QuizStatus.Approved);
         int aiDraftId = InsertQuiz(topicId, "Level 2", Difficulty.Medium, QuizStatus.Draft, questionCount: 1);
 
-        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId, Difficulty.Insane);
+        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId);
 
         Assert.True(named);
         IReadOnlyList<Quiz> topicQuizzes = _quizzes.GetByTopic(topicId);
         Quiz level2 = Assert.Single(topicQuizzes, quiz => quiz.Title == "Level 2");
         Assert.Equal(aiDraftId, level2.QuizId);
         Assert.Equal(QuizStatus.Approved, level2.Status);
+        Assert.Equal(Difficulty.Easy, level2.Difficulty); // the ladder tier of Level 2
         Assert.Equal(2, topicQuizzes.Count);
     }
 
     // -------------------------------------------------------------------------
-    // 3. The guarded helper itself: the belt-and-braces delete never touches an
+    // 3. The difficulty follows the ladder, not a fixed tier: with Levels 1-5
+    //    in place, the rival's next level is 6 — Medium, even though the
+    //    generation request asked for Insane content.
+    // -------------------------------------------------------------------------
+    [Fact]
+    public void NameAndApproveNextLevel_StampsTheLadderDifficultyOfTheNextNumber()
+    {
+        int topicId = InsertCampaignTopic();
+        for (int level = 1; level <= 5; level++)
+        {
+            InsertQuiz(topicId, $"Level {level}", Difficulty.Easy, QuizStatus.Approved);
+        }
+
+        int aiDraftId = InsertQuiz(topicId, "AI authored title", Difficulty.Insane, QuizStatus.Draft, questionCount: 1);
+
+        bool named = _levels.NameAndApproveNextLevel(aiDraftId, topicId);
+
+        Assert.True(named);
+        Quiz level6 = Assert.Single(_quizzes.GetByTopic(topicId), quiz => quiz.Title == "Level 6");
+        Assert.Equal(Difficulty.Medium, level6.Difficulty);
+        Assert.Equal(QuizStatus.Approved, level6.Status);
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. The guarded helper itself: the belt-and-braces delete never touches an
     //    approved quiz and never reaches another topic; only the exact-title
     //    Draft of the given topic is removed.
     // -------------------------------------------------------------------------

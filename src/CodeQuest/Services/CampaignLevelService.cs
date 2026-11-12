@@ -15,9 +15,10 @@ public sealed class CampaignLevelService
         _quizzes = quizzes;
     }
 
-    // Titles the just-inserted quiz as the next level of one campaign topic
-    // and approves it; returns false when the quiz no longer exists.
-    public bool NameAndApproveNextLevel(int quizId, int topicId, Difficulty difficulty)
+    // Titles the just-inserted quiz as the next level of one campaign topic,
+    // stamps the difficulty the ladder prescribes for that number and
+    // approves it; returns false when the quiz no longer exists.
+    public bool NameAndApproveNextLevel(int quizId, int topicId)
     {
         // The just-inserted draft is excluded from the scan, so an AI title
         // like "Level 26" can never push the next number past the real one.
@@ -39,7 +40,7 @@ public sealed class CampaignLevelService
         }
 
         quiz.Title = title;
-        quiz.Difficulty = difficulty;
+        quiz.Difficulty = Campaign.DifficultyForLevel(nextLevel); // Easy..Insane by the level ladder
         quiz.Status = QuizStatus.Approved;
         _quizzes.Update(quiz);
         return true;

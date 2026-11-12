@@ -9,6 +9,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!-- Repository version: the release the app reports in its update check. Bump on every release (docs/release-process.md). -->
@@ -25,7 +26,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Assets\FluentSystemIcons-Regular.ttf" />
     <EmbeddedResource Include="Assets\Sprites\*.png" />
-    <!-- The campaign script ships INSIDE the exe: the installed app has no database/ folder, and the startup migration replays it to guarantee the 25 levels. -->
+    <EmbeddedResource Include="Assets\app.ico" />
+    <!-- The campaign script ships INSIDE the exe: the installed app has no database/ folder, and the startup migration replays it to guarantee the built-in campaign (the Campaign topic and Level 1). -->
     <EmbeddedResource Include="..\..\database\campaign.sql" Link="Database\campaign.sql" />
   </ItemGroup>
 

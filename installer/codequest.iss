@@ -20,6 +20,7 @@ DefaultDirName={userpf}\CodeQuest
 DirExistsWarning=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
+SetupIconFile=..\src\CodeQuest\Assets\app.ico
 OutputDir=.
 OutputBaseFilename=CodeQuest-Setup-{#AppVersion}
 Compression=lzma2/max

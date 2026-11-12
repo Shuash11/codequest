@@ -48,6 +48,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
     private Label _mixTitle = null!;
     private Label _mixCaption = null!;
     private FlatButton _mixPlay = null!;
+    private Label _campaignCaption = null!;
     private Label _questionBadge = null!;
     private Label _questionTopic = null!;
     private Label _feedbackGlyph = null!;
@@ -219,6 +220,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         _runView = BuildRunView();
         _resultView = BuildResultView();
         _mixBanner = BuildMixBanner();
+        _campaignCaption = BuildCampaignCaption();
 
         Controls.Add(_cardFlow);
         Controls.Add(_runView);
@@ -230,6 +232,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             if (sender is FlowLayoutPanel flow && flow.FindAncestor<QuizTakeForm>() is { } form)
             {
                 form.SyncMixBannerWidth();
+                form.SyncCampaignCaptionWidth();
             }
         };
 
@@ -316,11 +319,58 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             _cardFlow.Controls.Add(card);
         }
 
+        // The campaign intro line: only while the campaign holds exactly its
+        // single built-in level — from then on the AI generates the next one.
+        if (CountCampaignLevels(quizzes) == 1)
+        {
+            SyncCampaignCaptionWidth();
+            _cardFlow.Controls.Add(_campaignCaption);
+        }
+
         _cardFlow.ResumeLayout();
 
         bool empty = quizzes.Count == 0;
         _emptyView.Visible = empty;
         _cardFlow.Visible = !empty;
+    }
+
+    private int CountCampaignLevels(IReadOnlyList<Quiz> quizzes)
+    {
+        int count = 0;
+        foreach (Quiz quiz in quizzes)
+        {
+            if (_topicNames.TryGetValue(quiz.TopicId, out string? topicName)
+                && string.Equals(topicName, Campaign.TopicName, StringComparison.Ordinal)
+                && Campaign.IsLevelTitle(quiz.Title))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private Label BuildCampaignCaption()
+    {
+        return new Label
+        {
+            Name = "CampaignCaption",
+            Text = "Complete the level and the AI generates the next one.",
+            Font = UITheme.Caption,
+            ForeColor = UITheme.TextSecondary,
+            BackColor = UITheme.Background,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Size = new Size(UITheme.Scaled(this, 400), UITheme.Scaled(this, 18)),
+            Margin = new Padding(0, 0, UITheme.Scaled(this, UITheme.Spacing16), UITheme.Scaled(this, UITheme.Spacing8)),
+        };
+    }
+
+    private void SyncCampaignCaptionWidth()
+    {
+        _campaignCaption.Width = Math.Max(
+            UITheme.Scaled(this, 200),
+            _cardFlow.ClientSize.Width - UITheme.Scaled(this, UITheme.Spacing16));
     }
 
     private Panel BuildMixBanner()
@@ -1589,7 +1639,7 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
                 // The AI authors the content; the app keeps the campaign
                 // numbering consistent (a stale draft on the number is
                 // replaced) and marks the level ready to play.
-                if (_campaignLevels.NameAndApproveNextLevel(quizId, campaign.TopicId, difficulty))
+                if (_campaignLevels.NameAndApproveNextLevel(quizId, campaign.TopicId))
                 {
                     return quizId;
                 }

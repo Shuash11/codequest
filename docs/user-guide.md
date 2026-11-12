@@ -31,10 +31,11 @@ behave identically.
 ## 2. Take a quiz (offline-capable)
 
 1. In "Take quiz", the list shows the approved quizzes with Title, Topic,
-   Difficulty, Questions, and an Approved badge. On a fresh install the list
-   holds the 25 built-in campaign levels — Level 1 (Easy) through Level 25
-   (Insane), five questions each. A hint under the list reads "Enter activates
-   a focused row action."
+   Difficulty, Questions, and an Approved badge. On a fresh install the
+   campaign holds one level — Level 1 (Easy), five questions; every next
+   level is written by the AI once you clear the current highest (a caption
+   under the card says so). A hint under the list reads "Enter activates a
+   focused row action."
 2. Press "Start" on **Level 1** (or click the row's action).
    - **Expected:** the run header shows the quiz title and "Question 1 of 5";
      an 8px progress track; the question card with four choice rows.
@@ -59,13 +60,16 @@ feedback line; **Previous** / **Next** still work and simply cancel the
 pending advance.
 
 **The AI rival (campaign levels only):** completing the *current highest*
-campaign level (Level 25 on a fresh install, then each generated one) opens
+campaign level (Level 1 on a fresh install, then each generated one) opens
 the dialog "The AI strikes back" — accept and the AI writes Level N+1
-(Insane) through the same provider chain as "Generate quiz", approved
+through the same provider chain as "Generate quiz", at the difficulty the
+campaign ladder prescribes for that number (Easy through Level 5, Medium
+through Level 12, Hard through Level 19, Insane from Level 20), approved
 immediately and joined to the campaign list, and offers **Play now**;
 decline or lose the connection and nothing changes (a failed generation
-offers **Try again**). Closing the dialog while the AI is still writing does
-not stop it: the level may still finish and join the campaign list.
+offers **Try again**). The close box stays disabled while the AI writes;
+after a success, declining simply leaves the finished level waiting in the
+list.
 
 Mid-quiz, click another sidebar item (for example History): the confirm
 dialog "Leave this quiz? / Your answers so far will be discarded." appears —
