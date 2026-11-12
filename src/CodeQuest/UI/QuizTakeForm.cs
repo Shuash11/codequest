@@ -168,9 +168,18 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
         {
             if (sender is Panel view)
             {
+                int cardWidth = UITheme.ResponsiveWidth(view);
                 foreach (Control child in view.Controls)
                 {
-                    child.Left = Math.Max((view.Width - child.Width) / 2, 0);
+                    child.Width = cardWidth;
+                    child.Left = Math.Max((view.Width - cardWidth) / 2, 0);
+                    foreach (Control inner in child.Controls)
+                    {
+                        if (inner is not FlatButton)
+                        {
+                            inner.Width = Math.Max(cardWidth - UITheme.Scaled(view, UITheme.Spacing32), 1);
+                        }
+                    }
                 }
             }
         };
