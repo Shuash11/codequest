@@ -123,6 +123,16 @@ public sealed class HistoryForm : ModulePanel
             Visible = false,
             BackColor = UITheme.Background,
         };
+        _emptyView.Resize += static (sender, e) =>
+        {
+            if (sender is Panel view)
+            {
+                foreach (Control child in view.Controls)
+                {
+                    child.Left = Math.Max((view.Width - child.Width) / 2, 0);
+                }
+            }
+        };
 
         Controls.Add(_search);
         Controls.Add(_topicFilter);
@@ -348,8 +358,7 @@ public sealed class HistoryForm : ModulePanel
             Size = new Size(UITheme.Scaled(this, 460), UITheme.Scaled(this, 140)),
             Anchor = AnchorStyles.Top | AnchorStyles.Left,
             Location = new Point(Math.Max((Width - UITheme.Scaled(this, 460)) / 2, 0), 0),
-        };
-        var title = new Label
+        };        var title = new Label
         {
             Name = "HistoryEmptyTitle",
             Text = state == EmptyState.AllEmpty ? EmptyTitle : NoMatchTitle,

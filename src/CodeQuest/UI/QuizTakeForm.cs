@@ -164,11 +164,22 @@ public sealed class QuizTakeForm : ModulePanel, ILeaveGuard
             Visible = false,
             BackColor = UITheme.Background,
         };
+        _emptyView.Resize += static (sender, e) =>
+        {
+            if (sender is Panel view)
+            {
+                foreach (Control child in view.Controls)
+                {
+                    child.Left = Math.Max((view.Width - child.Width) / 2, 0);
+                }
+            }
+        };
         var emptyCard = new CardPanel
         {
             Name = "TakeQuizEmptyCard",
             Size = new Size(UITheme.Scaled(this, 480), UITheme.Scaled(this, 130)),
             Anchor = AnchorStyles.Top | AnchorStyles.Left,
+            Location = new Point(Math.Max((_emptyView.Width - UITheme.Scaled(this, 480)) / 2, 0), 0),
         };
         var emptyTitle = new Label
         {
